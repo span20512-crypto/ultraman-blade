@@ -296,6 +296,8 @@ class Fighter {
   airLogic(opp) {
     const p = this.pad;
     if (!this.move) {
+      // 空中必杀(忍者空投): 有 airspecial 定义且可用 -> 空中苦无; 否则常规
+      if (p.special && this.c.moves.airspecial && this.specialReady()) return this.startMove('airspecial');
       if (p.heavy) return this.startMove('dive');
       if (p.light) return this.startMove('air');
     }
@@ -342,7 +344,8 @@ class Fighter {
       if (p.super && this.superReady()) return this.startMove('super');
       if (p.special && this.specialReady()) return this.startMove('special');
       if (p.heavy) return this.startMove('heavy');
-      if (p.light) return this.startMove('light');
+      // dash+J: 有 dashslash 定义 -> 专属冲刺斩(奔り斬, 忍者突进); 否则常规轻击
+      if (p.light) return this.startMove(this.c.moves.dashslash ? 'dashslash' : 'light');
     }
     if (this.dashT >= 20) { this.state = 'idle'; this.vx = 0; }
   }

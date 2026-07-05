@@ -310,7 +310,7 @@ const Effects = {
       flip: fighter.facing !== c.native, mirrorX: fighter.x,
       edge, t: 0, tPhases, decayEnd: tPhases + decay, echo,
       gale: sdef.gale || 0, // 必杀刃风: 放大 additive 重影 (1.06 = +6%)
-      mirror: !!sdef.mirror, bankCx, bankCy, owner: fighter,
+      mirror: !!sdef.mirror, flipY: !!sdef.flipY, bankCx, bankCy, owner: fighter,
       standalone: phaseImgs, ox: sdef.dx || 0, oy: sdef.dy || 0,
       squashY: sdef.squashY || 1, scale: sdef.scale || 1,
       rot: sdef.rot || 0, wipe: sdef.wipe || 0, // wipe: 前 N tick 沿刀路渐进擦入
@@ -721,6 +721,10 @@ const Effects = {
       if (s.mirror) { // 回手招: 动效与基底重染同步, 绕月牙质心镜像
         const cx = dx + s.ox + s.bankCx * (s.dw / s.fs);
         ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0);
+      }
+      if (s.flipY) { // 上挑招: 垂直翻转月牙(下劈笔迹→上挑), 绕月牙质心Y, 物理正确
+        const cyf = dy + s.oy + s.bankCy * (s.dh / s.fs);
+        ctx.translate(0, cyf); ctx.scale(1, -1); ctx.translate(0, -cyf);
       }
       // 统一几何: standalone 的下沉/挤压/缩放对所有层生效(基底+闪白+余波+刃风),
       // 绕月牙质心锚定, 质心位置不动; 非 standalone 时退化为原始 dx/dy/dw/dh

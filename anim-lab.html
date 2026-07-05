@@ -78,6 +78,8 @@ const SEQS = [
   { key: 'airJ',  label: '空中J',       chain: ['light'], air: true },
   { key: 'dive',  label: '空中K 下砸',  chain: ['heavy'], air: true },
   { key: 'U',     label: 'U 必杀',      chain: ['special'] },
+  { key: 'airU',  label: '空中U 空苦无(剑二)', chain: ['special'], air: true },
+  { key: 'dashJ', label: '冲刺J 疾駆斬(剑二)', chain: ['light'], dash: true },
   { key: 'I',     label: 'I 超必杀·終A 桜吹雪', chain: ['super'], finisher: 'A' },
   { key: 'IB',    label: 'I 超必杀·終B 月輪爆', chain: ['super'], finisher: 'B' },
   { key: 'IC',    label: 'I 超必杀·終C 斬鉄十字', chain: ['super'], finisher: 'C' },
@@ -186,6 +188,12 @@ function scriptPad(seq) {
   if (seq.hold === 'crouch') p.crouch = true;
   if (phase !== 'run') return p;
   if (seq.air && !airPressed && A.state === 'idle') { p.jump = true; airPressed = true; return p; }
+  // dash 型招式(疾駆斬): 先触发冲刺, 待 dash 进行几 tick 后再按攻击
+  if (seq.dash) {
+    if (A.state === 'idle' && chainIdx === 0) { p.dashR = true; return p; }
+    if (A.state === 'dash' && A.dashT > 5 && chainIdx === 0) { p.light = true; chainIdx++; return p; }
+    return p;
+  }
   pressCd--;
   const readyGround = chainIdx === 0 ? A.state === 'idle' || A.state === 'crouch' : (A.move && A.move.contact);
   const readyAir = !A.grounded && A.vy > -9 && !A.move; // press on the way up/apex
