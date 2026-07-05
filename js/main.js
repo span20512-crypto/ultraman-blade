@@ -194,16 +194,26 @@ function tryHit(a, b, boxA, moveA) {
     Effects.spark(px, py, a.facing, ['#35b9e0', '#8ad8ff', '#ffffff'], 8, 4);
     G.hitstop(4);
   } else if (res === 'crush') {
-    Effects.spark(px, py, a.facing, ['#ffc531', '#ffe27a', '#ffffff'], 20, 8);
+    Effects.impact(px, py, a.facing, { tier: 3, color: a.c.theme2 || '#ffc531' });
     G.hitstop(12);
     G.shake(7, 12);
   } else {
-    Effects.spark(px, py, a.facing, ['#ffe27a', '#ff7a3d', '#ffffff'], 12, d.kind === 'light' ? 5 : 8);
+    // 月华式星爆: tier 按招式威力分级(轻1/重2/必杀·超3), 在 hitstop 冻结中演完
+    Effects.impact(px, py, a.facing, {
+      tier: d.kind === 'light' ? 1 : d.kind === 'heavy' ? 2 : 3,
+      color: a.c.theme2 || '#ffc531',
+    });
     G.hitstop(d.hitstop || 5);
     if (d.shake) G.shake(d.shake, 8);
+    // 重击命中: 受击者脚下扬尘(冲击传到地面的重量感)
+    if (d.kind === 'heavy' && res === 'hit' && b.grounded) Effects.dust(b.x, b.y, 8, a.facing);
+    // 必杀命中: 冲击环 + 冻结解除后 14 tick 半速 slowmo 收尾(刀劲的余韵)
+    if (d.kind === 'special' && res === 'hit') {
+      Effects.shockRing(px, py, a.c.theme2 || '#ffc531');
+      G.slowmoT = 14; G.slowmo = 0.5; G.slowAcc = 0;
+    }
     if (finisher && res === 'hit') {
       Effects.text(px, py - 46, 'BONUS!', '#ffc531', 14);
-      Effects.spark(px, py, a.facing, ['#ffc531', '#ffffff'], 8, 7);
       G.hitstop(3);
     }
     // cine only if the attacker wasn't themselves interrupted this tick
@@ -513,6 +523,12 @@ function drawFight() {
   ctx.drawImage(UI.bgCanvas(G), 0, 0);
   ctx.fillStyle = 'rgba(7,8,12,0.22)';
   ctx.fillRect(0, 0, 1024, 576);
+
+  // 超杀演出: 背景压暗, 舞台让位给角色(月华式屏幕接管)
+  if (G.fighters.some(f => f.superSeq)) {
+    ctx.fillStyle = 'rgba(10,6,20,0.52)';
+    ctx.fillRect(0, 0, 1024, 576);
+  }
 
   Effects.drawGhosts(ctx);
 

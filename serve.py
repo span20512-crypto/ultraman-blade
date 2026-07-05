@@ -3,8 +3,10 @@
 so the browser always loads the latest code after edits."""
 import http.server
 import socketserver
+import sys
 
-PORT = 8787
+# 默认 8787; worktree 并行开发时传端口参数错开: python3 serve.py 8788
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8787
 
 
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):

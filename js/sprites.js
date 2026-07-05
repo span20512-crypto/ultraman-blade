@@ -3,6 +3,9 @@
 
 const Assets = {
   images: {},
+  smears: {},     // `${cid}:${aname}` -> { frameIdx: { edge, core } } 画师月牙剥离层
+  _tintCache: new Map(),
+
   load() {
     const list = [
       ['bg', 'assets/img/background.png'],
@@ -19,9 +22,123 @@ const Assets = {
       img.onload = () => { Assets.images[key] = img; res(); };
       img.onerror = () => rej(new Error('failed to load ' + src));
       img.src = src;
-    })));
+    }))).then(() => Assets.bakeSmears());
   },
   img(key) { return Assets.images[key]; },
+
+  /* 月牙提取: 素材作者把刀光 smear 直接画进了攻击帧(近纯白像素), 且部分帧
+     月牙压在身体前面 —— 因此绝不能从原图上擦除(会把身体咬穿, 踩过坑),
+     只提取月牙层供"帧同步重染覆盖"用: 角色绘制时把当前帧的月牙实时染成
+     招式主题色, 盖在原图之上。对齐由构造保证: 同一批像素、同一变换。 */
+  bakeSmears() {
+    for (const cid of Object.keys(DATA)) {
+      const c = DATA[cid];
+      for (const [aname, a] of Object.entries(c.anims)) {
+        if (!a.smearFrames || !a.smearFrames.length) continue;
+        const img = Assets.images[`${cid}:${aname}`];
+        if (!img) continue;
+        const W = img.width, H = img.height;
+        const cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        const gc = cv.getContext('2d');
+        gc.drawImage(img, 0, 0);
+        const px = gc.getImageData(0, 0, W, H).data;
+        const bank = {};
+        for (const f of a.smearFrames) {
+          const comp = Assets._crescentMask(px, W, f * 200, Math.min((f + 1) * 200, W), H);
+          if (!comp || comp.count < 60) continue; // 太小视为无月牙,走旧 fx 兜底
+          const edge = document.createElement('canvas');
+          edge.width = 200; edge.height = 200;
+          const ed = edge.getContext('2d').createImageData(200, 200);
+          for (let i = 0; i < comp.mask.length; i++) {
+            if (!comp.mask[i]) continue;
+            const lx = i % 200, ly = (i / 200) | 0;
+            const si = (ly * W + f * 200 + lx) * 4;
+            const di = i * 4;
+            ed.data[di] = px[si]; ed.data[di + 1] = px[si + 1];
+            ed.data[di + 2] = px[si + 2]; ed.data[di + 3] = px[si + 3];
+          }
+          edge.getContext('2d').putImageData(ed, 0, 0);
+          // 两档内芯腐蚀: rim=2 细色边(轻·快), rim=4 厚色边(重·豪)
+          bank[f] = { edge, core2: Assets._erode(edge, 2), core4: Assets._erode(edge, 4) };
+        }
+        if (Object.keys(bank).length) Assets.smears[`${cid}:${aname}`] = bank;
+      }
+    }
+  },
+
+  /* 帧内近纯白掩码的最大 4-连通域(排除刀身/衣物上的零散白点) */
+  _crescentMask(px, W, x0, x1, H) {
+    const w = x1 - x0;
+    const isW = new Uint8Array(w * H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * W + x0 + x) * 4;
+        if (px[i] >= 240 && px[i + 1] >= 240 && px[i + 2] >= 235 && px[i + 3] >= 200) isW[y * w + x] = 1;
+      }
+    }
+    const lab = new Int32Array(w * H);
+    let best = null, cur = 0;
+    const qx = new Int32Array(w * H), qy = new Int32Array(w * H);
+    for (let sy = 0; sy < H; sy++) for (let sx = 0; sx < w; sx++) {
+      const si = sy * w + sx;
+      if (!isW[si] || lab[si]) continue;
+      cur++; let head = 0, tail = 0, count = 0;
+      qx[tail] = sx; qy[tail++] = sy; lab[si] = cur;
+      const members = [];
+      while (head < tail) {
+        const x = qx[head], y = qy[head++]; count++;
+        members.push(y * w + x);
+        if (x > 0 && isW[y * w + x - 1] && !lab[y * w + x - 1]) { lab[y * w + x - 1] = cur; qx[tail] = x - 1; qy[tail++] = y; }
+        if (x < w - 1 && isW[y * w + x + 1] && !lab[y * w + x + 1]) { lab[y * w + x + 1] = cur; qx[tail] = x + 1; qy[tail++] = y; }
+        if (y > 0 && isW[(y - 1) * w + x] && !lab[(y - 1) * w + x]) { lab[(y - 1) * w + x] = cur; qx[tail] = x; qy[tail++] = y - 1; }
+        if (y < H - 1 && isW[(y + 1) * w + x] && !lab[(y + 1) * w + x]) { lab[(y + 1) * w + x] = cur; qx[tail] = x; qy[tail++] = y + 1; }
+      }
+      if (!best || count > best.count) best = { count, members };
+    }
+    if (!best) return null;
+    const mask = new Uint8Array(w * H);
+    for (const m of best.members) mask[m] = 1;
+    return { mask, count: best.count };
+  },
+
+  /* 腐蚀 n 圈得到内芯层(smear 双色: 边缘主题色 + 灼亮内芯) */
+  _erode(canvas, n) {
+    const g = canvas.getContext('2d');
+    let a = g.getImageData(0, 0, 200, 200).data.slice();
+    for (let it = 0; it < n; it++) {
+      const b = a.slice();
+      for (let y = 1; y < 199; y++) for (let x = 1; x < 199; x++) {
+        const i = (y * 200 + x) * 4 + 3;
+        if (a[i] && (!a[i - 4] || !a[i + 4] || !a[i - 800] || !a[i + 800])) b[i] = 0;
+      }
+      a = b;
+    }
+    const out = document.createElement('canvas');
+    out.width = 200; out.height = 200;
+    const od = out.getContext('2d').createImageData(200, 200);
+    od.data.set(a);
+    out.getContext('2d').putImageData(od, 0, 0);
+    return out;
+  },
+
+  /* 重染缓存: 白月牙 -> 招式主题色(source-in 保 alpha, 剪影不变) */
+  tinted(key, f, layer, color) {
+    const ck = `${key}:${f}:${layer}:${color}`;
+    let cv = Assets._tintCache.get(ck);
+    if (cv) return cv;
+    const bank = Assets.smears[key];
+    if (!bank || !bank[f]) return null;
+    cv = document.createElement('canvas');
+    cv.width = 200; cv.height = 200;
+    const g = cv.getContext('2d');
+    g.drawImage(bank[f][layer], 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, 200, 200);
+    Assets._tintCache.set(ck, cv);
+    return cv;
+  },
 };
 
 /* Procedural 和风 stage: painted pixel-by-pixel at 256x144 with a seeded RNG,
@@ -115,9 +232,118 @@ const Stage = {
 };
 
 const Effects = {
-  parts: [], texts: [], ghosts: [], slashes: [],
+  parts: [], texts: [], ghosts: [], slashes: [], smears: [], impacts: [], shocks: [], flashes: [], pillars: [], crossCuts: [],
 
-  reset() { this.parts = []; this.texts = []; this.ghosts = []; this.slashes = []; },
+  reset() {
+    this.parts = []; this.texts = []; this.ghosts = []; this.slashes = [];
+    this.smears = []; this.impacts = []; this.shocks = []; this.flashes = [];
+    this.pillars = []; this.crossCuts = [];
+  },
+
+  /* 月华式 smear 动效层: 基底重染由 fighter.draw 帧同步覆盖完成(见
+     fighter.drawSmearOverlay), 这里只负责 additive 动效 —— 出刀闪白(首2tick)
+     / 刃风 gale(招内) / 收势余波 echo(偏移残影)。世界坐标在出招瞬间快照,
+     attach 时跟随角色。 */
+  /* animKey: 演出期(superSeq)move 已置空, 由调用方指明当前攻击表 */
+  smearFx(fighter, sdef, animKey) {
+    const key = `${fighter.c.id}:${animKey || fighter.move.def.anim}`;
+    const bank = Assets.smears[key];
+    if (!bank) return false;
+    // 动效用月牙主帧(最大的那帧)做画笔
+    const frames = Object.keys(bank).map(Number).sort((a, b) => a - b);
+    const edge = Assets.tinted(key, frames[0], 'edge', sdef.edge);
+    if (!edge) return false;
+    // 变换显式按攻击表计算(不用 spriteParams 瞬时状态 —— 出生 tick 时
+    // anim 可能还停在 seq 引用的蹲姿帧, 会丢 yOff)
+    const c = fighter.c, sc = c.scale;
+    const yOff = (fighter.move && fighter.move.def.yOff) || 0;
+    const tPhases = sdef.phases.reduce((s, x) => s + x.t, 0);
+    const decay = sdef.decay !== undefined ? sdef.decay : 2;
+    const echo = sdef.echo || null;
+    this.smears.push({
+      dx: fighter.x - c.anchor.x * sc, dy: fighter.y - c.anchor.y * sc + yOff,
+      dw: 200 * sc, dh: 200 * sc,
+      flip: fighter.facing !== c.native, mirrorX: fighter.x,
+      edge, t: 0, tPhases, decayEnd: tPhases + decay, echo,
+      gale: sdef.gale || 0, // 必杀刃风: 放大 additive 重影 (1.06 = +6%)
+      mirror: !!sdef.mirror,
+      f: sdef.attach ? fighter : null, x0: fighter.x, y0: fighter.y,
+      total: tPhases + decay + (echo ? echo.t : 0),
+    });
+    return true;
+  },
+
+  /* 必杀命中冲击环: 三档量化扩张的像素八角环(贴地椭圆)。delay 为延后起爆 tick */
+  shockRing(x, y, color, delay = 0) {
+    this.shocks.push({ x: Math.round(x / 2) * 2, y: Math.round(y / 2) * 2, color, t: -delay });
+  },
+
+  /* 光柱: 爆心冲天的立柱(白芯+主题色包边), 三档收窄 —— 月輪爆的骨架 */
+  pillar(x, baseY, color) {
+    this.pillars.push({ x: Math.round(x / 2) * 2, baseY, color, t: 0 });
+  },
+
+  /* 斬鉄十字: 两道放大的画师月牙旋转成 X 交叉斩, 燃烧后碎成花瓣 */
+  crossCut(x, y, key, frame, color) {
+    const img = Assets.tinted(key, frame, 'edge', color);
+    const hot = Assets.tinted(key, frame, 'edge', '#ff5a3d');
+    if (!img) return;
+    this.crossCuts.push({ x, y, img, hot, t: 0, burst: false });
+  },
+
+  /* 超杀终结三变体(纯视觉, 伤害/时序不变):
+     A 桜吹雪·衝 — 花瓣放射爆发 + 双冲击环 + 粉色余光
+     B 月輪·爆   — 聚爆内吸 -> 三环连爆 + 冲天光柱, 花瓣作余韵飘落
+     C 斬鉄·十字 — 巨型月牙 X 交叉斩, 燃烧后碎成花瓣 */
+  superFinale(variant, x, y, f) {
+    const th = f.c.theme, th2 = f.c.theme2;
+    if (variant === 'B') {
+      this.converge(x, y - 90, [th, th2, '#ffffff'], 16, 110);
+      this.shockRing(x, y - 60, th2, 0);
+      this.shockRing(x, y - 60, '#ffffff', 3);
+      this.shockRing(x, y - 60, th, 6);
+      this.pillar(x, y, th2);
+      this.petals(x, y - 40, 18);
+    } else if (variant === 'C') {
+      const key = `${f.c.id}:attack1`;
+      const bank = Assets.smears[key];
+      if (bank) {
+        const fr = Object.keys(bank).map(Number).sort((a, b) => a - b)[0];
+        this.crossCut(x, y - 100, key, fr, th2);
+      }
+      this.flashes.push({ color: th, alpha: 0.2, t: 5, t0: 5 });
+      this.petalBurst(x, y - 90, 22);
+    } else { // 'A' 桜吹雪·衝
+      this.petalBurst(x, y - 80, 40);
+      this.shockRing(x, y - 60, th2, 0);
+      this.shockRing(x, y - 60, '#ffb7c9', 3);
+      this.flashes.push({ color: '#ffb7c9', alpha: 0.18, t: 6, t0: 6 });
+    }
+  },
+
+  /* 全屏白闪帧(超杀斩击的过曝一瞬), 阶梯衰减 */
+  flashFrame(o = {}) {
+    this.flashes.push({ color: o.color || '#ffffff', alpha: o.alpha || 0.3, t: o.t || 2, t0: o.t || 2 });
+  },
+
+  /* 月华式命中星爆: 三阶段 —— 白闪光球(0-2) -> 锯齿星芒(2-7) -> 碎星/喷溅。
+     hitstop 冻结中以 0.35 倍速演完, 重量感来自这里。
+     tier 1轻/2重/3必杀/4超杀终结 —— 碎星数量·尺寸、喷溅长条、细长线芒
+     全部按档位递进, 层级感的主要来源。 */
+  impact(x, y, dir, o = {}) {
+    const tier = o.tier || 1;
+    const r = o.r || [22, 34, 42, 50][tier - 1];
+    const jag = [];
+    for (let i = 0; i < 8; i++) jag.push(0.75 + Math.random() * 0.5); // 每根星芒长度抖动
+    this.impacts.push({
+      x: Math.round(x / 2) * 2, y: Math.round(y / 2) * 2, dir, r, tier,
+      color: o.color || '#ffc531', t: 0,
+      rot: Math.random() * Math.PI / 4, jag, shardsDone: false,
+      // 细长线芒(tier3+): 命中一瞬向四周射出的 1-2px 长线, 抖出"锐"感
+      rays: [0, 0, 7, 11][tier - 1],
+      rayA: Math.random() * Math.PI,
+    });
+  },
 
   /* 程序化刀光: 像素方块沿月牙弧铺开。前缘在生命前段扫过(sweep), 之后整体
      渐隐; 半径随时间微扩。角度约定: 0=正前, -PI/2=正上, dir 翻转左右。
@@ -156,16 +382,34 @@ const Effects = {
     }
   },
 
-  /* 花瓣: 粉白小片, 缓慢左右摇摆着飘落 (隼人超杀终结余韵) */
+  /* 花瓣: 粉白花瓣片, 4 向翻转姿态轮换(翻滚感), 左右摇摆着飘落。
+     petal:true 的粒子走专属绘制(不是方块) */
   petals(x, y, n = 14) {
     for (let i = 0; i < n; i++) {
       this.parts.push({
         x: x + (Math.random() - 0.5) * 190, y: y - Math.random() * 140,
         vx: (Math.random() - 0.5) * 0.4, vy: 0.45 + Math.random() * 0.7,
         life: 52 + Math.random() * 38, maxLife: 90,
-        size: 3 + (Math.random() < 0.35 ? 1 : 0),
-        color: Math.random() < 0.6 ? '#ffd9df' : '#fff3ee',
+        size: 3, petal: true,
+        color: Math.random() < 0.6 ? '#ffb7c9' : '#ffd9df',
         grav: 0, sway: 0.9 + Math.random() * 0.6, ph: Math.random() * 6.28,
+      });
+    }
+  },
+
+  /* 花瓣爆发: 从爆心呈放射状炸开的花瓣(快慢两波), 冲出去再飘落 —— 桜吹雪 */
+  petalBurst(x, y, n = 36) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const fast = i < n * 0.45;
+      const sp = fast ? 7 + Math.random() * 5 : 2.5 + Math.random() * 3;
+      this.parts.push({
+        x, y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.8 - 1.5,
+        life: 40 + Math.random() * 36, maxLife: 76,
+        size: 3, petal: true,
+        color: fast ? '#ffd9df' : (Math.random() < 0.5 ? '#ffb7c9' : '#fff3ee'),
+        grav: 0.08, drag: 0.93, sway: 0.7 + Math.random() * 0.6, ph: Math.random() * 6.28,
       });
     }
   },
@@ -238,6 +482,7 @@ const Effects = {
     for (const p of this.parts) {
       p.x += p.vx * rate; p.y += p.vy * rate;
       if (p.sway) p.x += Math.sin((p.maxLife - p.life) * 0.11 + p.ph) * p.sway * rate;
+      if (p.drag) { p.vx *= p.drag; p.vy *= p.drag; } // 爆发花瓣: 冲出去减速再飘
       p.vy += p.grav * rate; p.life -= rate;
     }
     this.parts = this.parts.filter(p => p.life > 0);
@@ -249,6 +494,73 @@ const Effects = {
       s.x += s.vx * s.dir * rate; s.y += s.rise * rate; s.life -= rate;
     }
     this.slashes = this.slashes.filter(s => s.life > 0);
+    for (const s of this.smears) s.t += rate;
+    this.smears = this.smears.filter(s => s.t < s.total);
+    for (const im of this.impacts) {
+      im.t += rate;
+      // 第三阶段入口: 一次性迸出碎星+喷溅, 数量/尺寸/速度按 tier 递进
+      if (!im.shardsDone && im.t >= 6.5) {
+        im.shardsDone = true;
+        const nShard = [6, 14, 24, 34][im.tier - 1];
+        const nStreak = [0, 4, 7, 12][im.tier - 1];
+        const pow = [1, 1.4, 1.8, 2.2][im.tier - 1];
+        for (let i = 0; i < nShard; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const sp = (2 + Math.random() * (im.r / 6)) * pow;
+          // 碎星: tier2+ 混入 4-6px 大块星屑(带更强重力, 坠得快)
+          const big = im.tier >= 2 && Math.random() < 0.3;
+          this.parts.push({
+            x: im.x, y: im.y,
+            vx: Math.cos(a) * sp + im.dir * (2 + im.r / 12),
+            vy: Math.sin(a) * sp * 0.8 - 1.6 * pow,
+            life: 10 + Math.random() * 10, maxLife: 20,
+            size: big ? 4 + Math.floor(Math.random() * 3) : 2 + Math.floor(Math.random() * 2),
+            color: Math.random() < 0.5 ? '#ffffff' : im.color,
+            grav: big ? 0.34 : 0.2,
+          });
+        }
+        // 喷溅: 沿挥砍方向 ±35° 的长条速度线(parts 的 w/h 长条粒子)
+        for (let i = 0; i < nStreak; i++) {
+          const a = (Math.random() - 0.5) * 1.2;
+          const sp = (5 + Math.random() * 5) * pow;
+          this.parts.push({
+            x: im.x, y: im.y - 4 + Math.random() * 8,
+            vx: Math.cos(a) * sp * im.dir, vy: Math.sin(a) * sp * 0.6,
+            life: 7 + Math.random() * 6, maxLife: 13,
+            w: Math.round(8 + Math.random() * 9 * pow), h: 2,
+            color: Math.random() < 0.4 ? '#ffffff' : im.color,
+            grav: 0.05,
+          });
+        }
+      }
+    }
+    this.impacts = this.impacts.filter(im => im.t < 10);
+    for (const sh of this.shocks) sh.t += rate;
+    this.shocks = this.shocks.filter(sh => sh.t < 9);
+    for (const fl of this.flashes) fl.t -= rate;
+    this.flashes = this.flashes.filter(fl => fl.t > 0);
+    for (const pl of this.pillars) pl.t += rate;
+    this.pillars = this.pillars.filter(pl => pl.t < 10);
+    for (const cc of this.crossCuts) {
+      cc.t += rate;
+      if (!cc.burst && cc.t >= 5.5) { // 燃烧尽头: X 碎成沿对角线飞散的花瓣
+        cc.burst = true;
+        for (let i = 0; i < 16; i++) {
+          const diag = (Math.random() < 0.5 ? 1 : -1);
+          const a = diag * (Math.PI / 4) + (Math.random() - 0.5) * 0.5 + (Math.random() < 0.5 ? Math.PI : 0);
+          const sp = 4 + Math.random() * 4;
+          this.parts.push({
+            x: cc.x, y: cc.y,
+            vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.8,
+            life: 34 + Math.random() * 26, maxLife: 60,
+            size: 3, petal: true,
+            color: Math.random() < 0.5 ? '#ffb7c9' : '#ffd9df',
+            grav: 0.1, drag: 0.94, sway: 0.8, ph: Math.random() * 6.28,
+          });
+        }
+      }
+    }
+    this.crossCuts = this.crossCuts.filter(cc => cc.t < 8);
   },
 
   drawGhosts(ctx) {
@@ -308,12 +620,173 @@ const Effects = {
     ctx.restore();
   },
 
+  drawSmears(ctx) {
+    for (const s of this.smears) {
+      // attach: 跟随角色当前位置(突进类); 静态则留在斩击发生处(月华行为)
+      const ddx = s.f ? s.f.x - s.x0 : 0;
+      const ddy = s.f ? s.f.y - s.y0 : 0;
+      const dx = s.dx + ddx, dy = s.dy + ddy, mx = s.mirrorX + ddx;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      if (s.flip) {
+        ctx.translate(mx, 0); ctx.scale(-1, 1); ctx.translate(-mx, 0);
+      }
+      if (s.mirror) { // 回手招: 动效与基底重染同步镜像
+        const cx = dx + s.dw / 2;
+        ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0);
+      }
+      ctx.globalCompositeOperation = 'lighter'; // 本层全部为 additive 动效
+      // 收势余波: 沿出刀方向偏移的 edge 残影(flip 变换内 +x 恒为面朝方向)
+      if (s.t >= s.decayEnd && s.echo) {
+        ctx.globalAlpha = 0.22;
+        ctx.drawImage(s.edge, 0, 0, 200, 200, dx + (s.echo.dx || 0), dy + (s.echo.dy || 0), s.dw, s.dh);
+      }
+      // 必杀刃风: 招内持续的放大重影, 刀势外溢
+      if (s.t < s.tPhases && s.gale) {
+        const g = s.gale;
+        ctx.globalAlpha = 0.3;
+        ctx.drawImage(s.edge, 0, 0, 200, 200,
+          dx - s.dw * (g - 1) / 2, dy - s.dh * (g - 1) / 2, s.dw * g, s.dh * g);
+      }
+      // 出刀首 2 tick: 过曝闪白(斩击的"炸开"感)
+      if (s.t < 2) {
+        ctx.globalAlpha = 0.55;
+        ctx.drawImage(s.edge, 0, 0, 200, 200, dx, dy, s.dw, s.dh);
+      }
+      ctx.restore();
+    }
+  },
+
+  drawPillars(ctx) {
+    for (const pl of this.pillars) {
+      const stage = pl.t < 3 ? 0 : pl.t < 6 ? 1 : 2;
+      const w = [12, 7, 3][stage];
+      const top = [80, 30, 10][stage];
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = [0.85, 0.55, 0.3][stage];
+      ctx.fillStyle = pl.color;
+      ctx.fillRect(pl.x - (w >> 1) - 2, top, w + 4, pl.baseY - top);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(pl.x - (w >> 2), top, Math.max(2, w >> 1), pl.baseY - top);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.globalAlpha = 1;
+  },
+
+  drawCrossCuts(ctx) {
+    for (const cc of this.crossCuts) {
+      const S = 1.6, half = 100 * S * 2.75 / 2; // 放大月牙, 以爆心为轴
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.globalCompositeOperation = 'lighter';
+      const drawArm = (rot, alpha, img) => {
+        ctx.save();
+        ctx.translate(cc.x, cc.y);
+        ctx.rotate(rot);
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(img, 0, 0, 200, 200, -half, -half, half * 2, half * 2);
+        ctx.restore();
+      };
+      if (cc.t < 2) drawArm(-0.6, 1, cc.img);
+      else if (cc.t < 4) { drawArm(-0.6, 0.8, cc.img); drawArm(0.6, 1, cc.img); }
+      else { drawArm(-0.6, 0.45, cc.hot); drawArm(0.6, 0.45, cc.hot); } // 燃烧余烬
+      ctx.restore();
+    }
+  },
+
+  drawShocks(ctx) {
+    for (const sh of this.shocks) {
+      if (sh.t < 0) continue; // 延时起爆
+      const stage = sh.t < 3 ? 0 : sh.t < 6 ? 1 : 2;
+      const r = [18, 36, 54][stage];
+      ctx.globalAlpha = [0.8, 0.5, 0.25][stage];
+      ctx.fillStyle = sh.color;
+      const n = 16;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const px = Math.round((sh.x + Math.cos(a) * r) / 2) * 2;
+        const py = Math.round((sh.y + Math.sin(a) * r * 0.55) / 2) * 2;
+        ctx.fillRect(px - 2, py - 2, 4, 4);
+      }
+    }
+    ctx.globalAlpha = 1;
+  },
+
+  drawImpacts(ctx) {
+    for (const im of this.impacts) {
+      const px2 = v => Math.round(v / 2) * 2;
+      ctx.save();
+      if (im.t < 2) {
+        // 阶段一: 实心白闪光球(锯齿圆, 逐行矩形)
+        ctx.fillStyle = '#ffffff';
+        const R = im.r * 0.72;
+        for (let ry = -R; ry <= R; ry += 4) {
+          const half = Math.sqrt(Math.max(0, R * R - ry * ry)) * (0.85 + Math.random() * 0.3);
+          ctx.fillRect(px2(im.x - half), px2(im.y + ry), px2(half * 2) || 2, 4);
+        }
+      } else {
+        // 阶段二: 八向锯齿星芒, 白芯 + 主题色外段; 阶梯透明度
+        ctx.globalAlpha = im.t < 4.5 ? 0.9 : 0.55;
+        for (let k = 0; k < 8; k++) {
+          const a = im.rot + k * Math.PI / 4;
+          const len = im.r * 1.5 * im.jag[k] * (im.t < 4.5 ? 1 : 1.15);
+          const steps = Math.max(3, Math.round(len / 7));
+          for (let s = 0; s < steps; s++) {
+            const u = s / steps;
+            const sz = Math.max(2, Math.round(7 * (1 - u * 0.8)));
+            ctx.fillStyle = u < 0.4 ? '#ffffff' : im.color;
+            ctx.fillRect(px2(im.x + Math.cos(a) * len * u) - (sz >> 1), px2(im.y + Math.sin(a) * len * u * 0.9) - (sz >> 1), sz, sz);
+          }
+        }
+        if (im.t < 4.5) { // 星芒期残留白芯
+          ctx.fillStyle = '#ffffff';
+          const cr = Math.max(4, Math.round(im.r * 0.3));
+          ctx.fillRect(px2(im.x) - cr, px2(im.y) - cr, cr * 2, cr * 2);
+        }
+        // 细长线芒(tier3+): 1-2px 阶梯点线向外放射, 只闪 t<4.5 的锐利一瞬
+        if (im.rays && im.t < 4.5) {
+          ctx.globalAlpha = im.t < 3 ? 0.85 : 0.4;
+          for (let k = 0; k < im.rays; k++) {
+            const a = im.rayA + (k / im.rays) * Math.PI * 2;
+            const len = im.r * (1.9 + im.jag[k % 8] * 0.6);
+            ctx.fillStyle = k % 2 === 0 ? '#ffffff' : im.color;
+            for (let d = im.r * 0.8; d < len; d += 5) {
+              ctx.fillRect(px2(im.x + Math.cos(a) * d), px2(im.y + Math.sin(a) * d * 0.9), 2, 2);
+            }
+          }
+        }
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  },
+
   draw(ctx) {
+    this.drawSmears(ctx);
     this.drawSlashes(ctx);
     for (const p of this.parts) {
       ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.maxLife * 1.6));
       ctx.fillStyle = p.color;
-      if (p.w) { // 长条粒子(速度线)
+      if (p.petal) {
+        // 花瓣: 4 向姿态轮换的小瓣片(平躺/斜倾/立起/反斜), 翻滚下落
+        const px = Math.round(p.x), py = Math.round(p.y);
+        const o = Math.floor((p.maxLife - p.life) / 5 + p.ph) % 4;
+        if (o === 0) {          // 平躺: 宽瓣 + 深色瓣尖
+          ctx.fillRect(px - 3, py - 1, 6, 2);
+          ctx.fillRect(px - 1, py - 2, 3, 1);
+          ctx.fillStyle = '#e88aa0'; ctx.fillRect(px + 2, py - 1, 1, 1);
+        } else if (o === 1) {   // 斜倾
+          ctx.fillRect(px - 2, py - 2, 3, 2);
+          ctx.fillRect(px, py, 3, 2);
+          ctx.fillStyle = '#e88aa0'; ctx.fillRect(px + 2, py + 1, 1, 1);
+        } else if (o === 2) {   // 立起(侧视变窄)
+          ctx.fillRect(px - 1, py - 3, 2, 6);
+        } else {                // 反斜
+          ctx.fillRect(px, py - 2, 3, 2);
+          ctx.fillRect(px - 2, py, 3, 2);
+          ctx.fillStyle = '#e88aa0'; ctx.fillRect(px - 2, py + 1, 1, 1);
+        }
+      } else if (p.w) { // 长条粒子(速度线)
         ctx.fillRect(Math.round(p.x - p.w / 2), Math.round(p.y - p.h / 2), p.w, p.h);
       } else {
         const s = p.size;
@@ -321,9 +794,19 @@ const Effects = {
       }
     }
     ctx.globalAlpha = 1;
+    this.drawPillars(ctx);
+    this.drawCrossCuts(ctx);
+    this.drawShocks(ctx);
+    this.drawImpacts(ctx);
     for (const t of this.texts) {
       ctx.globalAlpha = Math.max(0, Math.min(1, t.life / 20));
       UI.pixText(ctx, t.str, t.x, t.y, { size: t.size, color: t.color, align: 'center', outline: true });
+    }
+    // 全屏白闪帧(最顶层, 阶梯衰减)
+    for (const fl of this.flashes) {
+      ctx.globalAlpha = fl.alpha * (fl.t > fl.t0 / 2 ? 1 : 0.5);
+      ctx.fillStyle = fl.color;
+      ctx.fillRect(0, 0, STAGE.w, STAGE.h);
     }
     ctx.globalAlpha = 1;
   },

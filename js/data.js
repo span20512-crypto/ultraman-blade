@@ -26,63 +26,78 @@ const DATA = {
       run:     { file: 'Run.png',     frames: 8, hold: 6,  loop: true },
       jump:    { file: 'Jump.png',    frames: 2, hold: 10, loop: true },
       fall:    { file: 'Fall.png',    frames: 2, hold: 10, loop: true },
-      attack1: { file: 'Attack1.png', frames: 6, hold: 5,  loop: false },
-      attack2: { file: 'Attack2.png', frames: 6, hold: 6,  loop: false },
+      attack1: { file: 'Attack1.png', frames: 6, hold: 5,  loop: false, smearFrames: [4, 5] }, // 画师烘焙月牙所在帧
+      attack2: { file: 'Attack2.png', frames: 6, hold: 6,  loop: false, smearFrames: [4, 5] },
       hit:     { file: 'TakeHit.png', frames: 4, hold: 5,  loop: false },
       death:   { file: 'Death.png',   frames: 6, hold: 7,  loop: false },
     },
     moves: {
       /* seq = custom frame path: w(indup) -> i(mpact, held on active) -> r(ecovery) */
-      light: { // 正手斩: 抬刀 -> 月牙斩 -> 收势 · 细金白高弧
+      light: { // 正手斩: 抬刀 -> 月牙斩 -> 收势 · 素材月牙重染(月华式 smear)
         kind: 'light', anim: 'attack1', total: 24, startup: 7, active: 6, impact: 4,
         seq: { w: [0, 1, 2, 3], i: 4, r: [5] },
+        smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, edge: '#ffd24a', core: '#fff8e2' },
         fx: { x: 103, y: -101, r: 116, ry: 0.6, a0: 2.3, a1: -2.35, w: 13, life: 11, color: '#fff6d8', color2: '#ffd24a' },
         dmg: 6, chip: 0, guardDmg: 11, box: { x1: 15, x2: 165, y1: -175, y2: -40 },
         knock: 4.5, hitstun: 19, blockstun: 11, hitstop: 5, shake: 2,
         meterHit: 9, sfx: 'whooshL', hitSfx: 'hitL',
       },
-      light2: { // 低位快扫(J·J 第二段): 高斩接低扫,来回变线 · 低位金弧(反向)
+      light2: { // 低位快扫(J·J 第二段): 高斩接低扫,来回变线 · smear 深金
         kind: 'light', anim: 'attack2', total: 21, startup: 5, active: 5, impact: 4,
         seq: { w: [3], i: 4, r: [5] },
+        smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, edge: '#e8a83c', core: '#fff2c8' },
         fx: { x: 113, y: -142, r: 120, ry: 0.82, a0: 2.75, a1: 0.05, w: 12, life: 10, color: '#fff2c8', color2: '#e8a83c' },
         dmg: 7, chip: 0, guardDmg: 11, box: { x1: 15, x2: 165, y1: -160, y2: -30 },
         knock: 5, hitstun: 19, blockstun: 11, hitstop: 5, shake: 2,
         meterHit: 9, sfx: 'whooshL', hitSfx: 'hitL',
       },
-      heavy: { // 低位横扫 · 宽金重弧
+      heavy: { // 低位横扫 · 素材月牙重染(重击深金) + 月华级冻结
         kind: 'heavy', anim: 'attack2', total: 32, startup: 11, active: 6, impact: 4,
         seq: { w: [0, 1, 2, 3], i: 4, r: [5, 0] },
+        smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 3, dx: 6 }, edge: '#ffb32e', core: '#fff3cf' },
         fx: { x: 113, y: -142, r: 126, ry: 0.82, a0: 2.75, a1: 0.05, w: 20, life: 13, grow: 0.6, color: '#fff3cf', color2: '#ffc531' },
         dmg: 11, chip: 2, guardDmg: 28, box: { x1: 15, x2: 180, y1: -185, y2: -35 },
-        knock: 8, hitstun: 26, blockstun: 15, hitstop: 9, shake: 5,
+        knock: 8, hitstun: 26, blockstun: 15, hitstop: 13, shake: 5,
         meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
       },
-      heavy2: { // 大月牙终结斩(K·K 第二段): 蹬地前踏补足击退距离 · 红金大弧
+      heavy2: { // 大月牙终结斩(K·K 第二段): 蹬地前踏补足击退距离 · smear 红金终结
         kind: 'heavy', anim: 'attack1', total: 30, startup: 9, active: 6, impact: 4,
         seq: { w: [2, 3], i: 4, r: [5, 0] }, dash: { from: 2, to: 10, vx: 6.5 },
+        smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 4, dx: 8 }, edge: '#ff5a35', core: '#ffe27a' },
         fx: { x: 103, y: -101, r: 126, ry: 0.6, a0: 2.3, a1: -2.35, w: 22, life: 14, grow: 0.8, color: '#ffe27a', color2: '#ff4a3d' },
         dmg: 12, chip: 2, guardDmg: 28, box: { x1: 15, x2: 180, y1: -190, y2: -35 },
-        knock: 9, hitstun: 28, blockstun: 15, hitstop: 10, shake: 6,
+        knock: 9, hitstun: 28, blockstun: 15, hitstop: 14, shake: 6,
         meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
       },
-      clight: { // 蹲斩·削足: 蹲姿贴地平扫小腿,快但短 · 低位金弧
+      clight: { // 蹲斩·削足: 蹲姿贴地平扫小腿,快但短 · smear 低位金(yOff 自动下沉)
         kind: 'light', anim: 'attack2', total: 22, startup: 6, active: 5, impact: 4,
         seq: { w: [{ a: 'crouch', f: 0 }], i: 4, r: [{ a: 'crouch', f: 0 }] }, yOff: 16,
+        smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, edge: '#ffc531', core: '#fff2c8' },
         fx: { x: 100, y: -70, r: 110, ry: 0.42, a0: 2.75, a1: 0.05, w: 12, life: 10, color: '#fff2c8', color2: '#ffc531' },
         dmg: 5, chip: 0, guardDmg: 10, box: { x1: 10, x2: 128, y1: -70, y2: -5 },
         knock: 3.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
-      cheavy: { // 蹲升·月轮: 独立挑空技,不参与连锁 · 红金升弧
+      clight2: { // 蹲斩·返し(蹲J·J 第二段): 回手反扫, 镜像刀光接住正手 · 一套来回砍
+        kind: 'light', anim: 'attack2', total: 20, startup: 5, active: 4, impact: 4,
+        seq: { w: [3], i: 4, r: [{ a: 'crouch', f: 0 }] }, yOff: 16,
+        smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, mirror: true, edge: '#e8a83c', core: '#fff2c8' },
+        dmg: 4, chip: 0, guardDmg: 10, box: { x1: 10, x2: 135, y1: -70, y2: -5 },
+        knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
+        meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
+      },
+      cheavy: { // 蹲升·月轮: 独立挑空技,不参与连锁 · smear 红金升弧(余波上飘)
         kind: 'heavy', noChain: true, anim: 'attack1', total: 34, startup: 10, active: 6, impact: 4,
         seq: { w: [{ a: 'crouch', f: 0 }], i: 4, r: [5] }, hop: -8,
+        smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 3, dy: -7 }, attach: true, edge: '#ff5a3d', core: '#ffe27a' },
         fx: { x: 103, y: -101, r: 120, ry: 0.6, a0: 2.3, a1: -2.35, w: 18, life: 14, rise: -1.2, color: '#ffe27a', color2: '#ff5a3d' },
         dmg: 10, chip: 2, guardDmg: 22, box: { x1: 5, x2: 135, y1: -195, y2: -20 },
-        knock: 5, hitstun: 26, blockstun: 14, hitstop: 9, shake: 5, kd: true, launch: -11,
+        knock: 5, hitstun: 26, blockstun: 14, hitstop: 13, shake: 5, kd: true, launch: -12.5,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
       air: {
         kind: 'light', anim: 'attack1', total: 24, startup: 6, active: 8, impact: 4, air: true,
+        smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, attach: true, edge: '#ffd24a', core: '#fff6d8' },
         fx: { x: 103, y: -101, r: 110, ry: 0.6, a0: 2.3, a1: -2.35, w: 13, life: 10, color: '#fff6d8', color2: '#ffd24a' },
         dmg: 6, chip: 0, guardDmg: 12, box: { x1: 10, x2: 150, y1: -150, y2: 10 },
         knock: 4, hitstun: 20, blockstun: 10, hitstop: 5, shake: 2,
@@ -91,22 +106,25 @@ const DATA = {
       dive: {
         kind: 'heavy', name: '断地斬', anim: 'attack2', air: true, dive: true, impact: 4,
         startup: 8, diveSpeed: 15, diveDrift: 4.5, recovery: 26, slamActive: 8, slamRange: 125,
+        smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 3, dx: 5 }, edge: '#ffb32e', core: '#fff3cf' },
         dmg: 11, chip: 3, guardDmg: 32,
-        knock: 7, hitstun: 28, blockstun: 16, hitstop: 10, shake: 7, kd: true,
+        knock: 7, hitstun: 28, blockstun: 16, hitstop: 13, shake: 7, kd: true,
         meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
       },
-      special: { // 突进残影 + 追身红月牙
+      special: { // 突进残影 + 追身红月牙 · smear 红金刃风(attach 追身) + 命中冲击环/slowmo
         kind: 'special', name: '月牙·疾斬', anim: 'attack2', total: 44,
         startup: 10, active: 10, impact: 4, cooldown: 110,
+        smear: { phases: [{ f: 4, t: 6 }, { f: 5, t: 5 }], decay: 3, rim: 4, gale: 1.06, echo: { t: 4, dx: 10 }, attach: true, edge: '#ff4a3d', core: '#ffe27a' },
         fx: { x: 113, y: -142, r: 124, ry: 0.82, a0: 2.75, a1: 0.05, w: 20, life: 13, vx: 7, color: '#ffe27a', color2: '#d64533' },
         dmg: 13, chip: 5, guardDmg: 46, box: { x1: 0, x2: 190, y1: -185, y2: -30 },
-        knock: 10, hitstun: 30, blockstun: 18, hitstop: 12, shake: 7, kd: true,
+        knock: 10, hitstun: 30, blockstun: 18, hitstop: 16, shake: 7, kd: true,
         dash: { from: 4, to: 20, vx: 8.5 },
         meterHit: 16, sfx: 'special', hitSfx: 'hitH',
       },
-      super: { // 三幕: 聚气红光 -> 残影突进 -> 红金交替连斩·花瓣终结
+      super: { // 三幕: 聚气红光 -> 残影突进 -> 红金交替连斩·花瓣终结 (cine smear 在 runSuperSeq)
         kind: 'super', name: '無月·連獄斬', anim: 'attack1', total: 58, cost: 100,
         startup: 8, active: 16, impact: 4, invuln: 16,
+        smear: { phases: [{ f: 4, t: 6 }, { f: 5, t: 5 }], decay: 3, rim: 4, gale: 1.06, echo: { t: 4, dx: 12 }, attach: true, edge: '#ff4a3d', core: '#fff1c0' },
         fx: { x: 103, y: -101, r: 130, ry: 0.6, a0: 2.3, a1: -2.35, w: 22, life: 14, vx: 9, color: '#fff1c0', color2: '#ff4a3d' },
         dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 175, y1: -190, y2: -25 },
         knock: 4, hitstun: 24, blockstun: 24, hitstop: 8, shake: 6, kd: true,

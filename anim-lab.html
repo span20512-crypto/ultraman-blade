@@ -67,8 +67,10 @@ const SEQS = [
   { key: 'idle',  label: '站立',        chain: [] },
   { key: 'crouch',label: '下蹲',        chain: [], hold: 'crouch' },
   { key: 'J',     label: 'J 轻击',      chain: ['light'] },
+  { key: 'Jold',  label: 'J 轻击(旧)',  chain: ['light'], legacy: true },
   { key: 'JJ',    label: 'J·J 变招',    chain: ['light', 'light'] },
   { key: 'K',     label: 'K 重击',      chain: ['heavy'] },
+  { key: 'Kold',  label: 'K 重击(旧)',  chain: ['heavy'], legacy: true },
   { key: 'KK',    label: 'K·K 终结',    chain: ['heavy', 'heavy'] },
   { key: 'cJ',    label: '蹲J 削足',    chain: ['light'], hold: 'crouch' },
   { key: 'cJJ',   label: '蹲J·J 连打',  chain: ['light', 'light'], hold: 'crouch' },
@@ -76,7 +78,9 @@ const SEQS = [
   { key: 'airJ',  label: '空中J',       chain: ['light'], air: true },
   { key: 'dive',  label: '空中K 下砸',  chain: ['heavy'], air: true },
   { key: 'U',     label: 'U 必杀',      chain: ['special'] },
-  { key: 'I',     label: 'I 超必杀(含圆环/花瓣)', chain: ['super'] },
+  { key: 'I',     label: 'I 超必杀·終A 桜吹雪', chain: ['super'], finisher: 'A' },
+  { key: 'IB',    label: 'I 超必杀·終B 月輪爆', chain: ['super'], finisher: 'B' },
+  { key: 'IC',    label: 'I 超必杀·終C 斬鉄十字', chain: ['super'], finisher: 'C' },
   { key: 'JJKK',  label: '连招 J·J·K·K', chain: ['light', 'light', 'heavy', 'heavy'] },
   { key: 'JJKU',  label: '连招 J·J·K·U', chain: ['light', 'light', 'heavy', 'special'] },
   { key: 'JJKI',  label: '连招 J·J·K·I', chain: ['light', 'light', 'heavy', 'super'] },
@@ -90,6 +94,7 @@ let paused = false, showBox = true;
 // ---- stub world (the API surface Fighter needs) ---------------------------
 const W = {
   tick: 0, hitstopT: 0, projectiles: [], stats: { maxCombo: 0 },
+  slowmoT: 0, slowmo: 1, slowAcc: 0,
   training: { dummy: 'stand' }, mode: 'lab',
   hitstop(n) { this.hitstopT = Math.max(this.hitstopT, n); },
   shake() {},
@@ -108,8 +113,11 @@ function resetScene() {
   A = new Fighter(charId, 380, 1, W);
   B = new Fighter(other, 500, -1, W); // 触及距离内, 连锁取消才能开窗
   const seq = SEQS.find(x => x.key === seqKey);
+  A.legacyFx = !!seq.legacy; // (旧) 对照按钮: 白月牙+椭圆弧+旧火花, 仅实验室
+  A.finisherOverride = seq.finisher || null; // 超杀终结变体预览(A/B/C)
   A.meter = seq.chain.includes('super') ? 100 : 0; // 满气光环只在超杀序列出现
   W.projectiles = []; W.hitstopT = 0; W.banner = null;
+  W.slowmoT = 0; W.slowmo = 1; W.slowAcc = 0;
   W.tick = 0; W.stats.maxCombo = 0;               // 每循环从 0 计
   Effects.reset();
   phase = 'run'; chainIdx = 0; pressCd = 0; airPressed = false; restT = 0;
@@ -134,8 +142,24 @@ function miniResolve() {
         dmg: finisher ? Math.round(d.dmg * 1.3) : d.dmg, chip: d.chip, guardDmg: d.guardDmg,
         knock: d.knock, hitstun: d.hitstun, blockstun: d.blockstun, kd, meterHit: d.meterHit, hitSfx: d.hitSfx,
       }, A);
-      Effects.spark(px, py, A.facing, ['#ffe27a', '#ff7a3d', '#ffffff'], 12, d.kind === 'light' ? 5 : 8);
-      W.hitstop(d.hitstop || 5);
+      // 与 main.js tryHit 同步: 月华式星爆(尺寸按威力分级)
+      // legacy 对照: 复原旧粒子火花 + smear 化重击的旧 hitstop(9)
+      if (A.legacyFx) {
+        Effects.spark(px, py, A.facing, ['#ffe27a', '#ff7a3d', '#ffffff'], 12, d.kind === 'light' ? 5 : 8);
+        W.hitstop(d.smear && d.kind === 'heavy' ? 9 : (d.hitstop || 5));
+      } else {
+        Effects.impact(px, py, A.facing, {
+          tier: d.kind === 'light' ? 1 : d.kind === 'heavy' ? 2 : 3,
+          color: A.c.theme2 || '#ffc531',
+        });
+        W.hitstop(d.hitstop || 5);
+        // 与 main.js tryHit 同步: 重击命中扬尘 / 必杀冲击环+slowmo
+        if (d.kind === 'heavy' && B.grounded) Effects.dust(B.x, B.y, 8, A.facing);
+        if (d.kind === 'special') {
+          Effects.shockRing(px, py, A.c.theme2 || '#ffc531');
+          W.slowmoT = 14; W.slowmo = 0.5; W.slowAcc = 0;
+        }
+      }
       if (d.kind === 'super' && d.cine && A.state === 'attack') {
         A.vx = 0; A.move = null;
         A.superSeq = { hits: d.cine.hits, interval: d.cine.interval, dmgPer: d.cine.dmgPer, final: d.cine.final, t: 0, done: 0, scale: preScale };
@@ -175,6 +199,14 @@ function scriptPad(seq) {
 function step() {
   const seq = SEQS.find(s => s.key === seqKey);
   if (W.hitstopT > 0) { W.hitstopT--; if (W.banner) W.banner.t--; Effects.update(0.35); return; }
+  // 与 main.js update 同步: 必杀命中后的半速 slowmo 收尾
+  if (W.slowmoT > 0) {
+    W.slowmoT--;
+    if (W.slowmoT <= 0) W.slowmo = 1;
+    W.slowAcc += W.slowmo;
+    if (W.slowAcc < 1) { Effects.update(W.slowmo); return; }
+    W.slowAcc -= 1;
+  }
   W.tick++;
   A.pad = scriptPad(seq);
   B.pad = emptyPad();
@@ -199,6 +231,8 @@ function draw() {
   ctx.fillStyle = '#171126'; ctx.fillRect(0, 0, 760, 356);
   ctx.fillStyle = '#241812'; ctx.fillRect(0, 356, 760, 74);
   ctx.fillStyle = '#3d2b3a'; ctx.fillRect(0, 355, 760, 2);
+  // 与 main.js 同步: 超杀演出背景压暗
+  if (A && A.superSeq) { ctx.fillStyle = 'rgba(10,6,20,0.52)'; ctx.fillRect(0, 0, 760, 430); }
 
   ctx.save();
   // world -> lab viewport: game ground y480 -> 356, shift x to center the pair

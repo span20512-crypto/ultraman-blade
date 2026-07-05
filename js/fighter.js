@@ -17,6 +17,7 @@ class Fighter {
     this.rekka = false;        // light->light chain used
     this.rekkaH = false;       // heavy->heavy chain used
     this.altL = false;         // alternate light slash (来回砍)
+    this.altCL = false;        // alternate crouch light (蹲J 正手/回手)
     this.altH = false;         // alternate heavy swing
     this.hitstun = 0; this.blockstun = 0; this.guard = 0;
     this.invuln = 0; this.specialCd = 0; this.backdashCd = 0;
@@ -139,6 +140,11 @@ class Fighter {
     if (this.pad.crouch && this.grounded && (key === 'light' || key === 'heavy') &&
         this.c.moves['c' + key]) {
       key = 'c' + key;
+      // 蹲J·J 连打变招: 正手削足 -> 回手返扫(镜像刀光), 来回砍成一套动作
+      if (key === 'clight' && this.c.moves.clight2) {
+        if (this.altCL) key = 'clight2';
+        this.altCL = !this.altCL;
+      }
     } else if (key === 'light' && this.c.moves.light2) {
       if (this.altL) key = 'light2';
       this.altL = !this.altL;
@@ -368,11 +374,15 @@ class Fighter {
       this.grounded = false;
       Effects.dust(this.x, this.y, 6);
     }
-    // 程序化刀光: blade-arc fx fires as the active window opens
-    if (d.fx && m.t === d.startup) {
-      const list = Array.isArray(d.fx) ? d.fx : [d.fx];
-      for (const e of list) {
-        Effects.slash(this.x + this.facing * (e.x || 48), this.y + (e.y || -100), this.facing, e);
+    // 刀光: 优先素材月牙重染(smear, 对齐由构造保证); 无烘焙层时回退程序化弧线
+    // legacyFx 仅供 anim-lab 新旧对照, 游戏本体永不设置; dive 的 smear 在落地时触发
+    if (m.t === d.startup && !d.dive) {
+      const smeared = d.smear && !this.legacyFx ? Effects.smearFx(this, d.smear) : false;
+      if (!smeared && d.fx) {
+        const list = Array.isArray(d.fx) ? d.fx : [d.fx];
+        for (const e of list) {
+          Effects.slash(this.x + this.facing * (e.x || 48), this.y + (e.y || -100), this.facing, e);
+        }
       }
     }
     // forward motion (dash specials / supers)
@@ -507,17 +517,32 @@ class Fighter {
       this.setAnim(s.done % 2 === 0 ? 'attack1' : 'attack2', true);
       const sImp = this.c.moves.super.impact !== undefined ? this.c.moves.super.impact : 2;
       this.anim.t = this.c.anims[this.anim.name].hold * sImp;
-      // act 3 演出: every cine hit carves a big crescent across the victim,
-      // angle rotates per hit (斜劈 / 撩斩 / 横扫), theme colors alternate
-      const cutA = [[-2.5, 0.45], [0.7, -2.55], [-1.15, 1.0]][(s.done - 1) % 3];
-      Effects.slash(opp.x - this.facing * 8, opp.y - 96, this.facing, {
-        r: 130, a0: cutA[0], a1: cutA[1], w: 20, life: 13, grow: 2.2, sweep: 0.34,
-        color: s.done % 2 === 0 ? '#ffffff' : (this.c.id === 'mack' ? '#ffe27a' : '#b9fff7'),
-        color2: s.done % 2 === 0 ? this.c.theme2 : this.c.theme,
-      });
-      Effects.spark(opp.x, opp.y - 100, this.facing, ['#ffe27a', '#ff7a3d', '#ffffff'], 12, 6);
-      this.world.hitstop(5);
-      this.world.shake(4, 6);
+      // act 3 演出: 每段 cine 用画师月牙 smear 交替开斩(attack1 撩/attack2 扫),
+      // 主题色轮换 + 全屏白闪一瞬 + 大星爆 —— 月华式爽快
+      // 基底重染走 draw() 的帧同步覆盖(cineSmear), 这里只补出刀闪白动效
+      let smeared = false;
+      if (!this.legacyFx && Assets.smears[`${this.c.id}:${this.anim.name}`]) {
+        this.cineSmear = {
+          edge: s.done % 2 === 0 ? this.c.theme : this.c.theme2,
+          core: '#fff6e8', rim: 4,
+        };
+        smeared = Effects.smearFx(this, {
+          phases: [{ t: 4 }], decay: 0,
+          edge: this.cineSmear.edge,
+        }, this.anim.name);
+      }
+      if (!smeared) {
+        const cutA = [[-2.5, 0.45], [0.7, -2.55], [-1.15, 1.0]][(s.done - 1) % 3];
+        Effects.slash(opp.x - this.facing * 8, opp.y - 96, this.facing, {
+          r: 130, a0: cutA[0], a1: cutA[1], w: 20, life: 13, grow: 2.2, sweep: 0.34,
+          color: s.done % 2 === 0 ? '#ffffff' : (this.c.id === 'mack' ? '#ffe27a' : '#b9fff7'),
+          color2: s.done % 2 === 0 ? this.c.theme2 : this.c.theme,
+        });
+      }
+      Effects.impact(opp.x, opp.y - 100, this.facing, { tier: 3, color: this.c.theme2 });
+      Effects.flashFrame({ alpha: 0.26, t: 2 });
+      this.world.hitstop(6);
+      this.world.shake(5, 6);
       AudioSys.sfx('hitH');
     }
 
@@ -532,24 +557,19 @@ class Fighter {
       opp.kdPending = true;
       this.combo.count++; this.combo.timer = 90;
       this.world.stats.maxCombo = Math.max(this.world.stats.maxCombo, this.combo.count);
-      // 终结击: ring + crescent fan bursting outward; 隼人 adds slow sakura
-      // petals drifting down through the aftermath
-      const fanN = this.c.id === 'mack' ? 8 : 6;
-      for (let i = 0; i < fanN; i++) {
-        const base = (i / fanN) * Math.PI * 2 + 0.22;
-        Effects.slash(opp.x, opp.y - 104, 1, {
-          r: 46, grow: 4.5, a0: base - 0.34, a1: base + 0.34, w: 14, life: 12,
-          sweep: 0.3, color: i % 2 === 0 ? '#ffffff' : this.c.theme2,
-          color2: i % 2 === 0 ? this.c.theme : this.c.theme2,
-        });
+      // 终结一击: 最大星爆 + 全屏过曝白闪 + 月华级长冻结, 再叠终结变体
+      // (A 桜吹雪 / B 月輪爆 / C 斬鉄十字, 纯视觉, finisherOverride 供 lab 预览)
+      Effects.impact(opp.x, opp.y - 110, this.facing, { tier: 4, color: this.c.theme2 });
+      Effects.flashFrame({ alpha: 0.5, t: 3 });
+      const variant = this.finisherOverride || this.c.moves.super.finisher || 'A';
+      Effects.superFinale(variant, opp.x, opp.y, this);
+      if (variant === 'B') { // 月輪爆: 三环连爆配半速余韵
+        this.world.slowmoT = 16; this.world.slowmo = 0.4; this.world.slowAcc = 0;
       }
-      Effects.ring(opp.x, opp.y - 104, this.c.id === 'mack' ? '#ffe27a' : '#c9baff', 20);
-      if (this.c.id === 'mack') Effects.petals(opp.x, opp.y - 130, 22);
-      Effects.spark(opp.x, opp.y - 110, this.facing, ['#ffffff', '#ffe27a', this.c.theme], 24, 9);
-      this.world.hitstop(10);
-      this.world.shake(9, 16);
+      this.world.hitstop(16);
+      this.world.shake(variant === 'B' ? 13 : 11, 16);
       AudioSys.sfx('hitH');
-      this.superSeq = null;
+      this.superSeq = null; this.cineSmear = null;
       this.state = 'idle'; this.move = null;
       this.setAnim('idle', true);
     }
@@ -633,7 +653,7 @@ class Fighter {
   die() {
     this.dead = true;
     this.hp = 0;
-    this.superSeq = null;
+    this.superSeq = null; this.cineSmear = null;
     this.move = null;
     this.frozen = 0;
     this.state = 'dead';
@@ -653,10 +673,11 @@ class Fighter {
         if (this.dead) { /* body settles */ }
         else if (this.state === 'hit' && this.kdPending) this.knockdown();
         else if (this.state === 'attack' && this.move && this.move.def.dive && !this.move.landed) {
-          // ground slam impact
+          // ground slam impact — 斩击帧落在着地瞬间, smear 也在此时炸开
           this.move.landed = true;
           this.move.landedT = this.move.t;
           this.vx = 0;
+          if (this.move.def.smear && !this.legacyFx) Effects.smearFx(this, this.move.def.smear);
           Effects.dust(this.x, this.y, 14);
           Effects.ring(this.x, this.y - 8, '#ffd27a');
           this.world.shake(8, 12);
@@ -756,6 +777,29 @@ class Fighter {
     if (this.flash > 0) ctx.filter = 'brightness(2.4) saturate(0.4)';
     ctx.drawImage(p.img, p.sx, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
     ctx.filter = 'none';
+    // 帧同步月牙重染: 画师烘焙在攻击帧里的白月牙, 实时染成招式主题色盖回
+    // 原位(同帧同变换, 俯冲旋转/倾角自动继承)。绝不擦原图 —— 月牙压身帧
+    // 擦除会咬穿身体(踩过坑)
+    const sm = this.legacyFx ? null
+      : (this.state === 'attack' && this.move && this.move.def.smear &&
+         this.anim.name === this.move.def.anim) ? this.move.def.smear
+      : (this.superSeq && this.cineSmear) ? this.cineSmear : null;
+    if (sm) {
+      const key = `${this.c.id}:${this.anim.name}`;
+      const bank = Assets.smears[key];
+      if (bank && bank[this.anim.frame]) {
+        const edge = Assets.tinted(key, this.anim.frame, 'edge', sm.edge);
+        const core = Assets.tinted(key, this.anim.frame, `core${sm.rim || 2}`, sm.core);
+        ctx.save();
+        if (sm.mirror) { // 回手招: 刀光绕角色纵轴镜像(身体帧不动, 只反刀路)
+          const cx = p.dx + p.dw / 2;
+          ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0);
+        }
+        if (edge) ctx.drawImage(edge, 0, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
+        if (core) ctx.drawImage(core, 0, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
+        ctx.restore();
+      }
+    }
     // super act 1 聚气: pulsing additive body glow in the character's theme
     if (this.state === 'attack' && this.move && this.move.def.kind === 'super' &&
         this.move.t <= this.move.def.startup + 2) {
