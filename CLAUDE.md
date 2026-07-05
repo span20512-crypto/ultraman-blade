@@ -2,6 +2,10 @@
 
 KOF 式和风像素格斗游戏。纯 vanilla JS + Canvas,零依赖,零构建。人机对战,2 角色(HAYATO 隼人/力量型武士、KENJI 剣二/速度型忍者),完整格斗机制 + 练习场。
 
+## Git 账户(重要,勿违反)
+
+本项目是 Eric 的**个人项目**,一切 git 操作只用个人账户 **ericfu-tianchi**(仓库已 `git config` 锁定 `ericfu-tianchi <ericfu-tianchi@users.noreply.github.com>`)。**严禁**使用公司账户(eric.fu@opus.pro / OpusFu 组织)commit 或 push。如需 push 到 GitHub,目标是 ericfu-tianchi 的个人仓库,且需 Eric 明确指示。
+
 ## 运行
 
 ```bash
