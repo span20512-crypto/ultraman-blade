@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 · UI 资产库 UI LAB</title>
+<style>
+  body { margin:0; background:#14100d; color:#efe6d5; font:14px/1.7 "PingFang SC", monospace; }
+  header { padding:20px 28px 8px; border-bottom:2px solid #3a2d1c; }
+  h1 { margin:0; font-size:20px; color:#d9a441; }
+  .sub { color:#9a8f78; font-size:12px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(430px, 1fr)); gap:20px; padding:22px 28px; }
+  .card { background:#1b1512; border:2px solid #3a2d1c; }
+  .card .imgwrap { background:#0c0a09; display:flex; align-items:center; justify-content:center; padding:10px; min-height:220px; }
+  .card img { max-width:100%; max-height:260px; image-rendering:auto; }
+  .card .meta { padding:10px 16px 14px; border-top:2px solid #3a2d1c; }
+  .card .meta b { color:#d9a441; font-size:15px; }
+  .card .meta .use { color:#c9bfa8; font-size:12px; }
+  .card .meta .cur { color:#7a6f5c; font-size:12px; }
+  .tag { display:inline-block; background:#b32b20; color:#fff; font-size:11px; padding:1px 8px; margin-left:8px; vertical-align:middle; }
+  footer { padding:14px 28px 30px; color:#9a8f78; font-size:12px; border-top:2px solid #3a2d1c; }
+</style>
+</head>
+<body>
+<header>
+  <h1>拳魂 · 和风 UI 资产库</h1>
+  <div class="sub">Gemini 图像模型直连生成(gemini-2.5-flash-image) · 已全部接入游戏(运行时抠底/裁切/内窗检测,见 assets/ui-lab/proc.html 管线自检页) · 想重生成/改风格请指着卡片名字说</div>
+</header>
+<div class="grid" id="grid"></div>
+<footer>
+  接入说明:拍板后每张资产会被裁切/缩样到实际 UI 尺寸(如头像框 96px、血条框 400×36),必要时抠透明底,再替换 ui.js 里对应的程序化绘制。<br>
+  当前游戏内 UI 为程序化绘制版(漆黑×朱红×鎏金),可与本页资产混用 —— 例如只采纳血条框和标题徽章。
+</footer>
+<script>
+const ASSETS = [
+  ['portrait-frame', '角色头像框', '对战 HUD 左右上角,套住 84px 像素头像', '现为程序化描金方框'],
+  ['healthbar-frame', '血条外框', 'HUD 顶部左右血条的容器,中空处叠加现有血量填充', '现为程序化漆黑框+金线'],
+  ['meter-bar', '气槽(竹节)', '底部超必杀能量条,分段竹节样式', '现为程序化竹节金条'],
+  ['menu-panel', '菜单面板(木牌)', '标题菜单项/暂停菜单/选人卡片的底板', '现为程序化漆盘'],
+  ['keycap', '按键帽', '键位教学屏的按键图示', '现为程序化灰蓝键帽(风格最不搭,优先换)'],
+  ['timer-seal', '计时印章', '顶部中央回合倒计时的朱印底座', '现为程序化朱红方块'],
+  ['title-emblem', '标题徽章', '标题画面「拳魂」字后的旭日/円相底纹', '现为程序化旭日+光芒'],
+  ['vs-emblem', 'VS 徽章', '选人确认后的 VS 过场中心图案', '现为纯文字 VS'],
+  ['stage-alt', '战斗场景(AI生成版)', '对战背景 —— 已设为默认(?stage=proc 可切回程序化版)', '已接入'],
+  ['banner-ribbon', '公告缎带(补生成)', 'ROUND/胜负公告与结算屏标题的丝绸缎带底', '已接入'],
+  ['cursor-fan', '菜单光标·折扇(补生成)', '标题菜单选中项两侧的折扇指示', '已接入'],
+];
+const g = document.getElementById('grid');
+for (const [file, name, use, cur] of ASSETS) {
+  const d = document.createElement('div');
+  d.className = 'card';
+  d.innerHTML = `
+    <div class="imgwrap"><img src="assets/ui-lab/${file}.png" loading="lazy"></div>
+    <div class="meta">
+      <b>${name}</b><span class="tag">${file}</span><br>
+      <span class="use">用途:${use}</span><br>
+      <span class="cur">对照:${cur}</span>
+    </div>`;
+  g.appendChild(d);
+}
+</script>
+</body>
+</html>

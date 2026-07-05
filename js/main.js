@@ -1,0 +1,657 @@
+/* Game shell: fixed-timestep loop, screens, combat resolution, rounds. */
+'use strict';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const G = {
+  screen: 'boot', tick: 0,
+  fighters: [], projectiles: [],
+  ai: [null, null], p2IsAI: true, demo: false,
+  mode: 'versus', training: { dummy: 'stand' },
+  round: 1, roundTimer: 60, phase: 'intro', phaseT: 0,
+  hitstopT: 0, slowmo: 1, slowmoT: 0, slowAcc: 0,
+  shakeT: 0, shakeMag: 0, koFlashT: 0, koWinner: null,
+  ann: null, superBanner: null,
+  titleSel: 0,
+  select: { phase: 'char', cursor: 0, p1: null, p2: null, diff: 'normal', diffCursor: 1, vsT: 0 },
+  result: null, paused: false, pauseView: 'menu',
+  stats: { maxCombo: 0 },
+  showHint: true, debug: false,
+  stageArt: 'alt', // 'alt' = AI-painted stage (falls back to procedural if missing)
+  matchCfg: null,
+
+  hitstop(n) { this.hitstopT = Math.max(this.hitstopT, n); },
+  shake(mag, t) { this.shakeMag = Math.max(this.shakeMag, mag); this.shakeT = Math.max(this.shakeT, t); },
+  spawnProjectile(f, def) {
+    this.projectiles.push(new Projectile(f, def, f.x + f.facing * 70, f.y + def.y, f.facing));
+    AudioSys.sfx('projectile');
+  },
+  hasProjectile(f) { return this.projectiles.some(p => p.owner === f && !p.dead); },
+  superFlash(f, def) {
+    if (!def.cine) return;
+    // short flash: less time for the defender to react-guard on purpose
+    this.hitstopT = Math.max(this.hitstopT, 28);
+    this.superBanner = { t: 28, f, def };
+    AudioSys.sfx('superFlash');
+  },
+};
+
+function setAnn(text, style, dur, sub = null) { G.ann = { text, style, dur, sub, t: 0 }; }
+
+function showErr(e) {
+  const el = document.getElementById('err');
+  el.style.display = 'block';
+  el.textContent = 'ERROR: ' + (e && (e.stack || e.message || e));
+}
+window.addEventListener('error', ev => showErr(ev.error || ev.message));
+window.addEventListener('unhandledrejection', ev => showErr(ev.reason));
+
+// ---- match / round management ------------------------------------------------
+function startMatch(p1Id, p2Id, diff, demo = false, training = false) {
+  G.matchCfg = { p1Id, p2Id, diff, demo, training };
+  G.demo = demo;
+  G.mode = training ? 'training' : 'versus';
+  G.training.dummy = 'stand';
+  const f1 = new Fighter(p1Id, 330, 1, G);
+  const f2 = new Fighter(p2Id, 694, -1, G);
+  G.fighters = [f1, f2];
+  G.ai[1] = new AIController(f2, f1, diff, G);
+  G.ai[0] = demo ? new AIController(f1, f2, diff, G) : null;
+  G.stats.maxCombo = 0;
+  G.round = 1;
+  G.paused = false;
+  G.screen = 'fight';
+  startRound();
+  if (training) {
+    G.phase = 'fight';
+    setAnn('TRAINING', 'fight', 60);
+  }
+  AudioSys.playBgm('battle');
+}
+
+function startRound() {
+  const [f1, f2] = G.fighters;
+  [[f1, 330, 1], [f2, 694, -1]].forEach(([f, x, face]) => {
+    f.hp = f.maxHp; f.dispHp = f.maxHp;
+    f.x = x; f.y = STAGE.ground; f.vx = 0; f.vy = 0; f.facing = face;
+    f.state = 'idle'; f.stateT = 0; f.dead = false;
+    f.move = null; f.superSeq = null; f.rekka = false;
+    f.hitstun = 0; f.blockstun = 0; f.guard = 0; f.invuln = 0; f.lockout = 0;
+    f.kdPending = false; f.grounded = true; f.frozen = 0; f.flash = 0;
+    f.combo = { count: 0, timer: 0 }; f.comboable = 0;
+    f.setAnim('idle', true);
+  });
+  G.projectiles = [];
+  Effects.reset();
+  G.roundTimer = 60;
+  G.phase = 'intro'; G.phaseT = 0;
+  G.hitstopT = 0; G.slowmoT = 0; G.slowmo = 1; G.slowAcc = 0;
+  G.superBanner = null; G.koWinner = null; G.ann = null;
+}
+
+function doKO(dead1, dead2) {
+  const [f1, f2] = G.fighters;
+  G.phase = 'ko'; G.phaseT = 0;
+  if (dead1) f1.die();
+  if (dead2) f2.die();
+  G.koWinner = dead1 && dead2 ? null : dead1 ? f2 : f1;
+  for (const f of [f1, f2]) {
+    if (f.dead && f.grounded) { // dramatic fling if they died standing
+      f.grounded = false; f.vy = -7;
+      f.vx = (G.koWinner ? Math.sign(f.x - G.koWinner.x) || 1 : 1) * 5;
+    }
+  }
+  setAnn('K.O.', 'ko', 120);
+  AudioSys.sfx('ko');
+  G.koFlashT = 10;
+  G.shake(12, 22);
+  G.slowmo = 0.3; G.slowmoT = 70; G.slowAcc = 0;
+}
+
+function awardRound() {
+  const [f1, f2] = G.fighters;
+  const w = G.koWinner;
+  if (w) {
+    w.wins++;
+    const perfect = w.hp >= w.maxHp;
+    setAnn(`${w.c.name} WINS`, 'banner', 116, perfect ? 'PERFECT!' : null);
+    AudioSys.sfx(w === f1 ? 'win' : 'lose');
+  } else {
+    f1.wins++; f2.wins++;
+    setAnn('DOUBLE K.O.', 'banner', 116);
+  }
+  G.phase = 'roundend'; G.phaseT = 0;
+}
+
+function endRoundTimeout() {
+  const [f1, f2] = G.fighters;
+  const w = f1.hp === f2.hp ? null : (f1.hp > f2.hp ? f1 : f2);
+  if (w) {
+    w.wins++;
+    setAnn('TIME UP', 'banner', 116, `${w.c.name} WINS`);
+    AudioSys.sfx(w === f1 ? 'win' : 'lose');
+  } else {
+    setAnn('TIME UP · DRAW', 'banner', 116);
+  }
+  G.phase = 'roundend'; G.phaseT = 0;
+}
+
+function endMatch(winner) {
+  G.result = { winner };
+  G.screen = 'result';
+  Effects.reset();
+  G.projectiles = [];
+  AudioSys.playBgm('menu');
+  AudioSys.sfx(winner === G.fighters[0] ? 'win' : 'lose');
+}
+
+// ---- combat resolution ---------------------------------------------------------
+function rectsOverlap(a, b) {
+  return a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1;
+}
+
+/* moveA is snapshotted before resolution: in a same-tick trade the first hit
+   nulls the defender's a.move, but their already-active attack still lands. */
+function tryHit(a, b, boxA, moveA) {
+  if (!boxA || !moveA || b.dead || b.superSeq) return;
+  const bb = b.bodyBox();
+  if (!rectsOverlap(boxA, bb)) return;
+
+  moveA.hasHit = true;
+
+  // i-frames / off-the-ground: whiff
+  if (b.invuln > 0 || b.state === 'down' || b.state === 'getup') {
+    if (b.state === 'backdash') {
+      Effects.text(b.x, b.y - 195, '回避!', '#35e0d8', 16);
+      AudioSys.sfx('dodge');
+      b.gainMeter(6);
+    }
+    return;
+  }
+
+  moveA.contact = true;
+  moveA.contactT = moveA.t;
+  const d = moveA.def;
+  const px = (Math.max(boxA.x1, bb.x1) + Math.min(boxA.x2, bb.x2)) / 2;
+  const py = (Math.max(boxA.y1, bb.y1) + Math.min(boxA.y2, bb.y2)) / 2;
+  const preScale = a.comboScale(b);
+
+  // only the SECOND chained heavy (the K·K ender) knocks down — a single
+  // chained K must leave the target standing so U / I finishers connect
+  const kd = d.kd || (moveA.chained && d.kind === 'heavy' && a.rekkaH);
+  // finisher bonus: a chained hit landing as the 3rd+ hit of a combo
+  const predicted = b.comboable > 0 ? a.combo.count + 1 : 1;
+  const finisher = moveA.chained && predicted >= 3;
+  const dmgVal = finisher ? Math.round(d.dmg * 1.3) : d.dmg;
+
+  const res = b.receiveHit({
+    dmg: dmgVal, chip: d.chip, guardDmg: d.guardDmg, knock: d.knock, hitstun: d.hitstun,
+    blockstun: d.blockstun, kd, meterHit: d.meterHit, hitSfx: d.hitSfx,
+  }, a);
+
+  if (res === 'block') {
+    Effects.spark(px, py, a.facing, ['#35b9e0', '#8ad8ff', '#ffffff'], 8, 4);
+    G.hitstop(4);
+  } else if (res === 'crush') {
+    Effects.spark(px, py, a.facing, ['#ffc531', '#ffe27a', '#ffffff'], 20, 8);
+    G.hitstop(12);
+    G.shake(7, 12);
+  } else {
+    Effects.spark(px, py, a.facing, ['#ffe27a', '#ff7a3d', '#ffffff'], 12, d.kind === 'light' ? 5 : 8);
+    G.hitstop(d.hitstop || 5);
+    if (d.shake) G.shake(d.shake, 8);
+    if (finisher && res === 'hit') {
+      Effects.text(px, py - 46, 'BONUS!', '#ffc531', 14);
+      Effects.spark(px, py, a.facing, ['#ffc531', '#ffffff'], 8, 7);
+      G.hitstop(3);
+    }
+    // cine only if the attacker wasn't themselves interrupted this tick
+    if (d.kind === 'super' && d.cine && a.state === 'attack') {
+      a.vx = 0;
+      a.move = null; // cine anims play on their own timeline from here
+      a.superSeq = {
+        hits: d.cine.hits, interval: d.cine.interval, dmgPer: d.cine.dmgPer,
+        final: d.cine.final, t: 0, done: 0, scale: preScale,
+      };
+      b.frozen = 2;
+    }
+  }
+}
+
+function resolveCombat() {
+  const [f1, f2] = G.fighters;
+  const b1 = f1.activeBox(), b2 = f2.activeBox();
+  const m1 = f1.move, m2 = f2.move;
+  tryHit(f1, f2, b1, m1);
+  tryHit(f2, f1, b2, m2);
+
+  for (const pr of G.projectiles) {
+    if (pr.dead) continue;
+    const t = pr.owner === f1 ? f2 : f1;
+    if (t.dead || t.superSeq) continue;
+    if (!rectsOverlap(pr.box(), t.bodyBox())) continue;
+    if (t.invuln > 0 || t.state === 'down' || t.state === 'getup') {
+      if (t.state === 'backdash' && !pr.dodged) {
+        pr.dodged = true;
+        Effects.text(t.x, t.y - 195, '回避!', '#35e0d8', 16);
+        AudioSys.sfx('dodge');
+        t.gainMeter(6);
+      }
+      continue;
+    }
+    const pd = pr.def;
+    const res = t.receiveHit({
+      dmg: pd.dmg, chip: pd.chip, guardDmg: pd.guardDmg, knock: pd.knock, hitstun: pd.hitstun,
+      blockstun: pd.blockstun, meterHit: pd.meterHit, hitSfx: 'hitL',
+    }, pr.owner);
+    pr.dead = true;
+    Effects.spark(pr.x, pr.y, Math.sign(pr.vx), res === 'block' ? ['#35b9e0', '#8ad8ff'] : ['#c9baff', '#7d5bff', '#ffffff'], 10, 5);
+    G.hitstop(res === 'block' ? 4 : pd.hitstop || 6);
+  }
+}
+
+function pushApart() {
+  const [f1, f2] = G.fighters;
+  if (f1.dead || f2.dead) return;
+  if (['down', 'getup'].includes(f1.state) || ['down', 'getup'].includes(f2.state)) return;
+  if (!f1.grounded || !f2.grounded) return;
+  const b1 = f1.bodyBox(), b2 = f2.bodyBox();
+  const ox = Math.min(b1.x2, b2.x2) - Math.max(b1.x1, b2.x1);
+  if (ox <= 0) return;
+  const push = Math.min(3, ox / 2);
+  if (f1.x <= f2.x) { f1.x -= push; f2.x += push; }
+  else { f1.x += push; f2.x -= push; }
+  for (const f of [f1, f2]) f.x = Math.max(STAGE.left, Math.min(STAGE.right, f.x));
+}
+
+// ---- per-screen updates -----------------------------------------------------------
+function updateTitle() {
+  if (Input.consume('KeyW')) { G.titleSel = (G.titleSel + 2) % 3; AudioSys.sfx('menuMove'); }
+  if (Input.consume('KeyS')) { G.titleSel = (G.titleSel + 1) % 3; AudioSys.sfx('menuMove'); }
+  if (Input.consume('KeyJ') || Input.consume('Enter')) {
+    AudioSys.sfx('menuSel');
+    if (G.titleSel === 0 || G.titleSel === 1) {
+      G.select = {
+        phase: 'char', cursor: 0, p1: null, p2: null,
+        diff: 'normal', diffCursor: 1, vsT: 0,
+        training: G.titleSel === 1,
+      };
+      G.screen = 'select';
+    } else {
+      G.screen = 'controls';
+    }
+  }
+}
+
+function updateControls() {
+  if (Input.consume('KeyJ') || Input.consume('KeyK') || Input.consume('Escape')) {
+    AudioSys.sfx('menuBack');
+    G.screen = 'title';
+  }
+}
+
+function updateSelect() {
+  const s = G.select;
+  const ids = ['mack', 'kenji'];
+  if (s.phase === 'char') {
+    // directional, not toggle: A always selects left card, D always right
+    if (Input.consume('KeyA') && s.cursor !== 0) {
+      s.cursor = 0;
+      AudioSys.sfx('menuMove');
+    }
+    if (Input.consume('KeyD') && s.cursor !== 1) {
+      s.cursor = 1;
+      AudioSys.sfx('menuMove');
+    }
+    if (Input.consume('KeyJ')) {
+      s.p1 = ids[s.cursor];
+      s.p2 = ids[1 - s.cursor];
+      if (s.training) { s.phase = 'vs'; s.vsT = 0; AudioSys.sfx('fight'); }
+      else { s.phase = 'diff'; AudioSys.sfx('menuSel'); }
+    }
+    if (Input.consume('KeyK') || Input.consume('Escape')) { AudioSys.sfx('menuBack'); G.screen = 'title'; }
+  } else if (s.phase === 'diff') {
+    if (Input.consume('KeyA')) { s.diffCursor = (s.diffCursor + 2) % 3; AudioSys.sfx('menuMove'); }
+    if (Input.consume('KeyD')) { s.diffCursor = (s.diffCursor + 1) % 3; AudioSys.sfx('menuMove'); }
+    if (Input.consume('KeyJ')) {
+      s.diff = ['easy', 'normal', 'hard'][s.diffCursor];
+      s.phase = 'vs'; s.vsT = 0;
+      AudioSys.sfx('fight');
+    }
+    if (Input.consume('KeyK') || Input.consume('Escape')) { s.phase = 'char'; AudioSys.sfx('menuBack'); }
+  } else if (s.phase === 'vs') {
+    s.vsT++;
+    if (s.vsT >= (s.training ? 60 : 100)) startMatch(s.p1, s.p2, s.diff, false, !!s.training);
+  }
+}
+
+function updateResult() {
+  if (Input.consume('KeyJ') || Input.consume('KeyR')) {
+    AudioSys.sfx('menuSel');
+    const c = G.matchCfg;
+    startMatch(c.p1Id, c.p2Id, c.diff, c.demo, c.training);
+  } else if (Input.consume('KeyK')) {
+    AudioSys.sfx('menuBack');
+    G.select = { phase: 'char', cursor: 0, p1: null, p2: null, diff: 'normal', diffCursor: 1, vsT: 0 };
+    G.screen = 'select';
+  } else if (Input.consume('Escape')) {
+    AudioSys.sfx('menuBack');
+    G.screen = 'title';
+  }
+}
+
+function updateFight() {
+  // pause handling
+  if (Input.consume('Escape') || Input.consume('KeyP')) {
+    if (!G.paused) { G.paused = true; G.pauseView = 'menu'; AudioSys.sfx('menuSel'); }
+    else if (G.pauseView === 'keys') { G.pauseView = 'menu'; }
+    else { // quit to title
+      G.paused = false;
+      G.screen = 'title';
+      AudioSys.playBgm('menu');
+      AudioSys.sfx('menuBack');
+      return;
+    }
+  }
+  if (G.paused) {
+    if (G.pauseView === 'menu') {
+      if (Input.consume('KeyJ')) { G.paused = false; AudioSys.sfx('menuSel'); }
+      else if (Input.consume('KeyK')) { G.pauseView = 'keys'; AudioSys.sfx('menuMove'); }
+    } else {
+      if (Input.consume('KeyJ') || Input.consume('KeyK')) { G.pauseView = 'menu'; AudioSys.sfx('menuBack'); }
+    }
+    return;
+  }
+  if (Input.consume('KeyH')) G.showHint = !G.showHint;
+
+  // training-only controls
+  if (G.mode === 'training') {
+    if (Input.consume('KeyT')) {
+      const modes = ['stand', 'guard', 'cpu'];
+      const i = modes.indexOf(G.training.dummy);
+      G.training.dummy = modes[(i + 1) % 3];
+      const names = { stand: 'STAND', guard: 'AUTO-GUARD', cpu: 'CPU' };
+      Effects.text(512, 200, `DUMMY: ${names[G.training.dummy]}`, '#ffe27a', 16);
+      AudioSys.sfx('menuSel');
+    }
+    if (Input.consume('KeyR')) {
+      const [f1, f2] = G.fighters;
+      [[f1, 330, 1], [f2, 694, -1]].forEach(([f, x, face]) => {
+        f.x = x; f.y = STAGE.ground; f.vx = 0; f.vy = 0; f.facing = face;
+        f.hp = f.maxHp; f.dispHp = f.maxHp; f.guard = 0; f.meter = 100;
+        f.state = 'idle'; f.move = null; f.superSeq = null;
+        f.hitstun = 0; f.blockstun = 0; f.invuln = 0; f.lockout = 0;
+        f.kdPending = false; f.grounded = true; f.frozen = 0;
+        f.combo = { count: 0, timer: 0 }; f.comboable = 0;
+        f.setAnim('idle', true);
+      });
+      G.projectiles = [];
+      Effects.reset();
+      AudioSys.sfx('menuMove');
+    }
+  }
+
+  if (G.ann) { G.ann.t++; if (G.ann.t >= G.ann.dur) G.ann = null; }
+  if (G.superBanner) { G.superBanner.t--; if (G.superBanner.t <= 0) G.superBanner = null; }
+
+  if (G.hitstopT > 0) { G.hitstopT--; Effects.update(0.35); return; }
+
+  if (G.slowmoT > 0) {
+    G.slowmoT--;
+    if (G.slowmoT <= 0) { G.slowmo = 1; }
+    G.slowAcc += G.slowmo;
+    if (G.slowAcc < 1) { Effects.update(G.slowmo); return; }
+    G.slowAcc -= 1;
+  }
+
+  const [f1, f2] = G.fighters;
+
+  // phase sequencing
+  if (G.phase === 'intro') {
+    G.phaseT++;
+    if (G.phaseT === 1) {
+      setAnn(`ROUND ${G.round}`, 'round', 64, (f1.wins === 1 && f2.wins === 1) ? 'FINAL ROUND' : null);
+      AudioSys.sfx('round');
+    }
+    if (G.phaseT === 70) { setAnn('FIGHT!', 'fight', 36); AudioSys.sfx('fight'); }
+    if (G.phaseT >= 88) G.phase = 'fight';
+  } else if (G.phase === 'ko') {
+    G.phaseT++;
+    if (G.phaseT >= 150) awardRound();
+  } else if (G.phase === 'roundend') {
+    G.phaseT++;
+    if (G.phaseT >= 118) {
+      if (f1.wins >= 2 && f2.wins >= 2) { f1.wins = 1; f2.wins = 1; G.round++; startRound(); }
+      else if (f1.wins >= 2 || f2.wins >= 2) endMatch(f1.wins >= 2 ? f1 : f2);
+      else { G.round++; startRound(); }
+      return;
+    }
+  }
+
+  // pads
+  const locked = G.phase !== 'fight';
+  f1.pad = locked ? emptyPad() : (G.ai[0] ? G.ai[0].update() : humanPad());
+  if (locked) {
+    f2.pad = emptyPad();
+  } else if (G.mode === 'training' && G.training.dummy !== 'cpu') {
+    const p = emptyPad();
+    if (G.training.dummy === 'guard') {
+      // reactive perfect-guard: hold away only while threatened, else stand
+      const threatened = f1.state === 'attack' || G.projectiles.length > 0;
+      if (threatened) { if (f1.x >= f2.x) p.left = true; else p.right = true; }
+    }
+    f2.pad = p;
+  } else {
+    f2.pad = G.ai[1].update();
+  }
+
+  f1.update(f2);
+  f2.update(f1);
+  pushApart();
+
+  if (G.tick % 26 === 0) {
+    Effects.parts.push({
+      x: Math.random() * 1024, y: -6,
+      vx: 0.35 + Math.random() * 0.5, vy: 0.55 + Math.random() * 0.5,
+      life: 900, maxLife: 900, size: 2,
+      color: Math.random() < 0.5 ? '#c98a9e' : '#a86a80', grav: 0,
+    });
+  }
+
+  for (const pr of G.projectiles) pr.update();
+  G.projectiles = G.projectiles.filter(p => !p.dead);
+
+  if (G.phase === 'fight') resolveCombat();
+  Effects.update();
+
+  if (G.mode === 'training') {
+    // debug: ?pose=<moveKey> auto-repeats a move for visual inspection
+    if (G.poseTest && f1.state === 'idle' && G.tick % 40 === 0) f1.startMove(G.poseTest);
+    // infinite meter for the PLAYER only — a dummy with free meter just
+    // spams supers forever; the dummy builds meter naturally
+    f1.meter = 100;
+    for (const f of G.fighters) {
+      if (f.hp < f.maxHp && G.tick - (f.lastHurt || 0) > 100 &&
+          ['idle', 'walk', 'guard'].includes(f.state) && f.comboable <= 0) {
+        f.hp = f.maxHp;
+        f.dispHp = f.maxHp;
+        f.guard = 0;
+      }
+    }
+    return; // no timer, no KO
+  }
+
+  // round timer
+  if (G.phase === 'fight') {
+    const prev = Math.ceil(G.roundTimer);
+    G.roundTimer -= 1 / 60;
+    const cur = Math.ceil(G.roundTimer);
+    if (cur !== prev && cur <= 10 && cur > 0) AudioSys.sfx('beep');
+    if (G.roundTimer <= 0) { endRoundTimeout(); return; }
+  }
+
+  // KO check
+  if (G.phase === 'fight') {
+    const d1 = f1.hp <= 0, d2 = f2.hp <= 0;
+    if (d1 || d2) doKO(d1, d2);
+  }
+}
+
+// ---- drawing -----------------------------------------------------------------------
+function drawFight() {
+  ctx.save();
+  let ox = 0, oy = 0;
+  if (G.shakeT > 0) {
+    G.shakeT--;
+    ox = (Math.random() * 2 - 1) * G.shakeMag;
+    oy = (Math.random() * 2 - 1) * G.shakeMag * 0.6;
+    if (G.shakeT <= 0) G.shakeMag = 0;
+  }
+  ctx.translate(ox, oy);
+
+  ctx.drawImage(UI.bgCanvas(G), 0, 0);
+  ctx.fillStyle = 'rgba(7,8,12,0.22)';
+  ctx.fillRect(0, 0, 1024, 576);
+
+  Effects.drawGhosts(ctx);
+
+  const [f1, f2] = G.fighters;
+  const f1Active = f1.state === 'attack' || f1.superSeq;
+  const f2Active = f2.state === 'attack' || f2.superSeq;
+  const order = f1Active && !f2Active ? [f2, f1] : f2Active && !f1Active ? [f1, f2] : [f2, f1];
+  for (const f of order) f.draw(ctx);
+
+  for (const pr of G.projectiles) pr.draw(ctx);
+  Effects.draw(ctx);
+
+  if (G.debug) {
+    for (const f of G.fighters) {
+      const bb = f.bodyBox();
+      ctx.strokeStyle = 'rgba(60,255,120,0.8)'; ctx.lineWidth = 1;
+      ctx.strokeRect(bb.x1, bb.y1, bb.x2 - bb.x1, bb.y2 - bb.y1);
+      const ab = f.activeBox();
+      if (ab) { ctx.strokeStyle = 'rgba(255,60,60,0.9)'; ctx.strokeRect(ab.x1, ab.y1, ab.x2 - ab.x1, ab.y2 - ab.y1); }
+    }
+  }
+  ctx.restore();
+
+  UI.drawHUD(ctx, G);
+  UI.drawSuperBanner(ctx, G);
+  UI.drawAnnounce(ctx, G);
+
+  if (G.koFlashT > 0) {
+    G.koFlashT--;
+    ctx.fillStyle = `rgba(255,255,255,${(G.koFlashT / 10) * 0.75})`;
+    ctx.fillRect(0, 0, 1024, 576);
+  }
+  if (G.paused) UI.drawPause(ctx, G);
+}
+
+function draw() {
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 1024, 576);
+  switch (G.screen) {
+    case 'boot':
+      ctx.fillStyle = '#0b0d12'; ctx.fillRect(0, 0, 1024, 576);
+      UI.pixText(ctx, 'LOADING...', 512, 300, { size: 18, align: 'center', color: '#8892ad' });
+      break;
+    case 'title': UI.drawTitle(ctx, G); break;
+    case 'controls': UI.drawControls(ctx, G); break;
+    case 'select': UI.drawSelect(ctx, G); break;
+    case 'result': UI.drawResult(ctx, G); break;
+    case 'fight': drawFight(); break;
+  }
+}
+
+function update() {
+  if (G.freezeAll) return;
+  G.tick++;
+  if (Input.consume('KeyM')) {
+    const m = AudioSys.toggleMute();
+    Effects.text(90, 520, m ? 'MUTED' : 'SOUND ON', '#8892ad', 12);
+  }
+  switch (G.screen) {
+    case 'title': updateTitle(); break;
+    case 'controls': updateControls(); break;
+    case 'select': updateSelect(); break;
+    case 'result': updateResult(); break;
+    case 'fight': updateFight(); break;
+  }
+}
+
+// ---- boot ---------------------------------------------------------------------------
+function applyUrlParams() {
+  const q = new URLSearchParams(location.search);
+  if (q.has('debug')) G.debug = true;
+  if (q.get('stage')) G.stageArt = q.get('stage'); // ?stage=proc|alt
+  if (q.get('pose')) G.poseTest = q.get('pose');
+  const scr = q.get('screen');
+  if (scr && ['title', 'controls', 'select'].includes(scr)) G.screen = scr;
+  if (q.has('fight')) {
+    startMatch(
+      q.get('p1') || 'mack',
+      q.get('p2') || (q.get('p1') === 'kenji' ? 'mack' : 'kenji'),
+      q.get('ai') || 'normal',
+      q.has('demo'),
+      q.has('training'),
+    );
+  }
+  // debug fast-forward: simulate N ticks synchronously (headless verification)
+  const ff = parseInt(q.get('ff') || '0', 10);
+  for (let i = 0; i < ff; i++) update();
+  if (q.has('pause') && G.screen === 'fight') { G.paused = true; G.pauseView = 'menu'; } // debug
+  if (q.get('screen') === 'select' && q.has('vs')) { // debug: jump into VS splash
+    G.select = { phase: 'vs', cursor: 0, p1: q.get('p1') || 'mack', p2: q.get('p2') || 'kenji',
+                 diff: 'normal', diffCursor: 1, vsT: parseInt(q.get('vs'), 10) || 20, training: false };
+  }
+  if (q.has('freeze')) G.freezeAll = true; // exact-frame screenshots (debug)
+  // debug state hooks for visual verification
+  if (q.has('pause') && G.screen === 'fight') { G.paused = true; G.pauseView = q.get('pause') === 'keys' ? 'keys' : 'menu'; }
+  if (q.has('result') && G.screen === 'fight') endMatch(G.fighters[q.get('result') === '2' ? 1 : 0]);
+  const sp = q.get('selphase');
+  if (sp && G.screen === 'select') {
+    G.select.p1 = 'mack'; G.select.p2 = 'kenji';
+    if (sp === 'diff') G.select.phase = 'diff';
+    if (sp === 'vs') { G.select.phase = 'vs'; G.select.vsT = 0; }
+  }
+}
+
+function desiredBgm() { return G.screen === 'fight' ? 'battle' : 'menu'; }
+
+function unlockAudio() {
+  if (AudioSys.ensure()) AudioSys.playBgm(desiredBgm());
+}
+window.addEventListener('keydown', unlockAudio, { once: false });
+window.addEventListener('pointerdown', unlockAudio);
+
+let last = performance.now(), acc = 0;
+function loop(now) {
+  acc += Math.min(100, now - last);
+  last = now;
+  while (acc >= 16.667) { update(); acc -= 16.667; }
+  draw();
+  (Input.expire || Input.clearFrame)(); // tolerate a stale-cached input.js
+  requestAnimationFrame(loop);
+}
+
+(async function boot() {
+  try {
+    await Assets.load();
+    await UI.loadAssets(); // 和风 UI art; per-asset failures fall back internally
+    try {
+      await Promise.race([
+        Promise.all([document.fonts.load('16px PressStart'), document.fonts.load('16px FusionPixel'), document.fonts.load('16px FusionPixelJA')]),
+        new Promise(r => setTimeout(r, 3000)),
+      ]);
+    } catch (e) { /* fonts are cosmetic */ }
+    Stage.build();
+    UI.makePortraits();
+    applyUrlParams();
+    if (G.screen === 'boot') G.screen = 'title';
+  } catch (e) {
+    showErr(e);
+  }
+  last = performance.now();
+  requestAnimationFrame(loop);
+})();

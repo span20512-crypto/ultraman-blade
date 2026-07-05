@@ -1,0 +1,798 @@
+/* Fighter: state machine, frame-data driven attacks, chain cancels,
+   dash / backdash (i-frame dodge), block, knockdown, cinematic supers. */
+'use strict';
+
+class Fighter {
+  constructor(charId, x, facing, world) {
+    this.c = DATA[charId];
+    this.world = world;
+    this.x = x; this.y = STAGE.ground;
+    this.vx = 0; this.vy = 0;
+    this.facing = facing;
+    this.maxHp = 100; this.hp = 100; this.meter = 0;
+    this.wins = 0;
+    this.state = 'idle'; this.stateT = 0;
+    this.anim = { name: 'idle', t: 0, frame: 0, done: false };
+    this.move = null;          // active attack {def, t, hasHit, contact, contactT, want, spawned}
+    this.rekka = false;        // light->light chain used
+    this.rekkaH = false;       // heavy->heavy chain used
+    this.altL = false;         // alternate light slash (来回砍)
+    this.altH = false;         // alternate heavy swing
+    this.hitstun = 0; this.blockstun = 0; this.guard = 0;
+    this.invuln = 0; this.specialCd = 0; this.backdashCd = 0;
+    this.lockout = 0;          // landing recovery etc.
+    this.kdPending = false;
+    this.grounded = true;
+    this.dashT = 0; this.dashDir = 0;
+    this.combo = { count: 0, timer: 0 };   // as attacker
+    this.comboable = 0;                    // as victim: chain window
+    this.frozen = 0;
+    this.dead = false;
+    this.lastHurt = 0;         // world tick of last damage taken (training regen)
+    this.superSeq = null;      // cinematic super in progress
+    this.flash = 0;            // white flash on hit
+    this.pad = emptyPad();
+  }
+
+  // ---- animation --------------------------------------------------------
+  setAnim(name, restart = false) {
+    if (this.anim.name !== name || restart) {
+      this.anim = { name, t: 0, frame: 0, done: false };
+    }
+  }
+
+  updateAnim() {
+    if (this.state === 'attack' && this.move) {
+      const def = this.move.def;
+      const da = this.c.anims[def.anim];
+      const impact = def.impact !== undefined ? def.impact : Math.floor(da.frames / 2);
+      // seq entries may be numbers (frame of def.anim) or objects
+      // {a:'crouch', f:0} referencing a frame of another sheet — this is how
+      // crouching attacks start from / return to the baked crouch pose.
+      const setFrame = (fr) => {
+        if (typeof fr === 'object' && fr !== null) {
+          this.anim.name = fr.a; this.anim.frame = fr.f || 0;
+        } else {
+          this.anim.name = def.anim; this.anim.frame = fr;
+        }
+      };
+      if (def.dive) {
+        // hold the windup pose while plunging, land on the slash frame
+        this.anim.name = def.anim;
+        if (!this.move.landed) this.anim.frame = Math.max(0, impact - 1);
+        else this.anim.frame = Math.min(da.frames - 1, impact + Math.floor((this.move.t - this.move.landedT) / 7));
+        return;
+      }
+      // phase-aligned mapping: windup frames sweep through startup, the
+      // slash frame lands exactly on the active window, rest is recovery.
+      // def.seq allows custom frame paths (return slashes, overhead chops).
+      const t = this.move.t;
+      const sq = def.seq || {
+        w: Array.from({ length: Math.max(0, impact) }, (_, k) => k),
+        i: impact,
+        r: Array.from({ length: Math.max(0, da.frames - impact - 1) }, (_, k) => impact + 1 + k),
+      };
+      if (t < def.startup) {
+        const arr = sq.w.length ? sq.w : [sq.i];
+        setFrame(arr[Math.min(arr.length - 1, Math.floor(t / def.startup * arr.length))]);
+      } else if (t < def.startup + def.active) {
+        setFrame(sq.i);
+      } else {
+        const arr = sq.r.length ? sq.r : [sq.i];
+        const recT = t - def.startup - def.active;
+        const recDur = Math.max(1, def.total - def.startup - def.active);
+        setFrame(arr[Math.min(arr.length - 1, Math.floor(recT / recDur * arr.length))]);
+      }
+      return;
+    }
+    const d = this.c.anims[this.anim.name];
+    this.anim.t++;
+    let f = Math.floor(this.anim.t / d.hold);
+    if (d.loop) f %= d.frames;
+    else if (f >= d.frames) { f = d.frames - 1; this.anim.done = true; }
+    this.anim.frame = f;
+  }
+
+  // ---- boxes --------------------------------------------------------------
+  bodyBox() { return { x1: this.x - 30, y1: this.y - 148, x2: this.x + 30, y2: this.y }; }
+
+  activeBox() {
+    if (this.state !== 'attack' || !this.move) return null;
+    const d = this.move.def, m = this.move;
+    if (m.hasHit) return null;
+    const f = this.facing;
+    const rel = (x1, x2, y1, y2) => ({
+      x1: f > 0 ? this.x + x1 : this.x - x2,
+      x2: f > 0 ? this.x + x2 : this.x - x1,
+      y1: this.y + y1, y2: this.y + y2,
+    });
+    if (d.dive) {
+      if (!m.landed) return m.t >= d.startup ? rel(-25, 75, -115, 15) : null;
+      return m.t <= m.landedT + d.slamActive ? rel(-d.slamRange, d.slamRange, -80, 5) : null;
+    }
+    if (!d.box) return null;
+    if (m.t < d.startup || m.t >= d.startup + d.active) return null;
+    return rel(d.box.x1, d.box.x2, d.box.y1, d.box.y2);
+  }
+
+  // ---- helpers -------------------------------------------------------------
+  specialReady() { return this.specialCd <= 0 && !this.world.hasProjectile(this); }
+  superReady() { return this.meter >= 100; }
+  /* 'block' (= blockstun) counts as busy via the state itself; never gate on
+     the blockstun counter — a leaked counter once froze the AI permanently */
+  busy() { return !['idle', 'walk', 'guard', 'crouch'].includes(this.state); }
+  /* directional guard: holding the direction away from x at this instant */
+  holdingAway(fromX) {
+    const away = this.x >= fromX ? 1 : -1;
+    return away > 0 ? this.pad.right : this.pad.left;
+  }
+  comboScale(victim) {
+    const predicted = victim.comboable > 0 ? this.combo.count + 1 : 1;
+    return predicted <= 2 ? 1 : predicted <= 4 ? 0.72 : 0.5;
+  }
+
+  gainMeter(n) { this.meter = Math.min(100, this.meter + n); }
+
+  // ---- attack start / chain -------------------------------------------------
+  startMove(key, chained = false) {
+    // crouching variants: S held at the moment of the press
+    if (this.pad.crouch && this.grounded && (key === 'light' || key === 'heavy') &&
+        this.c.moves['c' + key]) {
+      key = 'c' + key;
+    } else if (key === 'light' && this.c.moves.light2) {
+      if (this.altL) key = 'light2';
+      this.altL = !this.altL;
+    } else if (key === 'heavy' && this.c.moves.heavy2) {
+      if (this.altH) key = 'heavy2';
+      this.altH = !this.altH;
+    }
+    const def = this.c.moves[key];
+    if (!def) return;
+    if (def.kind === 'super') {
+      if (!this.superReady()) return;
+      this.meter = 0;
+      this.world.superFlash(this, def);
+      // 聚气 burst: embers gather into the body during the super flash
+      // (the flash freezes the world, so these drift inward in slow motion)
+      Effects.converge(this.x, this.y - 85, [this.c.theme, this.c.theme2, '#ffffff'], 42, 110);
+    }
+    if (def.kind === 'special') this.specialCd = def.cooldown || 0;
+    if (def.invuln) this.invuln = Math.max(this.invuln, def.invuln);
+    if (!chained) { this.rekka = false; this.rekkaH = false; }
+    this.state = 'attack';
+    this.move = { def, t: 0, chained, hasHit: false, contact: false, contactT: 0, want: null, spawned: false, sfxDone: false, landed: false, landedT: 0 };
+    this.setAnim(def.anim, true);
+    // attacks inherit momentum: walking/dashing attacks step in, air attacks keep their arc
+    if (!def.air && !def.dash) this.vx *= 0.6;
+  }
+
+  chainLegal(cur, nextKey) {
+    const next = this.c.moves[nextKey];
+    if (!next || cur.air) return false;
+    if (cur.noChain) return false;                       // 蹲K: 独立技,不可取消出
+    if (this.pad.crouch && nextKey === 'heavy') return false; // 也不可被连入
+    if (nextKey === 'special' && !this.specialReady()) return false;
+    if (nextKey === 'super' && !this.superReady()) return false;
+    if (CHAIN_RANK[next.kind] > CHAIN_RANK[cur.kind]) return true;
+    if (cur.kind === 'light' && next.kind === 'light' && !this.rekka) return true;
+    if (cur.kind === 'heavy' && next.kind === 'heavy' && !this.rekkaH) return true;
+    return false;
+  }
+
+  // ---- main update ------------------------------------------------------------
+  update(opp) {
+    if (this.frozen > 0) { this.frozen--; return; }
+
+    if (this.invuln > 0) this.invuln--;
+    if (this.specialCd > 0) this.specialCd--;
+    if (this.backdashCd > 0) this.backdashCd--;
+    if (this.comboable > 0) this.comboable--;
+    if (this.flash > 0) this.flash--;
+    if (this.lockout > 0) this.lockout--;
+    if (this.combo.timer > 0) { this.combo.timer--; if (this.combo.timer <= 0) this.combo.count = 0; }
+    // guard gauge recovers slowly, and only after a beat with no blocks —
+    // sustained pressure keeps the crush threat alive
+    if (this.guard > 0 && this.blockstun <= 0 && this.world.tick - (this.lastBlockT || 0) > 55) {
+      this.guard = Math.max(0, this.guard - 0.14);
+    }
+
+    if (this.dead) {
+      if (this.grounded) this.vx *= 0.8; // body settles instead of sliding away
+      this.applyPhysics();
+      this.updateAnim();
+      return;
+    }
+
+    if (this.superSeq) { this.runSuperSeq(opp); this.applyPhysics(); this.updateAnim(); return; }
+
+    switch (this.state) {
+      case 'idle': case 'walk': case 'guard': this.groundedLogic(opp); break;
+      case 'crouch': this.crouchLogic(opp); break;
+      case 'block': this.blockLogic(opp); break;
+      case 'jump': case 'fall': this.airLogic(opp); break;
+      case 'dash': this.dashLogic(); break;
+      case 'backdash': this.backdashLogic(); break;
+      case 'attack': this.attackLogic(opp); break;
+      case 'hit': this.hitLogic(); break;
+      case 'down': this.downLogic(); break;
+      case 'getup': this.getupLogic(); break;
+    }
+
+    this.applyPhysics();
+    this.pickAnim();
+    this.updateAnim();
+
+    // full-meter aura
+    if (this.meter >= 100 && this.world.tick % 7 === 0) {
+      Effects.rise(this.x, this.y, this.c.theme2, 1);
+    }
+  }
+
+  groundedLogic(opp) {
+    this.facing = opp.x >= this.x ? 1 : -1;
+    const p = this.pad;
+    if (this.lockout > 0) { this.vx = 0; this.state = 'idle'; return; }
+
+    if (p.super && this.superReady()) return this.startMove('super');
+    if (p.special && this.specialReady()) return this.startMove('special');
+    if (p.heavy) return this.startMove('heavy');
+    if (p.light) return this.startMove('light');
+
+    if (p.dashL || p.dashR) {
+      const dir = p.dashR ? 1 : -1;
+      if (dir === this.facing) return this.startDash(dir);
+      if (this.backdashCd <= 0) return this.startBackdash(dir);
+    }
+
+    if (p.jump) {
+      return this.doJump((p.right ? 1 : p.left ? -1 : 0) * this.c.walk * 1.15);
+    }
+
+    if (p.crouch) { this.state = 'crouch'; this.crouchT = 0; this.vx = 0; return; }
+
+    const mx = (p.right ? 1 : 0) + (p.left ? -1 : 0);
+    // proximity guard stance: holding back while the opponent is attacking
+    // nearby primes the guard pose (actual block resolves on impact)
+    const threat = opp.state === 'attack' && Math.abs(opp.x - this.x) < 340;
+    if (threat && mx !== 0 && mx === -this.facing) {
+      this.state = 'guard';
+      this.vx = mx * this.c.walk * 0.45;
+      return;
+    }
+    this.vx = mx * this.c.walk;
+    this.state = mx !== 0 ? 'walk' : 'idle';
+  }
+
+  /* crouch stance: locked in place; J/K become low attacks (mapped in
+     startMove), U/I/W behave as normal */
+  crouchLogic(opp) {
+    this.facing = opp.x >= this.x ? 1 : -1;
+    this.vx = 0;
+    this.crouchT = (this.crouchT || 0) + 1;
+    const p = this.pad;
+    if (p.super && this.superReady()) return this.startMove('super');
+    if (p.special && this.specialReady()) return this.startMove('special');
+    if (p.heavy) return this.startMove('heavy');   // -> cheavy via startMove
+    if (p.light) return this.startMove('light');   // -> clight via startMove
+    if (p.jump) return this.doJump(0);
+    if (!p.crouch) this.state = 'idle';
+  }
+
+  /* blockstun after a successful directional block */
+  blockLogic(opp) {
+    this.vx *= 0.8;
+    if (this.blockstun > 0) { this.blockstun--; return; }
+    this.state = 'idle';
+  }
+
+  airLogic(opp) {
+    const p = this.pad;
+    if (!this.move) {
+      if (p.heavy) return this.startMove('dive');
+      if (p.light) return this.startMove('air');
+    }
+    // real air control: steer toward held direction, capped at walk speed
+    const mx = (p.right ? 1 : 0) + (p.left ? -1 : 0);
+    this.vx += mx * 0.55;
+    const cap = this.c.walk * 1.15;
+    this.vx = Math.max(-cap, Math.min(cap, this.vx));
+    this.state = this.vy < 0 ? 'jump' : 'fall';
+  }
+
+  doJump(vx) {
+    this.vy = this.c.jumpVy;
+    this.grounded = false;
+    this.vx = vx;
+    this.state = 'jump';
+    Effects.dust(this.x, this.y, 5);
+    AudioSys.sfx('jump');
+  }
+
+  startDash(dir) {
+    this.state = 'dash'; this.dashT = 0; this.dashDir = dir;
+    Effects.dust(this.x, this.y, 7, -dir);
+    AudioSys.sfx('dash');
+  }
+
+  startBackdash(dir) {
+    this.state = 'backdash'; this.dashT = 0; this.dashDir = dir;
+    this.invuln = 13;           // dodge i-frames
+    this.backdashCd = 42;
+    Effects.dust(this.x, this.y, 7, -dir);
+    AudioSys.sfx('dodge');
+  }
+
+  dashLogic() {
+    this.dashT++;
+    this.vx = this.dashDir * 9;
+    if (this.dashT % 3 === 0) Effects.ghost(this.spriteParams());
+    const p = this.pad;
+    // dash-jump: leap carrying dash momentum
+    if (p.jump) return this.doJump(this.dashDir * 8);
+    // dash can cancel into attacks after a few ticks
+    if (this.dashT > 5) {
+      if (p.super && this.superReady()) return this.startMove('super');
+      if (p.special && this.specialReady()) return this.startMove('special');
+      if (p.heavy) return this.startMove('heavy');
+      if (p.light) return this.startMove('light');
+    }
+    if (this.dashT >= 20) { this.state = 'idle'; this.vx = 0; }
+  }
+
+  backdashLogic() {
+    this.dashT++;
+    this.vx = this.dashDir * 7.5;
+    if (this.dashT % 3 === 0) Effects.ghost(this.spriteParams());
+    if (this.pad.jump) return this.doJump(this.dashDir * 6); // hop-back
+    if (this.dashT >= 17) { this.state = 'idle'; this.vx = 0; }
+  }
+
+  attackLogic(opp) {
+    const m = this.move;
+    if (!m) { this.state = 'idle'; return; }
+    m.t++;
+
+    const d = m.def;
+    // swing sound just before active frames
+    if (!m.sfxDone && m.t >= Math.max(1, d.startup - 3)) {
+      AudioSys.sfx(d.sfx); m.sfxDone = true;
+    }
+    // super act 1 聚气: inward ember stream while charging
+    if (d.kind === 'super' && m.t < d.startup && m.t % 2 === 0) {
+      Effects.converge(this.x, this.y - 85, [this.c.theme, this.c.theme2, '#ffffff'], 4, 74);
+    }
+    // 小跳升: crouching rising slash springs off the ground on its first
+    // active tick — height is expressed physically, not by rotating the sprite
+    if (d.hop && m.t === d.startup && this.grounded) {
+      this.vy = d.hop;
+      this.grounded = false;
+      Effects.dust(this.x, this.y, 6);
+    }
+    // 程序化刀光: blade-arc fx fires as the active window opens
+    if (d.fx && m.t === d.startup) {
+      const list = Array.isArray(d.fx) ? d.fx : [d.fx];
+      for (const e of list) {
+        Effects.slash(this.x + this.facing * (e.x || 48), this.y + (e.y || -100), this.facing, e);
+      }
+    }
+    // forward motion (dash specials / supers)
+    if (d.dash && m.t >= d.dash.from && m.t <= d.dash.to) {
+      this.vx = this.facing * d.dash.vx;
+      // super act 2 突进: denser afterimages + horizontal speed lines
+      if (m.t % (d.kind === 'super' ? 2 : 3) === 0) Effects.ghost(this.spriteParams());
+      if (d.kind === 'super') {
+        Effects.parts.push({
+          x: this.x - this.facing * (8 + Math.random() * 52),
+          y: this.y - 28 - Math.random() * 112,
+          vx: -this.facing * (5 + Math.random() * 4), vy: 0,
+          life: 5 + Math.random() * 4, maxLife: 9,
+          size: 2, w: 12 + Math.floor(Math.random() * 12), h: 2,
+          color: Math.random() < 0.5 ? this.c.theme2 : '#ffffff',
+          grav: 0,
+        });
+      }
+    } else if (!d.air) {
+      this.vx *= 0.9;
+    }
+    // dive attack: plunge down-forward, slam on landing
+    if (d.dive) {
+      if (!m.landed) {
+        if (m.t >= d.startup) {
+          this.vy = Math.max(this.vy, d.diveSpeed);
+          this.vx = this.facing * d.diveDrift;
+          if (m.t % 3 === 0) Effects.ghost(this.spriteParams());
+        }
+      } else if (m.t >= m.landedT + d.recovery) {
+        this.move = null;
+        this.state = 'idle';
+        this.rekka = false;
+        return;
+      }
+    }
+    // kenji teleport super: 内爆 at the vanish point, 外爆 at the arrival
+    if (d.teleport && m.t === d.teleport.at) {
+      Effects.converge(this.x, this.y - 90, ['#7d5bff', '#35e0d8', '#c9baff'], 16, 52);
+      Effects.spark(this.x, this.y - 90, 0, ['#7d5bff', '#ffffff'], 6, 3);
+      const side = opp.x >= this.x ? 1 : -1;
+      this.x = Math.max(STAGE.left, Math.min(STAGE.right, opp.x + side * d.teleport.offset));
+      this.facing = opp.x >= this.x ? 1 : -1;
+      this.invuln = Math.max(this.invuln, d.teleport.invuln);
+      Effects.ring(this.x, this.y - 90, '#c9baff', 14);
+      Effects.spark(this.x, this.y - 90, 0, ['#7d5bff', '#35e0d8', '#ffffff'], 12, 5);
+      AudioSys.sfx('tele');
+    }
+    // projectile spawn
+    if (d.projectile && m.t === d.startup && !m.spawned) {
+      m.spawned = true;
+      this.world.spawnProjectile(this, d.projectile);
+    }
+
+    // buffer chain input
+    const p = this.pad;
+    if (p.super) m.want = 'super';
+    else if (p.special) m.want = 'special';
+    else if (p.heavy) m.want = 'heavy';
+    else if (p.light) m.want = 'light';
+
+    // execute chain on contact within the cancel window
+    if (m.want && m.contact && m.t <= m.contactT + 18 && this.grounded && this.chainLegal(d, m.want)) {
+      const nextKind = this.c.moves[m.want].kind;
+      if (d.kind === 'light' && nextKind === 'light') this.rekka = true;
+      if (d.kind === 'heavy' && nextKind === 'heavy') this.rekkaH = true;
+      const key = m.want;
+      this.move = null;
+      return this.startMove(key, true);
+    }
+
+    if (!d.dive && m.t >= d.total) {
+      this.move = null;
+      this.state = this.grounded ? 'idle' : 'fall';
+      this.rekka = false;
+      this.rekkaH = false;
+    }
+  }
+
+  hitLogic() {
+    this.vx *= 0.88;
+    if (this.grounded) {
+      if (this.kdPending) return this.knockdown();
+      this.hitstun--;
+      if (this.hitstun <= 0) this.state = 'idle';
+    }
+    // airborne: wait for landing (applyPhysics handles the fall)
+  }
+
+  knockdown() {
+    this.kdPending = false;
+    this.state = 'down'; this.stateT = 52;
+    this.setAnim('death', true);
+    Effects.dust(this.x, this.y, 10);
+    this.world.shake(4, 10);
+    AudioSys.sfx('land');
+  }
+
+  downLogic() {
+    this.vx *= 0.8;
+    this.stateT--;
+    if (this.stateT <= 0) {
+      this.state = 'getup'; this.stateT = 16;
+      this.invuln = 42;
+      AudioSys.sfx('getup');
+    }
+  }
+
+  getupLogic() {
+    this.stateT--;
+    if (this.stateT <= 0) this.state = 'idle';
+  }
+
+  // cinematic super: victim is held, scripted hits land on a timer
+  runSuperSeq(opp) {
+    const s = this.superSeq;
+    s.t++;
+    opp.frozen = 2;
+    opp.state = 'hit'; opp.hitstun = 12; opp.setAnim('hit');
+    opp.grounded = true; opp.y = STAGE.ground; opp.vy = 0; opp.vx = 0;
+
+    if (s.t % s.interval === 0 && s.done < s.hits) {
+      s.done++;
+      const dmg = Math.max(1, Math.round(s.dmgPer * s.scale));
+      opp.hp = Math.max(0, opp.hp - dmg);
+      opp.lastHurt = this.world.tick;
+      opp.flash = 5;
+      opp.setAnim('hit', true);
+      this.combo.count++; this.combo.timer = 60;
+      this.world.stats.maxCombo = Math.max(this.world.stats.maxCombo, this.combo.count);
+      // restart the anim ON its slash frame so every cine hit reads as a cut
+      this.setAnim(s.done % 2 === 0 ? 'attack1' : 'attack2', true);
+      const sImp = this.c.moves.super.impact !== undefined ? this.c.moves.super.impact : 2;
+      this.anim.t = this.c.anims[this.anim.name].hold * sImp;
+      // act 3 演出: every cine hit carves a big crescent across the victim,
+      // angle rotates per hit (斜劈 / 撩斩 / 横扫), theme colors alternate
+      const cutA = [[-2.5, 0.45], [0.7, -2.55], [-1.15, 1.0]][(s.done - 1) % 3];
+      Effects.slash(opp.x - this.facing * 8, opp.y - 96, this.facing, {
+        r: 130, a0: cutA[0], a1: cutA[1], w: 20, life: 13, grow: 2.2, sweep: 0.34,
+        color: s.done % 2 === 0 ? '#ffffff' : (this.c.id === 'mack' ? '#ffe27a' : '#b9fff7'),
+        color2: s.done % 2 === 0 ? this.c.theme2 : this.c.theme,
+      });
+      Effects.spark(opp.x, opp.y - 100, this.facing, ['#ffe27a', '#ff7a3d', '#ffffff'], 12, 6);
+      this.world.hitstop(5);
+      this.world.shake(4, 6);
+      AudioSys.sfx('hitH');
+    }
+
+    const finished = s.done >= s.hits && s.t >= s.hits * s.interval + 14;
+    if (finished || opp.hp <= 0) {
+      // final launcher
+      const dmg = Math.max(1, Math.round(s.final * s.scale));
+      opp.hp = Math.max(0, opp.hp - dmg);
+      opp.frozen = 0;
+      opp.state = 'hit'; opp.setAnim('hit', true);
+      opp.grounded = false; opp.vy = -9; opp.vx = this.facing * 9;
+      opp.kdPending = true;
+      this.combo.count++; this.combo.timer = 90;
+      this.world.stats.maxCombo = Math.max(this.world.stats.maxCombo, this.combo.count);
+      // 终结击: ring + crescent fan bursting outward; 隼人 adds slow sakura
+      // petals drifting down through the aftermath
+      const fanN = this.c.id === 'mack' ? 8 : 6;
+      for (let i = 0; i < fanN; i++) {
+        const base = (i / fanN) * Math.PI * 2 + 0.22;
+        Effects.slash(opp.x, opp.y - 104, 1, {
+          r: 46, grow: 4.5, a0: base - 0.34, a1: base + 0.34, w: 14, life: 12,
+          sweep: 0.3, color: i % 2 === 0 ? '#ffffff' : this.c.theme2,
+          color2: i % 2 === 0 ? this.c.theme : this.c.theme2,
+        });
+      }
+      Effects.ring(opp.x, opp.y - 104, this.c.id === 'mack' ? '#ffe27a' : '#c9baff', 20);
+      if (this.c.id === 'mack') Effects.petals(opp.x, opp.y - 130, 22);
+      Effects.spark(opp.x, opp.y - 110, this.facing, ['#ffffff', '#ffe27a', this.c.theme], 24, 9);
+      this.world.hitstop(10);
+      this.world.shake(9, 16);
+      AudioSys.sfx('hitH');
+      this.superSeq = null;
+      this.state = 'idle'; this.move = null;
+      this.setAnim('idle', true);
+    }
+  }
+
+  // ---- receiving hits -----------------------------------------------------
+  /* returns 'block' | 'crush' | 'hit' */
+  receiveHit(info, attacker) {
+    const dir = attacker.x >= this.x ? -1 : 1; // knock direction (away from attacker)
+    // KOF-style directional guard: you block only if, at the moment of impact,
+    // you are grounded in a neutral state AND holding away from the attacker.
+    // Committed actions (attacks/dashes/jumps) can't guard; cross-ups flip
+    // which direction counts as "away".
+    const blocking = this.grounded && !info.unblockable &&
+                     ['idle', 'walk', 'guard', 'block'].includes(this.state) &&
+                     this.holdingAway(attacker.x);
+
+    if (blocking) {
+      this.facing = attacker.x >= this.x ? 1 : -1;
+      this.state = 'block';
+      this.lastBlockT = this.world.tick;
+      this.guard += info.guardDmg || 8;
+      if (this.guard >= 100) return this.guardCrush(dir);
+      const chip = info.chip || 0;
+      if (chip > 0) { this.hp = Math.max(1, this.hp - chip); this.lastHurt = this.world.tick; } // chip never KOs
+      this.blockstun = info.blockstun || 10;
+      this.vx = dir * Math.max(3, (info.knock || 4) * 0.6);
+      attacker.vx = -dir * 2;
+      this.gainMeter(3);
+      attacker.gainMeter(4);
+      AudioSys.sfx('block');
+      return 'block';
+    }
+
+    const scale = attacker.comboScale(this);
+    const dmg = Math.max(1, Math.round(info.dmg * scale));
+    this.hp = Math.max(0, this.hp - dmg);
+    this.lastHurt = this.world.tick;
+    this.flash = 6;
+    this.blockstun = 0; // getting hit out of block must not leak blockstun
+    this.hitstun = info.hitstun || 16;
+    this.vx = dir * (info.knock || 4);
+    this.state = 'hit';
+    this.move = null;
+    this.setAnim('hit', true);
+
+    if (info.kd || !this.grounded) {
+      this.grounded = false;
+      this.vy = Math.min(this.vy, info.launch || -7.5); // launchers pop higher
+      this.kdPending = true;
+    }
+
+    // combo bookkeeping
+    if (this.comboable > 0) attacker.combo.count++;
+    else attacker.combo.count = 1;
+    attacker.combo.timer = 60;
+    this.comboable = this.hitstun + 22;
+    this.world.stats.maxCombo = Math.max(this.world.stats.maxCombo, attacker.combo.count);
+
+    this.gainMeter(Math.round(dmg * 0.7));
+    attacker.gainMeter(info.meterHit || 8);
+    AudioSys.sfx(info.hitSfx || 'hitL');
+    return 'hit';
+  }
+
+  guardCrush(dir) {
+    this.guard = 0;
+    this.blockstun = 0;
+    this.state = 'hit';
+    this.move = null;
+    this.hitstun = 55;
+    this.comboable = 70;
+    this.flash = 8;
+    this.vx = dir * 5;
+    this.setAnim('hit', true);
+    Effects.text(this.x, this.y - 205, 'GUARD CRUSH!', '#ffc531', 15);
+    AudioSys.sfx('crush');
+    return 'crush';
+  }
+
+  die() {
+    this.dead = true;
+    this.hp = 0;
+    this.superSeq = null;
+    this.move = null;
+    this.frozen = 0;
+    this.state = 'dead';
+    this.setAnim('death', true);
+  }
+
+  // ---- physics -------------------------------------------------------------
+  applyPhysics() {
+    if (!this.grounded) {
+      this.vy += 0.8;
+      this.y += this.vy;
+      if (this.y >= STAGE.ground) {
+        this.y = STAGE.ground;
+        this.grounded = true;
+        this.vy = 0;
+        Effects.dust(this.x, this.y, 5);
+        if (this.dead) { /* body settles */ }
+        else if (this.state === 'hit' && this.kdPending) this.knockdown();
+        else if (this.state === 'attack' && this.move && this.move.def.dive && !this.move.landed) {
+          // ground slam impact
+          this.move.landed = true;
+          this.move.landedT = this.move.t;
+          this.vx = 0;
+          Effects.dust(this.x, this.y, 14);
+          Effects.ring(this.x, this.y - 8, '#ffd27a');
+          this.world.shake(8, 12);
+          AudioSys.sfx('slam');
+        }
+        else if (this.state === 'attack' && this.move && this.move.def.air) {
+          this.move = null; this.state = 'idle'; this.lockout = 8;
+          AudioSys.sfx('land');
+        } else if (this.state === 'jump' || this.state === 'fall') {
+          this.state = 'idle'; this.lockout = 5;
+          AudioSys.sfx('land');
+        }
+      }
+    }
+    this.x += this.vx;
+    if (this.x < STAGE.left) { this.x = STAGE.left; if (this.state !== 'hit') this.vx = 0; }
+    if (this.x > STAGE.right) { this.x = STAGE.right; if (this.state !== 'hit') this.vx = 0; }
+  }
+
+  pickAnim() {
+    switch (this.state) {
+      case 'idle': this.setAnim('idle'); break;
+      case 'walk': this.setAnim('run'); break;
+      case 'guard': case 'block': this.setAnim('idle'); break;
+      case 'crouch': this.setAnim(this.crouchT < 5 ? 'crouchin' : 'crouch'); break;
+      case 'jump': this.setAnim('jump'); break;
+      case 'fall': this.setAnim('fall'); break;
+      case 'dash': this.setAnim('run'); break;
+      case 'backdash': this.setAnim('fall'); break;
+      case 'hit': this.setAnim('hit'); break;
+      case 'down': break;   // death anim set on knockdown
+      case 'getup': this.setAnim('idle'); break;
+      case 'attack': break; // set on startMove
+    }
+  }
+
+  // ---- drawing ---------------------------------------------------------------
+  spriteParams() {
+    const c = this.c;
+    const s = c.scale;
+    let yOff = 0;
+    // yOff only applies to frames of the attack sheet itself — referenced
+    // crouch frames (seq objects) are already baked at the right height
+    if (this.state === 'attack' && this.move && this.move.def.yOff &&
+        this.anim.name === this.move.def.anim) yOff = this.move.def.yOff;
+    return {
+      img: Assets.img(`${c.id}:${this.anim.name}`),
+      sx: this.anim.frame * 200,
+      dx: this.x - c.anchor.x * s,
+      dy: this.y - c.anchor.y * s + yOff,
+      dw: 200 * s, dh: 200 * s,
+      flip: this.facing !== c.native,
+      mirrorX: this.x,
+    };
+  }
+
+  draw(ctx) {
+    // ground shadow
+    const air = Math.max(0, STAGE.ground - this.y);
+    const sw = Math.max(24, 54 - air * 0.12);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(this.x, STAGE.ground + 6, sw, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const p = this.spriteParams();
+    if (!p.img) return;
+    ctx.save();
+    if (p.flip) {
+      ctx.translate(p.mirrorX, 0); ctx.scale(-1, 1); ctx.translate(-p.mirrorX, 0);
+    }
+    // nose-down tilt while plunging
+    const diving = this.state === 'attack' && this.move && this.move.def.dive &&
+                   !this.move.landed && this.move.t >= this.move.def.startup;
+    if (diving) {
+      const pivotY = this.y - 80;
+      ctx.translate(this.x, pivotY);
+      // inside the mirror transform rotation flips visually — compensate so
+      // "nose-down" reads the same whichever way the fighter faces
+      ctx.rotate(0.32 * (p.flip ? -1 : 1));
+      ctx.translate(-this.x, -pivotY);
+    }
+    // blade-path tilt (kept only for the crouch stab): applies only while the
+    // shown frame is from the attack sheet — referenced crouch frames must
+    // never rotate
+    if (this.state === 'attack' && this.move && this.move.def.tilt &&
+        this.anim.name === this.move.def.anim) {
+      const mdef = this.move.def;
+      const pivotY = this.y - 78;
+      ctx.translate(this.x, pivotY);
+      ctx.rotate(mdef.tilt * (p.flip ? -1 : 1)); // keep blade direction facing-consistent
+      ctx.translate(-this.x, -pivotY);
+    }
+    const blink = (this.state === 'getup' || (this.state === 'backdash' && this.invuln > 0)) &&
+                  (this.world.tick % 6 < 3);
+    if (blink) ctx.globalAlpha = 0.45;
+    if (this.flash > 0) ctx.filter = 'brightness(2.4) saturate(0.4)';
+    ctx.drawImage(p.img, p.sx, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
+    ctx.filter = 'none';
+    // super act 1 聚气: pulsing additive body glow in the character's theme
+    if (this.state === 'attack' && this.move && this.move.def.kind === 'super' &&
+        this.move.t <= this.move.def.startup + 2) {
+      const hue = this.c.id === 'kenji' ? '215deg' : '-22deg';
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.34 + 0.24 * Math.sin(this.world.tick * 0.55);
+      ctx.filter = `sepia(1) saturate(4.5) hue-rotate(${hue}) brightness(1.15) blur(2px)`;
+      ctx.drawImage(p.img, p.sx, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
+      ctx.filter = 'none';
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // guard barrier: clean vertical energy pane, subtle when primed,
+    // bright during blockstun
+    if (this.state === 'guard' || this.state === 'block') {
+      const strong = this.state === 'block';
+      const bx = Math.round(this.x + this.facing * 44);
+      const h = 116, top = this.y - 136;
+      const base = strong ? 0.42 : 0.16 + 0.05 * Math.sin(this.world.tick * 0.25);
+      ctx.globalAlpha = base;
+      ctx.fillStyle = '#7fd8e8';
+      ctx.fillRect(bx - 4, top, 8, h);
+      // bright leading edge toward the opponent
+      ctx.globalAlpha = Math.min(1, base + 0.3);
+      ctx.fillStyle = '#e8fbff';
+      ctx.fillRect(bx + (this.facing > 0 ? 3 : -5), top, 2, h);
+      // caps
+      ctx.fillRect(bx - 7, top - 3, 14, 3);
+      ctx.fillRect(bx - 7, top + h, 14, 3);
+      // travelling shimmer band
+      const sy = top + ((this.world.tick * 4) % h);
+      ctx.globalAlpha = Math.min(1, base + 0.2);
+      ctx.fillStyle = '#bff0fa';
+      ctx.fillRect(bx - 4, sy, 8, Math.min(12, top + h - sy));
+      ctx.globalAlpha = 1;
+    }
+  }
+}

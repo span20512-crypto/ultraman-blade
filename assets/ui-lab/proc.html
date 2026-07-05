@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>UI asset pipeline — contact sheet</title>
+<style>
+  body { margin:0; background:#3f4048; color:#eee; font:12px monospace; }
+  canvas { display:block; }
+  #log { padding:8px 12px; color:#ffb; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div id="log"></div>
+<canvas id="sheet" width="1400" height="1500"></canvas>
+<script src="/js/ui.js?v=7"></script>
+<script>
+const log = m => document.getElementById('log').textContent += m + '\n';
+const cx = document.getElementById('sheet').getContext('2d');
+cx.imageSmoothingEnabled = false;
+
+function checker(x, y, w, h) {
+  for (let yy = 0; yy < h; yy += 8) for (let xx = 0; xx < w; xx += 8) {
+    cx.fillStyle = ((xx + yy) / 8) % 2 ? '#4a4b55' : '#57586386';
+    cx.fillRect(x + xx, y + yy, Math.min(8, w - xx), Math.min(8, h - yy));
+  }
+}
+function label(t, x, y) { cx.fillStyle = '#fff'; cx.font = '12px monospace'; cx.textAlign = 'left'; cx.fillText(t, x, y); }
+
+(async () => {
+  await UI.loadAssets();
+  const ua = UI.ua;
+  log('loaded: ' + Object.entries(ua).map(([k, v]) => k + (v ? ':OK' : ':NULL')).join('  '));
+
+  // row 1: portrait frame (raw + inner box) | seal | keycap raw | cursor
+  let X = 10, Y = 30;
+  label('portrait ' + (ua.portrait ? `${ua.portrait.w}x${ua.portrait.h} inner=${JSON.stringify(ua.portrait.inner)}` : 'NULL'), X, Y - 8);
+  if (ua.portrait) {
+    const p = ua.portrait, s = 180 / p.w;
+    checker(X, Y, 180, p.h * s); cx.drawImage(p.cv, X, Y, 180, p.h * s);
+    cx.strokeStyle = '#0f0'; cx.strokeRect(X + p.inner.x * s, Y + p.inner.y * s, p.inner.w * s, p.inner.h * s);
+    // composed sample at game size: 84px portrait + frame
+    const s2 = 86 / p.inner.w;
+    const fx = X + 260, fy = Y;
+    checker(fx - 12, fy - 2, 130, 130);
+    cx.fillStyle = '#7d5bff'; cx.fillRect(fx, fy + 10, 84, 84); // fake portrait
+    cx.drawImage(p.cv, fx - 1 - p.inner.x * s2, fy + 9 - p.inner.y * s2, p.w * s2, p.h * s2);
+  }
+  if (ua.seal) {
+    const p = ua.seal, X2 = 470, s = 130 / p.w;
+    label(`seal inner=${JSON.stringify(p.inner)}`, X2, Y - 8);
+    checker(X2, Y, 130, p.h * s); cx.drawImage(p.cv, X2, Y, 130, p.h * s);
+    cx.strokeStyle = '#0f0'; cx.strokeRect(X2 + p.inner.x * s, Y + p.inner.y * s, p.inner.w * s, p.inner.h * s);
+    // game size 92px with digits
+    const S = 92, s2 = S / p.w, X3 = X2 + 160;
+    checker(X3, Y, S, S); cx.drawImage(p.cv, X3, Y, S, p.h * s2);
+    UI.pixText(cx, '59', X3 + S / 2, Y + (p.inner.y + p.inner.h * 0.5) * s2 + 8, { size: 22, align: 'center', color: '#7a231a' });
+  }
+  if (ua.cursor) {
+    const p = ua.cursor, X2 = 760;
+    label(`cursor ${p.w}x${p.h}`, X2, Y - 8);
+    checker(X2, Y, 120, 60);
+    cx.drawImage(p.cv, X2 + 4, Y + 4, 24, 24 * p.h / p.w);
+    cx.drawImage(p.cv, X2 + 40, Y + 4, 40, 40 * p.h / p.w);
+  }
+  if (ua.title) {
+    const p = ua.title, X2 = 920, s = 190 / p.w;
+    label(`title ${p.w}x${p.h}`, X2, Y - 8);
+    checker(X2, Y, 190, p.h * s); cx.drawImage(p.cv, X2, Y, 190, p.h * s);
+  }
+  if (ua.vs) {
+    const p = ua.vs, X2 = 1140, s = 170 / p.w;
+    label(`vs ${p.w}x${p.h}`, X2, Y - 8);
+    checker(X2, Y, 170, p.h * s); cx.drawImage(p.cv, X2, Y, 170, p.h * s);
+  }
+
+  // row 2: health bar frame raw + composed with fills
+  Y = 250;
+  if (ua.hpframe) {
+    const p = ua.hpframe;
+    label(`hpframe display ${p.w}x${p.h} fill=${JSON.stringify(p.fill)}`, 10, Y - 8);
+    checker(10, Y, p.w, p.h);
+    cx.drawImage(p.cv, 10, Y);
+    cx.strokeStyle = '#0f0'; cx.strokeRect(10 + p.fill.x, Y + p.fill.y, p.fill.w, p.fill.h);
+    // composed sample: track+ghost+hp under frame
+    const bx = 10, by = Y + 60;
+    checker(bx, by, p.w, p.h);
+    cx.fillStyle = '#241d18'; cx.fillRect(bx + p.fill.x, by + p.fill.y, p.fill.w, p.fill.h);
+    cx.fillStyle = '#e8e4d8'; cx.fillRect(bx + p.fill.x, by + p.fill.y, p.fill.w * 0.8, p.fill.h);
+    cx.fillStyle = '#ff4a3d'; cx.fillRect(bx + p.fill.x, by + p.fill.y, p.fill.w * 0.62, p.fill.h);
+    cx.fillStyle = 'rgba(255,255,255,0.15)'; cx.fillRect(bx + p.fill.x, by + p.fill.y + 2, p.fill.w, 2);
+    cx.drawImage(p.cv, bx, by);
+    // mirrored
+    const mx = 10 + p.w + 30;
+    checker(mx, by, p.w, p.h);
+    cx.fillStyle = '#241d18'; cx.fillRect(mx + (p.w - p.fill.x - p.fill.w), by + p.fill.y, p.fill.w, p.fill.h);
+    cx.fillStyle = '#7d5bff'; cx.fillRect(mx + (p.w - p.fill.x - p.fill.w * 0.62), by + p.fill.y, p.fill.w * 0.62, p.fill.h);
+    cx.save(); cx.scale(-1, 1); cx.drawImage(p.cv, -(mx + p.w), by); cx.restore();
+  }
+
+  // row 3: meter variants + composed fill sample
+  Y = 420;
+  if (ua.meter) {
+    const p = ua.meter;
+    label(`meter display ${p.w}x${p.h} fill=${JSON.stringify(p.fill)}`, 10, Y - 8);
+    for (const [i, key] of [[0, 'empty'], [1, 'gold'], [2, 'hot']].values()) {
+      checker(10, Y + i * 46, p.w, p.h); cx.drawImage(p[key], 10, Y + i * 46);
+    }
+    cx.strokeStyle = '#0f0'; cx.strokeRect(10 + p.fill.x, Y + p.fill.y, p.fill.w, p.fill.h);
+    // 65% charge sample
+    const bx = 380, by = Y;
+    checker(bx, by, p.w, p.h);
+    cx.drawImage(p.empty, bx, by);
+    cx.save(); cx.beginPath(); cx.rect(bx + p.fill.x, by, p.fill.w * 0.65, p.h); cx.clip();
+    cx.drawImage(p.gold, bx, by); cx.restore();
+    label('65%', bx + p.w + 8, by + 20);
+  }
+
+  // row 4: panel raw + 9-slice samples
+  Y = 600;
+  if (ua.panel) {
+    const p = ua.panel, s = 300 / p.w;
+    label(`panel ${p.w}x${p.h}`, 10, Y - 8);
+    checker(10, Y, 300, p.h * s); cx.drawImage(p.cv, 10, Y, 300, p.h * s);
+    checker(330, Y, 380, 40); UI.nine(cx, p, 330, Y, 380, 40, 0.14);
+    checker(330, Y + 54, 160, 44); UI.nine(cx, p, 330, Y + 54, 160, 44, 0.14);
+    checker(730, Y, 300, 176); UI.nine(cx, p, 730, Y, 300, 176, 0.26);
+    checker(1050, Y, 320, 330); UI.nine(cx, p, 1050, Y, 320, 330, 0.3);
+  }
+
+  // row 5: keycaps
+  Y = 800;
+  if (ua.keycap) {
+    const p = ua.keycap, s = 130 / p.w;
+    label(`keycap ${p.w}x${p.h}`, 10, Y - 8);
+    checker(10, Y, 130, p.h * s); cx.drawImage(p.cv, 10, Y, 130, p.h * s);
+    // game-size mock: uniform 44 + wide 135 (3-slice test drawn manually here)
+    const H = 40, ss = H / p.h, capW = Math.round(p.w * ss);
+    checker(180, Y, 320, 60);
+    cx.drawImage(p.cv, 190, Y + 8, capW, H);
+    UI.pixText(cx, 'J', 190 + capW / 2, Y + 8 + Math.round(H * 0.42) + 5, { size: 13, align: 'center', color: '#ffe27a' });
+    const w2 = 135, l = Math.round(p.w * 0.21 * ss), r = Math.round(p.w * 0.195 * ss);
+    const bx = 260, by = Y + 8;
+    cx.drawImage(p.cv, 0, 0, p.w * 0.21, p.h, bx, by, l, H);
+    cx.drawImage(p.cv, p.w * 0.805, 0, p.w * 0.195, p.h, bx + w2 - r, by, r, H);
+    cx.drawImage(p.cv, p.w * 0.21, 0, p.w * (0.805 - 0.21), p.h, bx + l, by, w2 - l - r, H);
+    UI.pixText(cx, 'A A / D D', bx + w2 / 2, by + Math.round(H * 0.42) + 5, { size: 13, align: 'center', color: '#ffe27a' });
+  }
+  // ribbon
+  if (ua.ribbon) {
+    const p = ua.ribbon, s = 680 / p.w, X2 = 520;
+    label(`ribbon ${p.w}x${p.h}`, X2, Y - 8);
+    checker(X2, Y, 680, p.h * s); cx.drawImage(p.cv, X2, Y, 680, p.h * s);
+    UI.pixText(cx, 'ROUND 1', X2 + 340, Y + p.h * s / 2 + 12, { size: 40, align: 'center', color: '#f4f1e8', outline: true, shadow: 5 });
+  }
+
+  // row 6: stage
+  Y = 960;
+  if (ua.stage) {
+    label('stage 1024x576 (ground line marked at y=480)', 10, Y - 8);
+    cx.drawImage(ua.stage.cv, 10, Y, 1024 / 2, 576 / 2);
+    cx.strokeStyle = '#0f0'; cx.beginPath(); cx.moveTo(10, Y + 240); cx.lineTo(10 + 512, Y + 240); cx.stroke();
+    cx.drawImage(ua.stage.cv, 550, Y, 1024 * 0.78, 576 * 0.78);
+    cx.strokeStyle = '#0f0'; cx.beginPath(); cx.moveTo(550, Y + 480 * 0.78); cx.lineTo(550 + 1024 * 0.78, Y + 480 * 0.78); cx.stroke();
+  }
+  log('done');
+})().catch(e => log('ERR ' + (e.stack || e)));
+</script>
+</body>
+</html>

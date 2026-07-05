@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 · 动作实验室 ANIM LAB</title>
+<style>
+  body { margin:0; background:#14100d; color:#efe6d5; font:14px/1.6 "PingFang SC", monospace; }
+  header { padding:14px 22px 6px; }
+  h1 { margin:0; font-size:18px; color:#d9a441; }
+  .sub { color:#9a8f78; font-size:12px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; padding:8px 22px; align-items:center; }
+  button, select {
+    background:#241d18; color:#efe6d5; border:2px solid #8a6a2f; padding:6px 12px;
+    font:13px monospace; cursor:pointer; border-radius:0;
+  }
+  button.on { background:#b32b20; border-color:#d9a441; color:#fff; }
+  button:hover { border-color:#d9a441; }
+  #stagewrap { display:flex; gap:18px; padding:8px 22px; align-items:flex-start; }
+  canvas { background:#0c0a09; border:2px solid #8a6a2f; image-rendering:pixelated; }
+  #info { min-width:280px; background:#1b1512; border:2px solid #3a2d1c; padding:12px 16px; font-size:13px; }
+  #info b { color:#d9a441; }
+  #info .ph-w { color:#9a8f78; } #info .ph-a { color:#ff4a3d; } #info .ph-r { color:#35b9e0; }
+  table { border-collapse:collapse; margin-top:8px; }
+  td { border:1px solid #3a2d1c; padding:2px 10px; font-size:12px; }
+  .lbl { color:#9a8f78; }
+</style>
+</head>
+<body>
+<header>
+  <h1>拳魂 · 动作实验室 v2(真引擎)</h1>
+  <div class="sub">跑的就是游戏本体引擎, 刀光/圆环/花瓣 1:1。右侧木桩用于承接命中 — 连招取消和超杀演出只有真实命中才会发生。反馈请引用「角色/招式/tick」。</div>
+</header>
+<div class="row" id="charRow"></div>
+<div class="row" id="moveRow"></div>
+<div class="row">
+  速度
+  <select id="speed">
+    <option value="0.1">0.1x</option>
+    <option value="0.25" selected>0.25x</option>
+    <option value="0.5">0.5x</option>
+    <option value="1">1x</option>
+  </select>
+  <button id="pauseBtn">⏸ 暂停</button>
+  <button id="stepF">下一tick ▶|</button>
+  <button id="boxBtn">判定框: 开</button>
+</div>
+<div id="stagewrap">
+  <canvas id="cv" width="760" height="430"></canvas>
+  <div id="info">载入中…</div>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/data.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/fighter.js"></script>
+<script>
+'use strict';
+/* 真引擎沙盒: 复用 Fighter/Effects/Projectile, 只有战斗解算是 main.js tryHit
+   的精简副本(木桩不格挡)。若 main.js 的 tryHit 有改动, 此处需同步。 */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const CHARS = ['mack', 'kenji'];
+const SEQS = [
+  { key: 'idle',  label: '站立',        chain: [] },
+  { key: 'crouch',label: '下蹲',        chain: [], hold: 'crouch' },
+  { key: 'J',     label: 'J 轻击',      chain: ['light'] },
+  { key: 'JJ',    label: 'J·J 变招',    chain: ['light', 'light'] },
+  { key: 'K',     label: 'K 重击',      chain: ['heavy'] },
+  { key: 'KK',    label: 'K·K 终结',    chain: ['heavy', 'heavy'] },
+  { key: 'cJ',    label: '蹲J 削足',    chain: ['light'], hold: 'crouch' },
+  { key: 'cJJ',   label: '蹲J·J 连打',  chain: ['light', 'light'], hold: 'crouch' },
+  { key: 'cK',    label: '蹲K 升斩',    chain: ['heavy'], hold: 'crouch' },
+  { key: 'airJ',  label: '空中J',       chain: ['light'], air: true },
+  { key: 'dive',  label: '空中K 下砸',  chain: ['heavy'], air: true },
+  { key: 'U',     label: 'U 必杀',      chain: ['special'] },
+  { key: 'I',     label: 'I 超必杀(含圆环/花瓣)', chain: ['super'] },
+  { key: 'JJKK',  label: '连招 J·J·K·K', chain: ['light', 'light', 'heavy', 'heavy'] },
+  { key: 'JJKU',  label: '连招 J·J·K·U', chain: ['light', 'light', 'heavy', 'special'] },
+  { key: 'JJKI',  label: '连招 J·J·K·I', chain: ['light', 'light', 'heavy', 'super'] },
+];
+
+const _q = new URLSearchParams(location.search);
+let charId = _q.get('char') || 'mack';
+let seqKey = _q.get('seq') || 'J';
+let paused = false, showBox = true;
+
+// ---- stub world (the API surface Fighter needs) ---------------------------
+const W = {
+  tick: 0, hitstopT: 0, projectiles: [], stats: { maxCombo: 0 },
+  training: { dummy: 'stand' }, mode: 'lab',
+  hitstop(n) { this.hitstopT = Math.max(this.hitstopT, n); },
+  shake() {},
+  spawnProjectile(f, def) {
+    this.projectiles.push(new Projectile(f, def, f.x + f.facing * 70, f.y + def.y, f.facing));
+  },
+  hasProjectile(f) { return this.projectiles.some(p => p.owner === f && !p.dead); },
+  superFlash(f, def) { if (def.cine) { this.hitstopT = Math.max(this.hitstopT, 28); this.banner = { t: 28, def }; } },
+};
+
+let A = null, B = null;      // attacker / dummy
+let phase = 'run', restT = 0, chainIdx = 0, pressCd = 0, airPressed = false;
+
+function resetScene() {
+  const other = charId === 'mack' ? 'kenji' : 'mack';
+  A = new Fighter(charId, 380, 1, W);
+  B = new Fighter(other, 500, -1, W); // 触及距离内, 连锁取消才能开窗
+  const seq = SEQS.find(x => x.key === seqKey);
+  A.meter = seq.chain.includes('super') ? 100 : 0; // 满气光环只在超杀序列出现
+  W.projectiles = []; W.hitstopT = 0; W.banner = null;
+  W.tick = 0; W.stats.maxCombo = 0;               // 每循环从 0 计
+  Effects.reset();
+  phase = 'run'; chainIdx = 0; pressCd = 0; airPressed = false; restT = 0;
+}
+
+// ---- mini combat resolution (subset of main.js tryHit; dummy never guards) --
+function rectsOverlap(a, b) { return a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1; }
+function miniResolve() {
+  const boxA = A.activeBox(), mA = A.move;
+  if (boxA && mA && !B.dead && !B.superSeq && rectsOverlap(boxA, B.bodyBox())) {
+    if (!(B.invuln > 0 || B.state === 'down' || B.state === 'getup')) {
+      mA.hasHit = true; mA.contact = true; mA.contactT = mA.t;
+      const d = mA.def;
+      const kd = d.kd || (mA.chained && d.kind === 'heavy' && A.rekkaH);
+      const predicted = B.comboable > 0 ? A.combo.count + 1 : 1;
+      const finisher = mA.chained && predicted >= 3;
+      const bb = B.bodyBox();
+      const px = (Math.max(boxA.x1, bb.x1) + Math.min(boxA.x2, bb.x2)) / 2;
+      const py = (Math.max(boxA.y1, bb.y1) + Math.min(boxA.y2, bb.y2)) / 2;
+      const preScale = A.comboScale(B);
+      B.receiveHit({
+        dmg: finisher ? Math.round(d.dmg * 1.3) : d.dmg, chip: d.chip, guardDmg: d.guardDmg,
+        knock: d.knock, hitstun: d.hitstun, blockstun: d.blockstun, kd, meterHit: d.meterHit, hitSfx: d.hitSfx,
+      }, A);
+      Effects.spark(px, py, A.facing, ['#ffe27a', '#ff7a3d', '#ffffff'], 12, d.kind === 'light' ? 5 : 8);
+      W.hitstop(d.hitstop || 5);
+      if (d.kind === 'super' && d.cine && A.state === 'attack') {
+        A.vx = 0; A.move = null;
+        A.superSeq = { hits: d.cine.hits, interval: d.cine.interval, dmgPer: d.cine.dmgPer, final: d.cine.final, t: 0, done: 0, scale: preScale };
+        B.frozen = 2;
+      }
+    } else { mA.hasHit = true; }
+  }
+  for (const pr of W.projectiles) {
+    if (pr.dead || B.dead) continue;
+    if (rectsOverlap(pr.box(), B.bodyBox()) && !(B.invuln > 0 || ['down', 'getup'].includes(B.state))) {
+      const pd = pr.def;
+      B.receiveHit({ dmg: pd.dmg, chip: pd.chip, guardDmg: pd.guardDmg, knock: pd.knock, hitstun: pd.hitstun, blockstun: pd.blockstun, meterHit: pd.meterHit, hitSfx: 'hitL' }, pr.owner);
+      pr.dead = true;
+      Effects.spark(pr.x, pr.y, Math.sign(pr.vx), ['#c9baff', '#7d5bff', '#ffffff'], 10, 5);
+      W.hitstop(pd.hitstop || 6);
+    }
+  }
+}
+
+// ---- sequence driver (same pad-injection技法 as the combo test suite) ------
+function scriptPad(seq) {
+  const p = emptyPad();
+  if (seq.hold === 'crouch') p.crouch = true;
+  if (phase !== 'run') return p;
+  if (seq.air && !airPressed && A.state === 'idle') { p.jump = true; airPressed = true; return p; }
+  pressCd--;
+  const readyGround = chainIdx === 0 ? A.state === 'idle' || A.state === 'crouch' : (A.move && A.move.contact);
+  const readyAir = !A.grounded && A.vy > -9 && !A.move; // press on the way up/apex
+  const ready = seq.air ? readyAir : readyGround;
+  if (chainIdx < seq.chain.length && ready && pressCd <= 0) {
+    p[seq.chain[chainIdx]] = true;
+    chainIdx++; pressCd = 3;
+  }
+  return p;
+}
+
+function step() {
+  const seq = SEQS.find(s => s.key === seqKey);
+  if (W.hitstopT > 0) { W.hitstopT--; if (W.banner) W.banner.t--; Effects.update(0.35); return; }
+  W.tick++;
+  A.pad = scriptPad(seq);
+  B.pad = emptyPad();
+  A.update(B);
+  B.update(A);
+  for (const pr of W.projectiles) pr.update();
+  W.projectiles = W.projectiles.filter(p => !p.dead);
+  miniResolve();
+  Effects.update(1);
+
+  // loop control: after the sequence fully settles, hold a beat then reset
+  const done = chainIdx >= seq.chain.length && !A.move && !A.superSeq &&
+               ['idle', 'crouch'].includes(A.state) && ['idle', 'down', 'getup'].includes(B.state) &&
+               W.projectiles.length === 0;
+  if (phase === 'run' && done && seq.chain.length) { phase = 'rest'; restT = 0; }
+  if (phase === 'rest' && ++restT > 90 && B.state === 'idle') resetScene();
+}
+
+// ---- render ----------------------------------------------------------------
+function draw() {
+  ctx.clearRect(0, 0, 760, 430);
+  ctx.fillStyle = '#171126'; ctx.fillRect(0, 0, 760, 356);
+  ctx.fillStyle = '#241812'; ctx.fillRect(0, 356, 760, 74);
+  ctx.fillStyle = '#3d2b3a'; ctx.fillRect(0, 355, 760, 2);
+
+  ctx.save();
+  // world -> lab viewport: game ground y480 -> 356, shift x to center the pair
+  const offX = -130, offY = 356 - STAGE.ground;
+  ctx.translate(offX, offY);
+  Effects.drawGhosts(ctx);
+  B.draw(ctx);
+  ctx.fillStyle = '#9a8f78';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('DUMMY 木桩', B.x, B.y - 168);
+  A.draw(ctx);
+  for (const pr of W.projectiles) pr.draw(ctx);
+  Effects.draw(ctx);
+  if (showBox) {
+    const ab = A.activeBox();
+    if (ab) { ctx.strokeStyle = 'rgba(255,74,61,0.9)'; ctx.lineWidth = 2; ctx.strokeRect(ab.x1, ab.y1, ab.x2 - ab.x1, ab.y2 - ab.y1); }
+    const bb = A.bodyBox();
+    ctx.strokeStyle = 'rgba(60,255,120,0.3)'; ctx.lineWidth = 1;
+    ctx.strokeRect(bb.x1, bb.y1, bb.x2 - bb.x1, bb.y2 - bb.y1);
+  }
+  ctx.restore();
+
+  if (W.banner && W.banner.t > 0) {
+    ctx.fillStyle = `rgba(5,6,12,${Math.min(0.6, W.banner.t / 18)})`;
+    ctx.fillRect(0, 0, 760, 430);
+    ctx.fillStyle = '#ffe27a'; ctx.font = '20px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(W.banner.def.name, 380, 200);
+  }
+
+  // info
+  const m = A.move, d = m && m.def;
+  let ph = '-';
+  if (d && !d.dive) ph = m.t < d.startup ? 'windup' : m.t < d.startup + d.active ? 'ACTIVE' : 'recover';
+  else if (d && d.dive) ph = m.landed ? 'slam/recover' : 'plunge';
+  else if (A.superSeq) ph = 'SUPER CINE';
+  const cls = ph === 'ACTIVE' ? 'ph-a' : ph === 'windup' ? 'ph-w' : 'ph-r';
+  let html = `<b>${A.c.name} ${A.c.cn}</b> · ${SEQS.find(s => s.key === seqKey).label}<br>`;
+  html += `W.tick <b>${W.tick}</b> · 状态 <b>${A.state}</b> · 帧 <b>${A.anim.name}#${A.anim.frame}</b> · 阶段 <span class="${cls}"><b>${ph}</b></span>`;
+  if (m) html += ` · 招内tick <b>${m.t}</b>`;
+  if (A.superSeq) html += ` · cine ${A.superSeq.done}/${A.superSeq.hits}`;
+  if (d) {
+    html += `<table>
+      <tr><td class="lbl">招式</td><td>${d.name || d.anim + ':' + d.kind}</td></tr>
+      <tr><td class="lbl">前摇/判定/全长</td><td>${d.startup} / ${d.active || '-'} / ${d.total || 'dive'}</td></tr>
+      <tr><td class="lbl">伤害/削护</td><td>${d.dmg} / ${d.guardDmg || '-'}</td></tr>
+      <tr><td class="lbl">fx</td><td>${d.fx ? '有(引擎实时)' : '无'}${d.hop ? ' · hop ' + d.hop : ''}</td></tr>
+    </table>`;
+  }
+  html += `<div style="margin-top:8px;color:#9a8f78">木桩 HP ${Math.max(0, Math.round(B.hp))} · 本轮最大连击 ${W.stats.maxCombo}</div>`;
+  document.getElementById('info').innerHTML = html;
+}
+
+let acc = 0, last = performance.now();
+function loop(now) {
+  const dt = now - last; last = now;
+  if (!paused) {
+    acc += dt * parseFloat(document.getElementById('speed').value);
+    while (acc >= 16.667) { step(); acc -= 16.667; }
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---- ui wiring --------------------------------------------------------------
+function mkBtn(row, label, on, cb) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  if (on) b.classList.add('on');
+  b.onclick = () => cb(b);
+  document.getElementById(row).appendChild(b);
+}
+for (const cid of CHARS) {
+  mkBtn('charRow', `${DATA[cid].name} ${DATA[cid].cn}`, cid === charId, (b) => {
+    charId = cid; resetScene();
+    document.querySelectorAll('#charRow button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+  });
+}
+for (const s of SEQS) {
+  mkBtn('moveRow', s.label, s.key === seqKey, (b) => {
+    seqKey = s.key; resetScene();
+    document.querySelectorAll('#moveRow button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+  });
+}
+document.getElementById('pauseBtn').onclick = (e) => {
+  paused = !paused;
+  e.target.textContent = paused ? '▶ 播放' : '⏸ 暂停';
+};
+document.getElementById('stepF').onclick = () => {
+  paused = true; document.getElementById('pauseBtn').textContent = '▶ 播放'; step();
+};
+document.getElementById('boxBtn').onclick = (e) => { showBox = !showBox; e.target.textContent = `判定框: ${showBox ? '开' : '关'}`; };
+
+Assets.load().then(() => {
+  resetScene();
+  const ff = parseInt(_q.get('ff') || '0', 10);
+  for (let i = 0; i < ff; i++) step();
+  if (_q.has('freeze')) { paused = true; document.getElementById('pauseBtn').textContent = '▶ 播放'; }
+  requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>
