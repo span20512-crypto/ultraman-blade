@@ -24,7 +24,11 @@ const G = {
   hitstop(n) { this.hitstopT = Math.max(this.hitstopT, n); },
   shake(mag, t) { this.shakeMag = Math.max(this.shakeMag, mag); this.shakeT = Math.max(this.shakeT, t); },
   spawnProjectile(f, def) {
-    this.projectiles.push(new Projectile(f, def, f.x + f.facing * 70, f.y + def.y, f.facing));
+    // def.spread: 一次抛出多枚(扇形苦无), 每枚一个 vy; 否则单发
+    const vys = def.spread || [0];
+    for (const vy of vys) {
+      this.projectiles.push(new Projectile(f, def, f.x + f.facing * 70, f.y + def.y, f.facing, vy));
+    }
     AudioSys.sfx('projectile');
   },
   hasProjectile(f) { return this.projectiles.some(p => p.owner === f && !p.dead); },

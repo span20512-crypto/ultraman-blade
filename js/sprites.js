@@ -411,6 +411,7 @@ const Effects = {
       grow: o.grow !== undefined ? o.grow : 0.8,
       rise: o.rise || 0, vx: o.vx || 0,
       sweep: o.sweep || 0.4, ry: o.ry || 1, // ry<1 压扁成贴地平弧
+      lean: !!o.lean, // 精益: 无 additive 白芯 bloom, 清一色细锐弧(速度型忍者)
       life, maxLife: life,
     });
   },
@@ -688,15 +689,17 @@ const Effects = {
         ctx.globalAlpha = Math.min(1, g.alpha) * 0.8;
         ctx.fillRect(px - (w >> 1) - 1, py - (w >> 1) - 1, w + 2, w + 2);
       }
-      // pass 2 内芯亮色 (lighter: 沿弧内侧的灼热刃芯)
-      ctx.globalCompositeOperation = 'lighter';
+      // pass 2 内芯亮色
+      // lean(速度型忍者): source-over 细芯, 不 additive 烧白 —— 清一色细锐弧;
+      // 默认(豪剑): lighter 灼热刃芯, 富冲击白芒
+      ctx.globalCompositeOperation = s.lean ? 'source-over' : 'lighter';
       ctx.fillStyle = s.color;
       for (const g of seg) {
         const w = Math.max(2, Math.round(s.width * Math.pow(Math.sin(g.u * Math.PI), 0.65)));
-        const wi = Math.max(2, Math.round(w * 0.42));
+        const wi = Math.max(1, Math.round(w * (s.lean ? 0.34 : 0.42)));
         const ix = Math.round((s.x + Math.cos(g.ang) * (r - w * 0.3) * s.dir) / 2) * 2;
         const iy = Math.round((s.y + Math.sin(g.ang) * (r - w * 0.3) * s.ry) / 2) * 2;
-        ctx.globalAlpha = Math.min(1, g.alpha) * 0.55;
+        ctx.globalAlpha = Math.min(1, g.alpha) * (s.lean ? 0.9 : 0.55);
         ctx.fillRect(ix - (wi >> 1), iy - (wi >> 1), wi, wi);
       }
     }
@@ -931,38 +934,64 @@ const Effects = {
 
 /* Kenji's shadow shuriken. Drawn procedurally (spinning pixel blades + glow). */
 class Projectile {
-  constructor(owner, def, x, y, dir) {
+  constructor(owner, def, x, y, dir, vy = 0) {
     this.owner = owner; this.def = def;
     this.x = x; this.y = y; this.dir = dir;
-    this.vx = def.speed * dir;
+    this.vx = def.speed * dir; this.vy = vy;
+    this.kind = def.kind || 'shuriken';       // shuriken(四芒星) / kunai(苦无匕)
+    this.trail = def.trail || 'rgba(125,91,255,0.75)';
     this.t = 0; this.dead = false;
   }
 
   update() {
-    this.x += this.vx; this.t++;
-    if (this.x < -40 || this.x > STAGE.w + 40) this.dead = true;
+    this.x += this.vx; this.y += this.vy; this.t++;
+    if (this.x < -40 || this.x > STAGE.w + 40 || this.y < -20 || this.y > STAGE.ground + 20) this.dead = true;
     if (this.t % 2 === 0) {
       Effects.parts.push({
         x: this.x - this.dir * 10, y: this.y + (Math.random() - 0.5) * 10,
         vx: -this.dir * 0.6, vy: (Math.random() - 0.5) * 0.6,
-        life: 12, maxLife: 12, size: 3, color: 'rgba(125,91,255,0.75)', grav: 0,
+        life: 12, maxLife: 12, size: this.kind === 'kunai' ? 2 : 3, color: this.trail, grav: 0,
       });
     }
   }
 
-  box() { return { x1: this.x - 16, y1: this.y - 14, x2: this.x + 16, y2: this.y + 14 }; }
+  box() {
+    return this.kind === 'kunai'
+      ? { x1: this.x - 12, y1: this.y - 10, x2: this.x + 12, y2: this.y + 10 }
+      : { x1: this.x - 16, y1: this.y - 14, x2: this.x + 16, y2: this.y + 14 };
+  }
 
   draw(ctx) {
     ctx.save();
     ctx.translate(Math.round(this.x), Math.round(this.y));
-    ctx.fillStyle = 'rgba(125,91,255,0.25)';
-    ctx.fillRect(-14, -14, 28, 28);
-    ctx.rotate(this.t * 0.45);
-    ctx.fillStyle = '#c9baff';
-    ctx.fillRect(-13, -3, 26, 6);
-    ctx.fillRect(-3, -13, 6, 26);
-    ctx.fillStyle = '#35e0d8';
-    ctx.fillRect(-4, -4, 8, 8);
+    if (this.kind === 'kunai') {
+      // 苦无: 沿飞行方向的匕首(菱形刃+柄+环), 不旋转 —— 直刺感。放大 1.5x 更清晰
+      const a = Math.atan2(this.vy, this.vx * this.dir);
+      ctx.rotate(a);
+      ctx.scale(this.dir * 1.5, 1.5);
+      ctx.fillStyle = 'rgba(53,224,216,0.3)';
+      ctx.fillRect(-14, -5, 30, 10);                 // 拖影辉光
+      ctx.fillStyle = '#eafffd';                     // 菱形刃尖(最亮)
+      ctx.fillRect(8, -1, 10, 2);
+      ctx.fillStyle = '#d6fff8';                     // 菱形刃身
+      ctx.fillRect(3, -2, 8, 4);
+      ctx.fillRect(5, -3, 4, 6);
+      ctx.fillStyle = '#8fd8d0';                     // 柄
+      ctx.fillRect(-10, -1, 13, 2);
+      ctx.fillStyle = '#7d5bff';                     // 尾环
+      ctx.fillRect(-14, -3, 5, 6);
+      ctx.fillStyle = '#c9baff';
+      ctx.fillRect(-13, -2, 2, 4);
+    } else {
+      ctx.fillStyle = 'rgba(125,91,255,0.25)';
+      ctx.fillRect(-14, -14, 28, 28);
+      ctx.rotate(this.t * 0.45);
+      ctx.fillStyle = '#c9baff';
+      ctx.fillRect(-13, -3, 26, 6);
+      ctx.fillRect(-3, -13, 6, 26);
+      ctx.fillStyle = '#35e0d8';
+      ctx.fillRect(-4, -4, 8, 8);
+    }
     ctx.restore();
   }
 }
