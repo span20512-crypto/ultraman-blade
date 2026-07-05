@@ -62,7 +62,7 @@ const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
-const CHARS = ['mack', 'kenji'];
+const CHARS = ['mack', 'kenji', 'ayame'];
 const SEQS = [
   { key: 'idle',  label: '站立',        chain: [] },
   { key: 'crouch',label: '下蹲',        chain: [], hold: 'crouch' },
@@ -73,7 +73,7 @@ const SEQS = [
   { key: 'Kold',  label: 'K 重击(旧)',  chain: ['heavy'], legacy: true },
   { key: 'KK',    label: 'K·K 终结',    chain: ['heavy', 'heavy'] },
   { key: 'cJ',    label: '蹲J 削足',    chain: ['light'], hold: 'crouch' },
-  { key: 'cJJ',   label: '蹲J·J 连打',  chain: ['light', 'light'], hold: 'crouch' },
+  { key: 'cJJ',   label: '蹲J·J 连打', chain: ['light', 'light'], hold: 'crouch' },
   { key: 'cK',    label: '蹲K 升斩',    chain: ['heavy'], hold: 'crouch' },
   { key: 'airJ',  label: '空中J',       chain: ['light'], air: true },
   { key: 'dive',  label: '空中K 下砸',  chain: ['heavy'], air: true },
@@ -109,12 +109,13 @@ let A = null, B = null;      // attacker / dummy
 let phase = 'run', restT = 0, chainIdx = 0, pressCd = 0, airPressed = false;
 
 function resetScene() {
-  const other = charId === 'mack' ? 'kenji' : 'mack';
+  const other = charId === 'kenji' ? 'mack' : 'kenji';
   A = new Fighter(charId, 380, 1, W);
   B = new Fighter(other, 500, -1, W); // 触及距离内, 连锁取消才能开窗
   const seq = SEQS.find(x => x.key === seqKey);
   A.legacyFx = !!seq.legacy; // (旧) 对照按钮: 白月牙+椭圆弧+旧火花, 仅实验室
   A.finisherOverride = seq.finisher || null; // 超杀终结变体预览(A/B/C)
+  A.cjjVariant = seq.cjj || null;            // 蹲J·J 第二段方案预览(V1/V2/V3)
   A.meter = seq.chain.includes('super') ? 100 : 0; // 满气光环只在超杀序列出现
   W.projectiles = []; W.hitstopT = 0; W.banner = null;
   W.slowmoT = 0; W.slowmo = 1; W.slowAcc = 0;
@@ -140,7 +141,7 @@ function miniResolve() {
       const preScale = A.comboScale(B);
       B.receiveHit({
         dmg: finisher ? Math.round(d.dmg * 1.3) : d.dmg, chip: d.chip, guardDmg: d.guardDmg,
-        knock: d.knock, hitstun: d.hitstun, blockstun: d.blockstun, kd, meterHit: d.meterHit, hitSfx: d.hitSfx,
+        knock: d.knock, hitstun: d.hitstun, blockstun: d.blockstun, kd, launch: d.launch, meterHit: d.meterHit, hitSfx: d.hitSfx,
       }, A);
       // 与 main.js tryHit 同步: 月华式星爆(尺寸按威力分级)
       // legacy 对照: 复原旧粒子火花 + smear 化重击的旧 hitstop(9)

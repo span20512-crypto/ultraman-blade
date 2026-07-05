@@ -187,7 +187,7 @@ function tryHit(a, b, boxA, moveA) {
 
   const res = b.receiveHit({
     dmg: dmgVal, chip: d.chip, guardDmg: d.guardDmg, knock: d.knock, hitstun: d.hitstun,
-    blockstun: d.blockstun, kd, meterHit: d.meterHit, hitSfx: d.hitSfx,
+    blockstun: d.blockstun, kd, launch: d.launch, meterHit: d.meterHit, hitSfx: d.hitSfx,
   }, a);
 
   if (res === 'block') {

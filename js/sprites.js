@@ -17,6 +17,9 @@ const Assets = {
         list.push([`${cid}:${aname}`, `${c.dir}/${a.file}`]);
       }
     }
+    if (typeof FX_SHEETS !== 'undefined') {
+      for (const [name, s] of Object.entries(FX_SHEETS)) list.push([`fx:${name}`, s.file]);
+    }
     return Promise.all(list.map(([key, src]) => new Promise((res, rej) => {
       const img = new Image();
       img.onload = () => { Assets.images[key] = img; res(); };
@@ -34,37 +37,50 @@ const Assets = {
     for (const cid of Object.keys(DATA)) {
       const c = DATA[cid];
       for (const [aname, a] of Object.entries(c.anims)) {
-        if (!a.smearFrames || !a.smearFrames.length) continue;
-        const img = Assets.images[`${cid}:${aname}`];
-        if (!img) continue;
-        const W = img.width, H = img.height;
-        const cv = document.createElement('canvas');
-        cv.width = W; cv.height = H;
-        const gc = cv.getContext('2d');
-        gc.drawImage(img, 0, 0);
-        const px = gc.getImageData(0, 0, W, H).data;
-        const bank = {};
-        for (const f of a.smearFrames) {
-          const comp = Assets._crescentMask(px, W, f * 200, Math.min((f + 1) * 200, W), H);
-          if (!comp || comp.count < 60) continue; // 太小视为无月牙,走旧 fx 兜底
-          const edge = document.createElement('canvas');
-          edge.width = 200; edge.height = 200;
-          const ed = edge.getContext('2d').createImageData(200, 200);
-          for (let i = 0; i < comp.mask.length; i++) {
-            if (!comp.mask[i]) continue;
-            const lx = i % 200, ly = (i / 200) | 0;
-            const si = (ly * W + f * 200 + lx) * 4;
-            const di = i * 4;
-            ed.data[di] = px[si]; ed.data[di + 1] = px[si + 1];
-            ed.data[di + 2] = px[si + 2]; ed.data[di + 3] = px[si + 3];
-          }
-          edge.getContext('2d').putImageData(ed, 0, 0);
-          // 两档内芯腐蚀: rim=2 细色边(轻·快), rim=4 厚色边(重·豪)
-          bank[f] = { edge, core2: Assets._erode(edge, 2), core4: Assets._erode(edge, 4) };
-        }
-        if (Object.keys(bank).length) Assets.smears[`${cid}:${aname}`] = bank;
+        if (a.smearFrames && a.smearFrames.length) Assets._bakeSheet(`${cid}:${aname}`, a.smearFrames);
       }
     }
+    // 外部 fx 表(MH3 等): 帧为正方形, 边长=图高, 像素密度与主角色一致
+    if (typeof FX_SHEETS !== 'undefined') {
+      for (const [name, s] of Object.entries(FX_SHEETS)) Assets._bakeSheet(`fx:${name}`, s.smearFrames);
+    }
+  },
+
+  /* 单表烘焙: 提取 smearFrames 各帧的月牙层 -> Assets.smears[key] = {fs, frames} */
+  _bakeSheet(key, smearFrames) {
+    const img = Assets.images[key];
+    if (!img) return;
+    const W = img.width, H = img.height, fs = H; // 帧边长 = 图高(126/200 通吃)
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const gc = cv.getContext('2d');
+    gc.drawImage(img, 0, 0);
+    const px = gc.getImageData(0, 0, W, H).data;
+    const frames = {};
+    for (const f of smearFrames) {
+      const comp = Assets._crescentMask(px, W, f * fs, Math.min((f + 1) * fs, W), H);
+      if (!comp || comp.count < 60) continue; // 太小视为无月牙,走旧 fx 兜底
+      const edge = document.createElement('canvas');
+      edge.width = fs; edge.height = fs;
+      const ed = edge.getContext('2d').createImageData(fs, fs);
+      for (let i = 0; i < comp.mask.length; i++) {
+        if (!comp.mask[i]) continue;
+        const lx = i % fs, ly = (i / fs) | 0;
+        const si = (ly * W + f * fs + lx) * 4;
+        const di = i * 4;
+        ed.data[di] = px[si]; ed.data[di + 1] = px[si + 1];
+        ed.data[di + 2] = px[si + 2]; ed.data[di + 3] = px[si + 3];
+      }
+      edge.getContext('2d').putImageData(ed, 0, 0);
+      // 月牙质心(帧内坐标): 镜像绕 cx 翻转 / 缩放挤压绕质心锚定
+      let sx = 0, sy = 0, sn = 0;
+      for (let i = 0; i < comp.mask.length; i++) {
+        if (comp.mask[i]) { sx += i % fs; sy += (i / fs) | 0; sn++; }
+      }
+      // 两档内芯腐蚀: rim=2 细色边(轻·快), rim=4 厚色边(重·豪)
+      frames[f] = { edge, core2: Assets._erode(edge, 2), core4: Assets._erode(edge, 4), cx: sx / sn, cy: sy / sn };
+    }
+    if (Object.keys(frames).length) Assets.smears[key] = { fs, frames };
   },
 
   /* 帧内近纯白掩码的最大 4-连通域(排除刀身/衣物上的零散白点) */
@@ -104,19 +120,20 @@ const Assets = {
 
   /* 腐蚀 n 圈得到内芯层(smear 双色: 边缘主题色 + 灼亮内芯) */
   _erode(canvas, n) {
+    const S = canvas.width;
     const g = canvas.getContext('2d');
-    let a = g.getImageData(0, 0, 200, 200).data.slice();
+    let a = g.getImageData(0, 0, S, S).data.slice();
     for (let it = 0; it < n; it++) {
       const b = a.slice();
-      for (let y = 1; y < 199; y++) for (let x = 1; x < 199; x++) {
-        const i = (y * 200 + x) * 4 + 3;
-        if (a[i] && (!a[i - 4] || !a[i + 4] || !a[i - 800] || !a[i + 800])) b[i] = 0;
+      for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+        const i = (y * S + x) * 4 + 3;
+        if (a[i] && (!a[i - 4] || !a[i + 4] || !a[i - S * 4] || !a[i + S * 4])) b[i] = 0;
       }
       a = b;
     }
     const out = document.createElement('canvas');
-    out.width = 200; out.height = 200;
-    const od = out.getContext('2d').createImageData(200, 200);
+    out.width = S; out.height = S;
+    const od = out.getContext('2d').createImageData(S, S);
     od.data.set(a);
     out.getContext('2d').putImageData(od, 0, 0);
     return out;
@@ -128,14 +145,15 @@ const Assets = {
     let cv = Assets._tintCache.get(ck);
     if (cv) return cv;
     const bank = Assets.smears[key];
-    if (!bank || !bank[f]) return null;
+    if (!bank || !bank.frames[f]) return null;
+    const S = bank.fs;
     cv = document.createElement('canvas');
-    cv.width = 200; cv.height = 200;
+    cv.width = S; cv.height = S;
     const g = cv.getContext('2d');
-    g.drawImage(bank[f][layer], 0, 0);
+    g.drawImage(bank.frames[f][layer], 0, 0);
     g.globalCompositeOperation = 'source-in';
     g.fillStyle = color;
-    g.fillRect(0, 0, 200, 200);
+    g.fillRect(0, 0, S, S);
     Assets._tintCache.set(ck, cv);
     return cv;
   },
@@ -244,29 +262,58 @@ const Effects = {
      fighter.drawSmearOverlay), 这里只负责 additive 动效 —— 出刀闪白(首2tick)
      / 刃风 gale(招内) / 收势余波 echo(偏移残影)。世界坐标在出招瞬间快照,
      attach 时跟随角色。 */
-  /* animKey: 演出期(superSeq)move 已置空, 由调用方指明当前攻击表 */
+  /* animKey: 演出期(superSeq)move 已置空, 由调用方指明当前攻击表。
+     sdef.standalone: 蹲姿合成招 —— 身体帧全程蹲姿(表内无月牙), 刀光作为
+     独立基底逐相位绘制, 可用 dx/dy/squashY/scale 调低位平扫的形态。 */
   smearFx(fighter, sdef, animKey) {
-    const key = `${fighter.c.id}:${animKey || fighter.move.def.anim}`;
+    // sdef.sheet 是完整库键(如 'fx:mh3a3'); 未指定时用角色自己的攻击表
+    const key = sdef.sheet || `${fighter.c.id}:${animKey || fighter.move.def.anim}`;
     const bank = Assets.smears[key];
     if (!bank) return false;
     // 动效用月牙主帧(最大的那帧)做画笔
-    const frames = Object.keys(bank).map(Number).sort((a, b) => a - b);
+    const frames = Object.keys(bank.frames).map(Number).sort((a, b) => a - b);
     const edge = Assets.tinted(key, frames[0], 'edge', sdef.edge);
     if (!edge) return false;
+    const bankCx = bank.frames[frames[0]].cx; // 镜像动效的翻转轴(月牙质心)
+    const bankCy = bank.frames[frames[0]].cy;
+    const fs = bank.fs;
+    // cullPrev: 连锁第二刀开始时清掉前一刀残迹(节奏空拍, 两刀不糊在一起)
+    if (sdef.cullPrev) this.smears = this.smears.filter(x => x.owner !== fighter);
+    let phaseImgs = null;
+    if (sdef.standalone) {
+      phaseImgs = [];
+      const coreLayer = `core${sdef.rim || 2}`;
+      for (const ph of sdef.phases) {
+        const f = ph.f !== undefined ? ph.f : frames[0];
+        if (!bank.frames[f]) continue;
+        phaseImgs.push({
+          edge: Assets.tinted(key, f, 'edge', sdef.edge),
+          core: Assets.tinted(key, f, coreLayer, sdef.core),
+          t: ph.t,
+        });
+      }
+      if (!phaseImgs.length) return false;
+    }
     // 变换显式按攻击表计算(不用 spriteParams 瞬时状态 —— 出生 tick 时
-    // anim 可能还停在 seq 引用的蹲姿帧, 会丢 yOff)
+    // anim 可能还停在 seq 引用的蹲姿帧, 会丢 yOff)。
+    // 外部 fx 表(fs≠200)无角色锚点: 水平居中角色、底边贴脚, 再靠 dx/dy 微调
     const c = fighter.c, sc = c.scale;
     const yOff = (fighter.move && fighter.move.def.yOff) || 0;
+    const dw = fs * sc, dh = fs * sc;
+    const baseX = fs === 200 ? fighter.x - c.anchor.x * sc : fighter.x - dw / 2;
+    const baseY = fs === 200 ? fighter.y - c.anchor.y * sc + yOff : fighter.y - dh;
     const tPhases = sdef.phases.reduce((s, x) => s + x.t, 0);
     const decay = sdef.decay !== undefined ? sdef.decay : 2;
     const echo = sdef.echo || null;
     this.smears.push({
-      dx: fighter.x - c.anchor.x * sc, dy: fighter.y - c.anchor.y * sc + yOff,
-      dw: 200 * sc, dh: 200 * sc,
+      dx: baseX, dy: baseY, dw, dh, fs,
       flip: fighter.facing !== c.native, mirrorX: fighter.x,
       edge, t: 0, tPhases, decayEnd: tPhases + decay, echo,
       gale: sdef.gale || 0, // 必杀刃风: 放大 additive 重影 (1.06 = +6%)
-      mirror: !!sdef.mirror,
+      mirror: !!sdef.mirror, bankCx, bankCy, owner: fighter,
+      standalone: phaseImgs, ox: sdef.dx || 0, oy: sdef.dy || 0,
+      squashY: sdef.squashY || 1, scale: sdef.scale || 1,
+      rot: sdef.rot || 0, wipe: sdef.wipe || 0, // wipe: 前 N tick 沿刀路渐进擦入
       f: sdef.attach ? fighter : null, x0: fighter.x, y0: fighter.y,
       total: tPhases + decay + (echo ? echo.t : 0),
     });
@@ -303,7 +350,9 @@ const Effects = {
       this.shockRing(x, y - 60, '#ffffff', 3);
       this.shockRing(x, y - 60, th, 6);
       this.pillar(x, y, th2);
-      this.petals(x, y - 40, 18);
+      // 余韵按角色分语: 隼人=樱瓣落, 剑二=残影余烬升(冷)
+      if (f.c.id === 'mack') this.petals(x, y - 40, 18);
+      else { this.rise(x, y - 30, th2, 6); this.rise(x, y - 60, '#c8fff5', 5); }
     } else if (variant === 'C') {
       const key = `${f.c.id}:attack1`;
       const bank = Assets.smears[key];
@@ -313,8 +362,9 @@ const Effects = {
       }
       this.flashes.push({ color: th, alpha: 0.2, t: 5, t0: 5 });
       this.petalBurst(x, y - 90, 22);
-    } else { // 'A' 桜吹雪·衝
-      this.petalBurst(x, y - 80, 40);
+    } else { // 'A' 桜吹雪·衝: 爆发一瞬 + 爆点缓落花瓣雨(余韵主角)
+      this.petalBurst(x, y - 80, 26);
+      this.petalRain(x, y, 30);
       this.shockRing(x, y - 60, th2, 0);
       this.shockRing(x, y - 60, '#ffb7c9', 3);
       this.flashes.push({ color: '#ffb7c9', alpha: 0.18, t: 6, t0: 6 });
@@ -365,6 +415,24 @@ const Effects = {
     });
   },
 
+  /* 突刺: 直线快刺的刀线(亮芯长条 + 两侧薄流线), 轨迹最清晰的轻攻击视觉 */
+  thrust(x, y, dir, o = {}) {
+    const core = o.color2 || '#ffd24a', lite = o.color || '#fff6d8';
+    this.parts.push({
+      x: x + dir * 12, y,
+      vx: dir * 8.5, vy: 0,
+      life: 7, maxLife: 7, w: 30, h: 3, color: lite, grav: 0,
+    });
+    for (const oy of [-4, 4]) {
+      this.parts.push({
+        x: x + dir * 4, y: y + oy,
+        vx: dir * 7, vy: 0,
+        life: 6, maxLife: 6, w: 18, h: 2, color: core, grav: 0,
+      });
+    }
+    this.spark(x + dir * 46, y, dir, [lite, core], 3, 2.5);
+  },
+
   /* 聚气: 粒子从周围一圈向 (x,y) 汇聚, 到点即灭 (超杀起手/忍者内爆) */
   converge(x, y, colors, n = 8, r = 70) {
     for (let i = 0; i < n; i++) {
@@ -410,6 +478,22 @@ const Effects = {
         size: 3, petal: true,
         color: fast ? '#ffd9df' : (Math.random() < 0.5 ? '#ffb7c9' : '#fff3ee'),
         grav: 0.08, drag: 0.93, sway: 0.7 + Math.random() * 0.6, ph: Math.random() * 6.28,
+      });
+    }
+  },
+
+  /* 花瓣雨: 爆心正上方缓缓飘落的大瓣樱吹雪 —— 终结后的余韵主角, 慢而显眼 */
+  petalRain(x, y, n = 30) {
+    for (let i = 0; i < n; i++) {
+      this.parts.push({
+        x: x + (Math.random() - 0.5) * 150,
+        y: y - 90 - Math.random() * 120,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: 0.28 + Math.random() * 0.25,      // 比普通 petals 更慢
+        life: 90 + Math.random() * 60, maxLife: 150,
+        size: 3, petal: true, big: true,      // 大瓣, 更显眼
+        color: Math.random() < 0.55 ? '#ffb7c9' : '#ffd9df',
+        grav: 0, sway: 1.1 + Math.random() * 0.7, ph: Math.random() * 6.28,
       });
     }
   },
@@ -631,27 +715,57 @@ const Effects = {
       if (s.flip) {
         ctx.translate(mx, 0); ctx.scale(-1, 1); ctx.translate(-mx, 0);
       }
-      if (s.mirror) { // 回手招: 动效与基底重染同步镜像
-        const cx = dx + s.dw / 2;
+      if (s.mirror) { // 回手招: 动效与基底重染同步, 绕月牙质心镜像
+        const cx = dx + s.ox + s.bankCx * (s.dw / s.fs);
         ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0);
       }
-      ctx.globalCompositeOperation = 'lighter'; // 本层全部为 additive 动效
+      // 统一几何: standalone 的下沉/挤压/缩放对所有层生效(基底+闪白+余波+刃风),
+      // 绕月牙质心锚定, 质心位置不动; 非 standalone 时退化为原始 dx/dy/dw/dh
+      const cxW = s.bankCx * (s.dw / s.fs), cyW = s.bankCy * (s.dh / s.fs);
+      const gw = s.dw * s.scale, gh = s.dh * s.squashY * s.scale;
+      const gx = dx + s.ox + cxW * (1 - s.scale);
+      const gy = dy + s.oy + cyW * (1 - s.squashY * s.scale);
+      // standalone 基底: 蹲姿合成招的刀光本体(逐相位, 阶梯透明度)
+      if (s.standalone) {
+        let t = s.t, ph = null;
+        for (const p of s.standalone) { if (t < p.t) { ph = p; break; } t -= p.t; }
+        if (ph || s.t < s.decayEnd) {
+          const use = ph || s.standalone[s.standalone.length - 1];
+          ctx.save();
+          if (s.rot) { // 轻微转角(第二刀的角度变化), 绕月牙质心
+            const px = dx + s.ox + cxW, py = dy + s.oy + cyW;
+            ctx.translate(px, py); ctx.rotate(s.rot); ctx.translate(-px, -py);
+          }
+          if (s.wipe && s.t < s.wipe) { // 斩击擦入: 沿刀路 3 步量化"画出来"
+            const frac = (Math.floor(s.t) + 1) / (s.wipe + 1);
+            ctx.beginPath();
+            ctx.rect(gx, gy, gw * frac, gh);
+            ctx.clip();
+          }
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = ph ? 1 : 0.35;
+          if (use.edge) ctx.drawImage(use.edge, 0, 0, s.fs, s.fs, gx, gy, gw, gh);
+          if (ph && use.core) ctx.drawImage(use.core, 0, 0, s.fs, s.fs, gx, gy, gw, gh);
+          ctx.restore();
+        }
+      }
+      ctx.globalCompositeOperation = 'lighter'; // 以下为 additive 动效
       // 收势余波: 沿出刀方向偏移的 edge 残影(flip 变换内 +x 恒为面朝方向)
       if (s.t >= s.decayEnd && s.echo) {
         ctx.globalAlpha = 0.22;
-        ctx.drawImage(s.edge, 0, 0, 200, 200, dx + (s.echo.dx || 0), dy + (s.echo.dy || 0), s.dw, s.dh);
+        ctx.drawImage(s.edge, 0, 0, s.fs, s.fs, gx + (s.echo.dx || 0), gy + (s.echo.dy || 0), gw, gh);
       }
       // 必杀刃风: 招内持续的放大重影, 刀势外溢
       if (s.t < s.tPhases && s.gale) {
         const g = s.gale;
         ctx.globalAlpha = 0.3;
-        ctx.drawImage(s.edge, 0, 0, 200, 200,
-          dx - s.dw * (g - 1) / 2, dy - s.dh * (g - 1) / 2, s.dw * g, s.dh * g);
+        ctx.drawImage(s.edge, 0, 0, s.fs, s.fs,
+          gx - gw * (g - 1) / 2, gy - gh * (g - 1) / 2, gw * g, gh * g);
       }
       // 出刀首 2 tick: 过曝闪白(斩击的"炸开"感)
       if (s.t < 2) {
         ctx.globalAlpha = 0.55;
-        ctx.drawImage(s.edge, 0, 0, 200, 200, dx, dy, s.dw, s.dh);
+        ctx.drawImage(s.edge, 0, 0, s.fs, s.fs, gx, gy, gw, gh);
       }
       ctx.restore();
     }
@@ -768,23 +882,26 @@ const Effects = {
       ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.maxLife * 1.6));
       ctx.fillStyle = p.color;
       if (p.petal) {
-        // 花瓣: 4 向姿态轮换的小瓣片(平躺/斜倾/立起/反斜), 翻滚下落
+        // 花瓣: 4 向姿态轮换的瓣片(平躺/斜倾/立起/反斜), 翻滚下落
+        // big(花瓣雨大瓣, ~1.5x)慢速轮换姿态, 更显眼
         const px = Math.round(p.x), py = Math.round(p.y);
-        const o = Math.floor((p.maxLife - p.life) / 5 + p.ph) % 4;
+        const S = p.big ? 1.5 : 1;
+        const o = Math.floor((p.maxLife - p.life) / (p.big ? 7 : 5) + p.ph) % 4;
+        const r = (x, y, w, h) => ctx.fillRect(Math.round(px + x * S), Math.round(py + y * S), Math.max(1, Math.round(w * S)), Math.max(1, Math.round(h * S)));
         if (o === 0) {          // 平躺: 宽瓣 + 深色瓣尖
-          ctx.fillRect(px - 3, py - 1, 6, 2);
-          ctx.fillRect(px - 1, py - 2, 3, 1);
-          ctx.fillStyle = '#e88aa0'; ctx.fillRect(px + 2, py - 1, 1, 1);
+          r(-3, -1, 6, 2);
+          r(-1, -2, 3, 1);
+          ctx.fillStyle = '#e88aa0'; r(2, -1, 1.4, 1.4);
         } else if (o === 1) {   // 斜倾
-          ctx.fillRect(px - 2, py - 2, 3, 2);
-          ctx.fillRect(px, py, 3, 2);
-          ctx.fillStyle = '#e88aa0'; ctx.fillRect(px + 2, py + 1, 1, 1);
+          r(-2, -2, 3, 2);
+          r(0, 0, 3, 2);
+          ctx.fillStyle = '#e88aa0'; r(2, 1, 1.4, 1.4);
         } else if (o === 2) {   // 立起(侧视变窄)
-          ctx.fillRect(px - 1, py - 3, 2, 6);
+          r(-1, -3, 2, 6);
         } else {                // 反斜
-          ctx.fillRect(px, py - 2, 3, 2);
-          ctx.fillRect(px - 2, py, 3, 2);
-          ctx.fillStyle = '#e88aa0'; ctx.fillRect(px - 2, py + 1, 1, 1);
+          r(0, -2, 3, 2);
+          r(-2, 0, 3, 2);
+          ctx.fillStyle = '#e88aa0'; r(-2, 1, 1.4, 1.4);
         }
       } else if (p.w) { // 长条粒子(速度线)
         ctx.fillRect(Math.round(p.x - p.w / 2), Math.round(p.y - p.h / 2), p.w, p.h);

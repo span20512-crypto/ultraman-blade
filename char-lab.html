@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 · 角色候选调研 — 第二角色差异化</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #12101d; color: #d8cdb4; font: 13px/1.7 "SF Mono", Menlo, monospace; padding: 28px 34px 90px; }
+  h1 { font-size: 21px; color: #ffc531; letter-spacing: 2px; }
+  .sub { color: #9a8f78; margin: 4px 0 8px; }
+  h2 { font-size: 16px; color: #ffc531; margin: 40px 0 4px; }
+  h2 .tag { font-size: 11px; padding: 2px 8px; border: 1px solid; margin-left: 10px; vertical-align: middle; }
+  .rec { color: #35e0d8; border-color: #35e0d8; }
+  .alt { color: #ff8a3d; border-color: #ff8a3d; }
+  .keep { color: #b9a6ff; border-color: #7d5bff; }
+  .lead { color: #9a8f78; margin-bottom: 16px; max-width: 900px; }
+  hr { border: 0; border-top: 1px solid #3d2b3a; margin: 8px 0 0; }
+
+  /* 换体 diagram */
+  .swap { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #171126; border: 1px solid #3d2b3a; padding: 20px; margin: 14px 0; }
+  .box { border: 1px solid #3d2b3a; padding: 10px 14px; text-align: center; min-width: 128px; background: #0d0b16; }
+  .box .t { font-size: 12px; color: #fff2c8; font-weight: bold; }
+  .box .d { font-size: 11px; color: #9a8f78; margin-top: 3px; }
+  .box.swapbox { border-color: #35e0d8; box-shadow: 0 0 0 1px #35e0d833; }
+  .box.keepbox { border-color: #6a6055; opacity: .8; }
+  .op { font-size: 22px; color: #ffc531; }
+  .arrow { font-size: 22px; color: #35e0d8; }
+
+  .row { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; }
+  .anim { background: #171126; border: 1px solid #3d2b3a; padding: 10px; text-align: center; }
+  .anim.kuno { border-color: #7d5bff; }
+  .anim canvas { background: #0d0b16; image-rendering: pixelated; display: block; }
+  .anim .cap { font-size: 11px; color: #fff2c8; margin-top: 6px; font-weight: bold; }
+  .anim .sub2 { font-size: 10px; color: #9a8f78; }
+
+  table { border-collapse: collapse; margin: 14px 0; font-size: 12px; }
+  th, td { border: 1px solid #3d2b3a; padding: 6px 12px; text-align: left; }
+  th { color: #ffc531; background: #171126; }
+  td.hi { color: #35e0d8; }
+  td.lo { color: #9a8f78; }
+  .k { color: #b9a6ff; } .m { color: #ff8a3d; } .h { color: #66e8dc; }
+  ul { margin: 8px 0 8px 20px; } li { margin-bottom: 3px; }
+  .verdict { background: #1a1420; border-left: 3px solid #35e0d8; padding: 14px 18px; margin: 16px 0; max-width: 940px; }
+  .verdict b { color: #35e0d8; }
+</style>
+</head>
+<body>
+<h1>拳魂 · 第二角色差异化调研</h1>
+<div class="sub">核心要求: 第二角色的攻击/必杀/超杀要与隼人有明显区别, 不能雷同复用</div>
+<hr>
+
+<!-- ============ 什么是「换体」 ============ -->
+<h2>❓ 什么是「换体」<span class="tag keep">概念说明</span></h2>
+<div class="lead">你问方案二的"换体"是什么意思。本引擎是<b style="color:#fff2c8">数据驱动</b>的 —— 一个"角色"其实由三块拼成。"换体"= 换掉最左边那块<b style="color:#35e0d8">身体素材</b>, 招式和特效系统原样保留、重新组合:</div>
+<div class="swap">
+  <div class="box swapbox"><div class="t">① 身体素材</div><div class="d">动画帧图<br>(idle/跑/攻击…)</div></div>
+  <div class="op">+</div>
+  <div class="box keepbox"><div class="t">② 招式数据</div><div class="d">帧数/判定/连招<br>(data.js moveset)</div></div>
+  <div class="op">+</div>
+  <div class="box keepbox"><div class="t">③ 刀光/配色/打击感</div><div class="d">重染·星爆·冻结<br>(引擎, 通用)</div></div>
+  <div class="op">=</div>
+  <div class="box"><div class="t">一个角色</div></div>
+</div>
+<div class="lead"><b class="h">"剑二换体 → MH3"</b> = 把剑二的身体素材(Martial Hero 2, 攻击表仅 4 帧)整个替换成 <b class="h">Martial Hero 3</b> 的身体(7/6/9 帧三段攻击, 更丰富), 招式重新围绕新素材设计。②③ 两块和隼人共用同一套引擎, 所以"换体"很快 —— 主要工作是重写 moveset。<br>方案一的 <b class="h">Huntress 换体</b>同理, 只是身体换成完全不同武器(长枪)的角色。</div>
+
+<!-- ============ 方案一 Huntress ============ -->
+<h2>方案一 · Huntress 长枪忍者<span class="tag rec">我的首推</span></h2>
+<div class="lead">LuizMelo「Huntress」(同作者, CC0, 像素密度实测兼容)。原设是绿斗篷长枪猎手 → 程序化调色成<b class="k">靛蓝紫 kunoichi</b>(色相位移, 非 AI 生成)。三段攻击 5/5/7 帧, 武器是<b class="h">长柄枪</b> —— 突刺/横扫/下劈, 判定形状和隼人的刀弧从素材层就完全不同。下面是真实素材帧动画(左=原版, 右=kunoichi 调色):</div>
+<div class="row" id="huntressRow"></div>
+
+<table>
+  <tr><th>维度</th><th class="m">隼人(现有)</th><th class="h">Huntress 长枪(方案一)</th></tr>
+  <tr><td>武器语言</td><td class="lo">日本刀 · 圆弧月牙</td><td class="hi">长枪 · 直线突刺 / 大横扫</td></tr>
+  <tr><td>攻击距离</td><td class="lo">中(刀长)</td><td class="hi">远(枪 reach, 天然拉开身位)</td></tr>
+  <tr><td>攻击帧数</td><td class="lo">6 帧 ×2 表</td><td class="hi">5/5/7 帧 ×3 表(招式更细)</td></tr>
+  <tr><td>剪影差异</td><td class="lo">—</td><td class="hi">强(横持长杆 vs 竖握刀)</td></tr>
+  <tr><td>差异化上限</td><td class="lo">—</td><td class="hi">高(突刺系必杀/远程压制位, 打法逻辑都不同)</td></tr>
+</table>
+
+<!-- ============ 方案二 MH3 ============ -->
+<h2>方案二 · Martial Hero 3 换体<span class="tag alt">备选</span></h2>
+<div class="lead">MH3 身体(已入库, 三段攻击 7/6/9 帧: 竖劈/大回旋/长突刺)。招式形状比剑二丰富, 但<b class="m">仍是持剑男性</b> —— 剪影和隼人区分度只有中等, 存在"两个刀客"观感风险。下面是 MH3 攻击帧(注意: 这套我们目前只提取了刀光, 身体帧此前未用):</div>
+<div class="row" id="mh3Row"></div>
+
+<!-- ============ 方案四 留剑二 ============ -->
+<h2>方案四 · 留剑二 + 表现层差异化<span class="tag keep">已在做</span></h2>
+<div class="lead">不换素材, 靠<b class="k">配色(青紫)+ 刀光笔迹 + 机制</b>把剑二和隼人拉开。我刚按此方向重做了剑二全招: 拔刀速斩(青白细锐)、下劈(妖紫)、瞬身手里剑(远程)、超杀改<b class="k">終B 月輪爆</b>(隼人是終A 桜吹雪) + 影残余烬余韵。在 anim-lab 选 KENJI 可看。<b>局限</b>: 剪影仍是剑二(4 帧攻击表的素材上限不变)。</div>
+
+<div class="verdict">
+  <b>我的建议</b>: 差异化的"天花板"由<b>素材</b>决定, 不是特效能补的。方案四(现状)能把颜色/刀光/机制拉开, 但两人剪影都是"持刀武士", 近身招式的<b>体感</b>始终接近。<br>
+  想真正满足"不雷同"的核心要求, <b class="h">方案一 Huntress(长枪)</b>是唯一从武器语言层就根本不同的选择 —— 突刺 vs 挥斩是两种完全不同的战斗手感。这就是我推荐先给它做一个可玩原型的原因。
+</div>
+
+<script src="js/data.js"></script>
+<script>
+function mkAnim(parent, path, fs, scale, cap, sub, kuno) {
+  const box = document.createElement('div');
+  box.className = 'anim' + (kuno ? ' kuno' : '');
+  const cv = document.createElement('canvas');
+  const disp = Math.round(fs * scale);
+  cv.width = disp; cv.height = disp;
+  box.appendChild(cv);
+  box.insertAdjacentHTML('beforeend', `<div class="cap">${cap}</div><div class="sub2">${sub}</div>`);
+  parent.appendChild(box);
+  const img = new Image();
+  img.onload = () => {
+    const n = Math.max(1, Math.round(img.width / fs));
+    const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+    let f = 0;
+    setInterval(() => {
+      g.fillStyle = '#0d0b16'; g.fillRect(0, 0, disp, disp);
+      g.drawImage(img, f * fs, 0, fs, fs, 0, 0, disp, disp);
+      f = (f + 1) % n;
+    }, 140);
+  };
+  img.src = path;
+}
+const HR = document.getElementById('huntressRow');
+const HB = 'assets/img/huntress/';
+[['Idle','待机','8帧'],['Attack1','① 突刺','5帧 · 直线捅刺'],['Attack2','② 上撩','5帧 · 挑击'],['Attack3','③ 连扫','7帧 · 大横扫']].forEach(([f,c,s]) => {
+  mkAnim(HR, HB + f + '.png', 150, 1.5, '原版 · ' + c, s, false);
+  mkAnim(HR, HB + f + '_kunoichi.png', 150, 1.5, 'kunoichi · ' + c, s, true);
+});
+const MR = document.getElementById('mh3Row');
+[['Attack1','① 竖劈','7帧'],['Attack2','② 大回旋','6帧'],['Attack3','③ 长突刺','9帧']].forEach(([f,c,s]) => {
+  mkAnim(MR, 'assets/img/mh3/' + f + '.png', 126, 1.7, c, s, false);
+});
+</script>
+</body>
+</html>

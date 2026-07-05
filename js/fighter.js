@@ -136,6 +136,8 @@ class Fighter {
 
   // ---- attack start / chain -------------------------------------------------
   startMove(key, chained = false) {
+    // 蹲J 变招只在连锁内交替 —— 单发蹲J 必须永远是正手削足(否则会"起身"打返扫)
+    if (!chained) this.altCL = false;
     // crouching variants: S held at the moment of the press
     if (this.pad.crouch && this.grounded && (key === 'light' || key === 'heavy') &&
         this.c.moves['c' + key]) {
@@ -377,11 +379,17 @@ class Fighter {
     // 刀光: 优先素材月牙重染(smear, 对齐由构造保证); 无烘焙层时回退程序化弧线
     // legacyFx 仅供 anim-lab 新旧对照, 游戏本体永不设置; dive 的 smear 在落地时触发
     if (m.t === d.startup && !d.dive) {
-      const smeared = d.smear && !this.legacyFx ? Effects.smearFx(this, d.smear) : false;
-      if (!smeared && d.fx) {
-        const list = Array.isArray(d.fx) ? d.fx : [d.fx];
+      // cullSmear: 连锁第二刀出手瞬间清掉前一刀残迹(两刀不糊)
+      if (d.cullSmear) Effects.smears = Effects.smears.filter(s => s.owner !== this);
+      // smearAlt: 同招多方案(蹲J·J 三版本), lab 用 cjjVariant 切换预览
+      const sdef = (this.cjjVariant && d.smearAlt && d.smearAlt[this.cjjVariant]) || d.smear;
+      const smeared = sdef && !this.legacyFx ? Effects.smearFx(this, sdef) : false;
+      const fxDef = d.fx;
+      if (!smeared && fxDef) {
+        const list = Array.isArray(fxDef) ? fxDef : [fxDef];
         for (const e of list) {
-          Effects.slash(this.x + this.facing * (e.x || 48), this.y + (e.y || -100), this.facing, e);
+          if (e.thrust) Effects.thrust(this.x + this.facing * (e.x || 48), this.y + (e.y || -40), this.facing, e);
+          else Effects.slash(this.x + this.facing * (e.x || 48), this.y + (e.y || -100), this.facing, e);
         }
       }
     }
@@ -521,7 +529,8 @@ class Fighter {
       // 主题色轮换 + 全屏白闪一瞬 + 大星爆 —— 月华式爽快
       // 基底重染走 draw() 的帧同步覆盖(cineSmear), 这里只补出刀闪白动效
       let smeared = false;
-      if (!this.legacyFx && Assets.smears[`${this.c.id}:${this.anim.name}`]) {
+      const cineBank = Assets.smears[`${this.c.id}:${this.anim.name}`];
+      if (!this.legacyFx && cineBank && Object.keys(cineBank.frames).length) {
         this.cineSmear = {
           edge: s.done % 2 === 0 ? this.c.theme : this.c.theme2,
           core: '#fff6e8', rim: 4,
@@ -553,7 +562,8 @@ class Fighter {
       opp.hp = Math.max(0, opp.hp - dmg);
       opp.frozen = 0;
       opp.state = 'hit'; opp.setAnim('hit', true);
-      opp.grounded = false; opp.vy = -9; opp.vx = this.facing * 9;
+      // 终结崩飞: 超杀收尾要把人打得又高又远(vx 有 0.88/tick 摩擦衰减, 要给足)
+      opp.grounded = false; opp.vy = -12; opp.vx = this.facing * 18;
       opp.kdPending = true;
       this.combo.count++; this.combo.timer = 90;
       this.world.stats.maxCombo = Math.max(this.world.stats.maxCombo, this.combo.count);
@@ -723,12 +733,13 @@ class Fighter {
     // crouch frames (seq objects) are already baked at the right height
     if (this.state === 'attack' && this.move && this.move.def.yOff &&
         this.anim.name === this.move.def.anim) yOff = this.move.def.yOff;
+    const fw = c.fw || 200; // 帧边长: 主角色 200, 外部体(Huntress)150
     return {
       img: Assets.img(`${c.id}:${this.anim.name}`),
-      sx: this.anim.frame * 200,
+      sx: this.anim.frame * fw, fw,
       dx: this.x - c.anchor.x * s,
       dy: this.y - c.anchor.y * s + yOff,
-      dw: 200 * s, dh: 200 * s,
+      dw: fw * s, dh: fw * s,
       flip: this.facing !== c.native,
       mirrorX: this.x,
     };
@@ -775,7 +786,7 @@ class Fighter {
                   (this.world.tick % 6 < 3);
     if (blink) ctx.globalAlpha = 0.45;
     if (this.flash > 0) ctx.filter = 'brightness(2.4) saturate(0.4)';
-    ctx.drawImage(p.img, p.sx, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
+    ctx.drawImage(p.img, p.sx, 0, p.fw, p.fw, p.dx, p.dy, p.dw, p.dh);
     ctx.filter = 'none';
     // 帧同步月牙重染: 画师烘焙在攻击帧里的白月牙, 实时染成招式主题色盖回
     // 原位(同帧同变换, 俯冲旋转/倾角自动继承)。绝不擦原图 —— 月牙压身帧
@@ -787,16 +798,21 @@ class Fighter {
     if (sm) {
       const key = `${this.c.id}:${this.anim.name}`;
       const bank = Assets.smears[key];
-      if (bank && bank[this.anim.frame]) {
+      if (bank && bank.frames[this.anim.frame]) {
+        const fs = bank.fs;
         const edge = Assets.tinted(key, this.anim.frame, 'edge', sm.edge);
         const core = Assets.tinted(key, this.anim.frame, `core${sm.rim || 2}`, sm.core);
         ctx.save();
-        if (sm.mirror) { // 回手招: 刀光绕角色纵轴镜像(身体帧不动, 只反刀路)
-          const cx = p.dx + p.dw / 2;
+        if (sm.mirror) {
+          // 回手招: 原位先垫暗色盖掉素材白月牙(读作上一刀的暗残影),
+          // 再绕月牙自身质心镜像画亮刀 —— 刀光留在身前, 只反弧向
+          const dim = Assets.tinted(key, this.anim.frame, 'edge', sm.dim || '#69431c');
+          if (dim) ctx.drawImage(dim, 0, 0, fs, fs, p.dx, p.dy, p.dw, p.dh);
+          const cx = p.dx + bank.frames[this.anim.frame].cx * (p.dw / fs);
           ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0);
         }
-        if (edge) ctx.drawImage(edge, 0, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
-        if (core) ctx.drawImage(core, 0, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
+        if (edge) ctx.drawImage(edge, 0, 0, fs, fs, p.dx, p.dy, p.dw, p.dh);
+        if (core) ctx.drawImage(core, 0, 0, fs, fs, p.dx, p.dy, p.dw, p.dh);
         ctx.restore();
       }
     }
@@ -807,7 +823,7 @@ class Fighter {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.34 + 0.24 * Math.sin(this.world.tick * 0.55);
       ctx.filter = `sepia(1) saturate(4.5) hue-rotate(${hue}) brightness(1.15) blur(2px)`;
-      ctx.drawImage(p.img, p.sx, 0, 200, 200, p.dx, p.dy, p.dw, p.dh);
+      ctx.drawImage(p.img, p.sx, 0, p.fw, p.fw, p.dx, p.dy, p.dw, p.dh);
       ctx.filter = 'none';
       ctx.globalCompositeOperation = 'source-over';
     }

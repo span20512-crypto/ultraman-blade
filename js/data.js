@@ -6,6 +6,15 @@
 
 const STAGE = { w: 1024, h: 576, ground: 480, left: 60, right: 964 };
 
+/* 外部 fx 素材表(LuizMelo Martial Hero 3, CC0): 只取刀光 smear 层做新笔迹,
+   身体帧不用(服装不同)。帧为正方形, 边长=图高(126), 像素密度与主角色一致。
+   A1 竖劈月牙 / A2 大回旋巨弧(留给必杀·新角色) / A3 贴身小旋斩 */
+const FX_SHEETS = {
+  mh3a1: { file: 'assets/img/mh3/Attack1.png', frames: 7, smearFrames: [4, 5] },
+  mh3a2: { file: 'assets/img/mh3/Attack2.png', frames: 6, smearFrames: [3, 4] },
+  mh3a3: { file: 'assets/img/mh3/Attack3.png', frames: 9, smearFrames: [6, 7] },
+};
+
 const CHAIN_RANK = { light: 1, heavy: 2, special: 3, super: 4 };
 
 const DATA = {
@@ -69,19 +78,24 @@ const DATA = {
         knock: 9, hitstun: 28, blockstun: 15, hitstop: 14, shake: 6,
         meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
       },
-      clight: { // 蹲斩·削足: 蹲姿贴地平扫小腿,快但短 · smear 低位金(yOff 自动下沉)
+      clight: { // 蹲斩·削足: 身体全程蹲姿(合成), 刀光低位平扫作独立基底 —— 蹲着快速出刀
         kind: 'light', anim: 'attack2', total: 22, startup: 6, active: 5, impact: 4,
-        seq: { w: [{ a: 'crouch', f: 0 }], i: 4, r: [{ a: 'crouch', f: 0 }] }, yOff: 16,
-        smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, edge: '#ffc531', core: '#fff2c8' },
+        seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 2 }, r: [{ a: 'crouch', f: 0 }] },
+        smear: { standalone: true, phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, dy: 26, squashY: 0.8, edge: '#ffc531', core: '#fff2c8' },
         fx: { x: 100, y: -70, r: 110, ry: 0.42, a0: 2.75, a1: 0.05, w: 12, life: 10, color: '#fff2c8', color2: '#ffc531' },
         dmg: 5, chip: 0, guardDmg: 10, box: { x1: 10, x2: 128, y1: -70, y2: -5 },
         knock: 3.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
-      clight2: { // 蹲斩·返し(蹲J·J 第二段): 回手反扫, 镜像刀光接住正手 · 一套来回砍
+      clight2: { // 蹲斩·返し(蹲J·J 第二段): 全程蹲姿合成, 三个刀光方案由 smearAlt 切换
         kind: 'light', anim: 'attack2', total: 20, startup: 5, active: 4, impact: 4,
-        seq: { w: [3], i: 4, r: [{ a: 'crouch', f: 0 }] }, yOff: 16,
-        smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, mirror: true, edge: '#e8a83c', core: '#fff2c8' },
+        seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 3 }, r: [{ a: 'crouch', f: 0 }] },
+        // 第二刀 = 与第一刀同一笔迹(attack2 低扫, 同 dy/squash), 只差一个微小角度 ——
+        // "很快做两次同样的动作"。两版角度供拍板(smearAlt[2]=B版)。
+        // (历史: 镜像/缩小/细线/MH3借笔迹 四路都被否, 定位就是快速二连同刀)
+        cullSmear: true,
+        // 定版(Eric 拍板 A): 同刀微抬角(-7°), 第二刀收势略向上挑
+        smear: { standalone: true, phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, dy: 26, squashY: 0.8, rot: -0.12, edge: '#ffc531', core: '#fff2c8' },
         dmg: 4, chip: 0, guardDmg: 10, box: { x1: 10, x2: 135, y1: -70, y2: -5 },
         knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
@@ -92,7 +106,8 @@ const DATA = {
         smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 3, dy: -7 }, attach: true, edge: '#ff5a3d', core: '#ffe27a' },
         fx: { x: 103, y: -101, r: 120, ry: 0.6, a0: 2.3, a1: -2.35, w: 18, life: 14, rise: -1.2, color: '#ffe27a', color2: '#ff5a3d' },
         dmg: 10, chip: 2, guardDmg: 22, box: { x1: 5, x2: 135, y1: -195, y2: -20 },
-        knock: 5, hitstun: 26, blockstun: 14, hitstop: 13, shake: 5, kd: true, launch: -12.5,
+        // launch 此前未接线(receiveHit 只认默认 -7.5), 接线后 -10 ≈ 高度 35px→62px
+        knock: 5, hitstun: 26, blockstun: 14, hitstop: 13, shake: 5, kd: true, launch: -10,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
       air: {
@@ -117,7 +132,8 @@ const DATA = {
         smear: { phases: [{ f: 4, t: 6 }, { f: 5, t: 5 }], decay: 3, rim: 4, gale: 1.06, echo: { t: 4, dx: 10 }, attach: true, edge: '#ff4a3d', core: '#ffe27a' },
         fx: { x: 113, y: -142, r: 124, ry: 0.82, a0: 2.75, a1: 0.05, w: 20, life: 13, vx: 7, color: '#ffe27a', color2: '#d64533' },
         dmg: 13, chip: 5, guardDmg: 46, box: { x1: 0, x2: 190, y1: -185, y2: -30 },
-        knock: 10, hitstun: 30, blockstun: 18, hitstop: 16, shake: 7, kd: true,
+        // 突进斩命中要把人斩飞: knock 加重 + launch 抬高(接线后生效)
+        knock: 16, hitstun: 30, blockstun: 18, hitstop: 16, shake: 7, kd: true, launch: -9,
         dash: { from: 4, to: 20, vx: 8.5 },
         meterHit: 16, sfx: 'special', hitSfx: 'hitH',
       },
@@ -152,23 +168,25 @@ const DATA = {
       run:     { file: 'Run.png',     frames: 8, hold: 5,  loop: true },
       jump:    { file: 'Jump.png',    frames: 2, hold: 10, loop: true },
       fall:    { file: 'Fall.png',    frames: 2, hold: 10, loop: true },
-      attack1: { file: 'Attack1.png', frames: 4, hold: 5,  loop: false },
-      attack2: { file: 'Attack2.png', frames: 4, hold: 6,  loop: false },
+      attack1: { file: 'Attack1.png', frames: 4, hold: 5,  loop: false, smearFrames: [1] }, // 大月牙在 f1(共用)
+      attack2: { file: 'Attack2.png', frames: 4, hold: 6,  loop: false, smearFrames: [1] },
       hit:     { file: 'TakeHit.png', frames: 3, hold: 6,  loop: false },
       death:   { file: 'Death.png',   frames: 7, hold: 7,  loop: false },
     },
     moves: {
-      light: { // 拔刀快斩: 一帧起手立刻出刀(速度型标志) · 细白青快弧
+      light: { // 拔刀快斩: 一帧起手立刻出刀(速度型标志) · smear 细锐青白·单相位速斩
         kind: 'light', anim: 'attack1', total: 20, startup: 6, active: 5, impact: 1,
         seq: { w: [0], i: 1, r: [2, 3] },
+        smear: { phases: [{ f: 1, t: 3 }], decay: 1, edge: '#66e8dc', core: '#eafffd' },
         fx: { x: 110, y: -75, r: 110, ry: 0.61, a0: -2.3, a1: 2.3, w: 11, life: 9, color: '#eafffd', color2: '#66e8dc' },
         dmg: 5, chip: 0, guardDmg: 10, box: { x1: 12, x2: 140, y1: -165, y2: -40 },
         knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
-      light2: { // 逆袈裟回斩(J·J 第二段): 刀路上扬 · 反向上挑青弧
+      light2: { // 逆袈裟回斩(J·J 第二段): smear 镜像回斩, 刀路上扬
         kind: 'light', anim: 'attack1', total: 18, startup: 4, active: 5, impact: 1,
         seq: { w: [3], i: 1, r: [0] },
+        smear: { phases: [{ f: 1, t: 3 }], decay: 1, mirror: true, dim: '#173b3e', edge: '#35e0d8', core: '#ddfffa' },
         fx: { x: 110, y: -75, r: 112, ry: 0.61, a0: 2.3, a1: -2.3, w: 11, life: 10, color: '#ddfffa', color2: '#35e0d8' },
         dmg: 6, chip: 0, guardDmg: 10, box: { x1: 12, x2: 140, y1: -165, y2: -40 },
         knock: 4.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
@@ -177,17 +195,19 @@ const DATA = {
       heavy: { // 重击「举刀下劈」: 抬刀过头 -> 大弧斩落 · 紫下劈弧
         kind: 'heavy', anim: 'attack2', total: 28, startup: 9, active: 5, impact: 1,
         seq: { w: [2, 3], i: 1, r: [0, { a: 'crouchin', f: 0 }] }, // 评审③: 弓步->半起身桥接, 消除收招硬切
+        smear: { phases: [{ f: 1, t: 4 }], decay: 2, echo: { t: 3, dy: 7 }, edge: '#7d5bff', core: '#efe8ff' },
         fx: { x: 118, y: -118, r: 118, ry: 0.75, a0: -2.5, a1: 2.5, w: 17, life: 12, color: '#efe8ff', color2: '#7d5bff' },
         dmg: 9, chip: 2, guardDmg: 20, box: { x1: 12, x2: 155, y1: -175, y2: -35 },
-        knock: 7.5, hitstun: 24, blockstun: 14, hitstop: 8, shake: 4,
+        knock: 7.5, hitstun: 24, blockstun: 14, hitstop: 10, shake: 4,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
       heavy2: { // 回升斩(K·K 第二段): 低位前突撩起 · 紫青升弧(与下劈相反)
         kind: 'heavy', anim: 'attack2', total: 29, startup: 8, active: 5, impact: 1,
         seq: { w: [0], i: 1, r: [2, 3] }, dash: { from: 2, to: 9, vx: 7 },
+        smear: { phases: [{ f: 1, t: 4 }], decay: 2, mirror: true, dim: '#241b47', echo: { t: 3, dy: -8 }, attach: true, edge: '#8f6fff', core: '#c8fff5' },
         fx: { x: 118, y: -118, r: 120, ry: 0.75, a0: 2.5, a1: -2.5, w: 17, life: 13, rise: -1.0, color: '#c8fff5', color2: '#7d5bff' },
         dmg: 10, chip: 2, guardDmg: 20, box: { x1: 12, x2: 155, y1: -180, y2: -35 },
-        knock: 8.5, hitstun: 26, blockstun: 14, hitstop: 9, shake: 5,
+        knock: 8.5, hitstun: 26, blockstun: 14, hitstop: 11, shake: 5,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
       clight: { // 蹲刺·穿膝: 全程蹲姿(评审①), 低位刺击交给贴地 fx 表达
@@ -201,6 +221,7 @@ const DATA = {
       cheavy: { // 蹲撩·逆风: 独立挑空技,不参与连锁 · 青升弧
         kind: 'heavy', noChain: true, anim: 'attack2', total: 30, startup: 8, active: 5, impact: 1,
         seq: { w: [{ a: 'crouch', f: 0 }], i: 1, r: [2, 3] }, hop: -7,
+        smear: { phases: [{ f: 1, t: 3 }], decay: 1, echo: { t: 3, dy: -8 }, attach: true, edge: '#35e0d8', core: '#d6fff8' },
         fx: { x: 118, y: -118, r: 112, ry: 0.75, a0: 2.5, a1: -2.5, w: 15, life: 13, rise: -1.2, color: '#d6fff8', color2: '#35e0d8' },
         dmg: 9, chip: 2, guardDmg: 20, box: { x1: 5, x2: 125, y1: -190, y2: -20 },
         knock: 5, hitstun: 24, blockstun: 13, hitstop: 8, shake: 4, kd: true, launch: -11,
@@ -208,6 +229,7 @@ const DATA = {
       },
       air: {
         kind: 'light', anim: 'attack1', total: 20, startup: 5, active: 7, impact: 1, air: true,
+        smear: { phases: [{ f: 1, t: 3 }], decay: 1, attach: true, edge: '#66e8dc', core: '#eafffd' },
         fx: { x: 110, y: -75, r: 104, ry: 0.61, a0: -2.3, a1: 2.3, w: 12, life: 9, color: '#eafffd', color2: '#66e8dc' },
         dmg: 5, chip: 0, guardDmg: 11, box: { x1: 8, x2: 130, y1: -140, y2: 10 },
         knock: 4, hitstun: 18, blockstun: 10, hitstop: 5, shake: 2,
@@ -216,6 +238,8 @@ const DATA = {
       dive: {
         kind: 'heavy', name: '影·墜滅', anim: 'attack2', air: true, dive: true, impact: 1,
         startup: 7, diveSpeed: 16, diveDrift: 5, recovery: 22, slamActive: 8, slamRange: 110,
+        // 签名借笔: MH3 竖劈月牙染妖紫, 落地瞬间纵斩炸开(与隼人断地斬的横扫区分)
+        smear: { standalone: true, sheet: 'fx:mh3a1', phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, dy: 6, edge: '#7d5bff', core: '#efe8ff' },
         dmg: 9, chip: 2, guardDmg: 28,
         knock: 6.5, hitstun: 26, blockstun: 15, hitstop: 9, shake: 6, kd: true,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
@@ -229,15 +253,90 @@ const DATA = {
         projectile: { speed: 9.5, dmg: 8, chip: 3, guardDmg: 16, y: -95, hitstun: 22, blockstun: 12, knock: 5, hitstop: 6, meterHit: 12 },
         meterHit: 0, sfx: 'projectile', hitSfx: 'hitL',
       },
-      super: { // 三幕: 紫气聚身 -> 瞬身内爆/外爆 -> 紫青交替连斩
+      super: { // 三幕: 紫气聚身 -> 瞬身内爆/外爆 -> 紫青交替连斩 · 終B 月輪爆
         kind: 'super', name: '残影·滅殺陣', anim: 'attack2', total: 54, cost: 100,
-        startup: 16, active: 12, impact: 1, invuln: 0,
+        startup: 16, active: 12, impact: 1, invuln: 0, finisher: 'B',
+        smear: { phases: [{ f: 1, t: 4 }], decay: 2, gale: 1.06, attach: true, edge: '#7d5bff', core: '#efe8ff' },
         fx: { x: 118, y: -118, r: 124, ry: 0.75, a0: 2.5, a1: -2.5, w: 19, life: 13, color: '#efe8ff', color2: '#7d5bff' },
         dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 155, y1: -180, y2: -25 },
         knock: 4, hitstun: 24, blockstun: 24, hitstop: 8, shake: 6, kd: true,
         teleport: { at: 6, offset: 92, invuln: 26 },
         cine: { hits: 3, interval: 11, dmgPer: 7, final: 12 },
         meterHit: 0, sfx: 'tele', hitSfx: 'hitH',
+      },
+    },
+  },
+
+  /* ── 第三角色原型(方案一): Huntress 换体 → 月槍の巫 綾(AYAME) ──────────
+     LuizMelo Huntress (CC0), kunoichi 靛蓝调色。fw=150(外部体), scale 3.4。
+     差异化核心 = 长枪: 轻击长突刺(reach 远/程序化 thrust 线), 重击过头弧斩
+     (Attack1/2 f3 自带白月牙 → 重染系统)。突刺 vs 挥斩 = 与二侍完全不同的手感。
+     原型阶段: 无蹲攻/超杀(crouch 占位 idle), 供 anim-lab 预览 J/JJ/K/KK/U。 */
+  ayame: {
+    id: 'ayame',
+    name: 'AYAME', cn: '綾', title: '月槍の巫', type: 'REACH',
+    theme: '#5b7dff', theme2: '#c8d8ff',
+    dir: 'assets/img/huntress', fw: 150, native: 1, scale: 3.4,
+    anchor: { x: 76, y: 96 },
+    walk: 3.6, jumpVy: -15.5,
+    stats: { pow: 4, spd: 4, rng: 5 },
+    quoteWin: '月は、槍の先に。', quoteLose: '間合いを……読めなんだ。',
+    portrait: { x: 56, y: 44, w: 52, h: 52 },
+    anims: {
+      idle:    { file: 'Idle_kunoichi.png',    frames: 8, hold: 7,  loop: true },
+      crouch:  { file: 'Idle_kunoichi.png',    frames: 8, hold: 8,  loop: true },  // 原型占位: 无蹲帧
+      crouchin:{ file: 'Idle_kunoichi.png',    frames: 1, hold: 5,  loop: true },
+      run:     { file: 'Run_kunoichi.png',     frames: 8, hold: 6,  loop: true },
+      jump:    { file: 'Jump_kunoichi.png',    frames: 2, hold: 10, loop: true },
+      fall:    { file: 'Fall_kunoichi.png',    frames: 2, hold: 10, loop: true },
+      attack1: { file: 'Attack1_kunoichi.png', frames: 5, hold: 5,  loop: false, smearFrames: [3] }, // 过头弧斩(白月牙 f3)
+      attack2: { file: 'Attack2_kunoichi.png', frames: 5, hold: 6,  loop: false, smearFrames: [3] }, // 过头劈斩(白月牙 f3)
+      attack3: { file: 'Attack3_kunoichi.png', frames: 7, hold: 5,  loop: false },                    // 长突刺(无月牙)
+      hit:     { file: 'Take hit_kunoichi.png',frames: 3, hold: 5,  loop: false },
+      death:   { file: 'Death_kunoichi.png',   frames: 8, hold: 7,  loop: false },
+    },
+    moves: {
+      light: { // 突き: 长枪直刺, reach 极远, 招牌轻攻击 · 程序化月白突刺线
+        kind: 'light', anim: 'attack3', total: 22, startup: 6, active: 5, impact: 4,
+        seq: { w: [0, 1], i: 4, r: [5, 6] },
+        fx: { thrust: true, x: 60, y: -74, color: '#eef4ff', color2: '#8fb0ff' },
+        dmg: 5, chip: 0, guardDmg: 10, box: { x1: 20, x2: 205, y1: -95, y2: -55 }, // 超长判定=枪 reach
+        knock: 4, hitstun: 18, blockstun: 10, hitstop: 5, shake: 2,
+        meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
+      },
+      light2: { // 二の槍: 收枪再补一刺, 略高 · 突刺线
+        kind: 'light', anim: 'attack3', total: 20, startup: 5, active: 5, impact: 4,
+        seq: { w: [2], i: 4, r: [5, 6] },
+        fx: { thrust: true, x: 60, y: -88, color: '#eef4ff', color2: '#8fb0ff' },
+        dmg: 6, chip: 0, guardDmg: 10, box: { x1: 20, x2: 205, y1: -110, y2: -68 },
+        knock: 5, hitstun: 18, blockstun: 10, hitstop: 5, shake: 2,
+        meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
+      },
+      heavy: { // 月輪斬: 过头大弧斩(白月牙重染) · reach 中但伤害高
+        kind: 'heavy', anim: 'attack1', total: 30, startup: 10, active: 6, impact: 3,
+        seq: { w: [0, 1, 2], i: 3, r: [4] },
+        smear: { phases: [{ f: 3, t: 5 }], decay: 3, rim: 4, echo: { t: 3, dy: 6 }, edge: '#5b7dff', core: '#dfe8ff' },
+        dmg: 11, chip: 2, guardDmg: 26, box: { x1: 10, x2: 170, y1: -180, y2: -30 },
+        knock: 8, hitstun: 26, blockstun: 15, hitstop: 13, shake: 5,
+        meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
+      },
+      heavy2: { // 落月: 过头劈斩落地(K·K 第二段, 白月牙) · 击倒
+        kind: 'heavy', anim: 'attack2', total: 32, startup: 9, active: 6, impact: 3,
+        seq: { w: [0, 1, 2], i: 3, r: [4] },
+        smear: { phases: [{ f: 3, t: 5 }], decay: 3, rim: 4, echo: { t: 4, dy: 8 }, edge: '#4a63d8', core: '#dfe8ff' },
+        dmg: 12, chip: 2, guardDmg: 26, box: { x1: 10, x2: 165, y1: -185, y2: -25 },
+        knock: 9, hitstun: 28, blockstun: 15, hitstop: 14, shake: 6, kd: true, launch: -9,
+        meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
+      },
+      special: { // 疾風突: 前突长刺, 借冲刺补足位移 · 突刺线 + 冲击环
+        kind: 'special', name: '疾風突', anim: 'attack3', total: 40,
+        startup: 9, active: 8, impact: 4, cooldown: 110,
+        seq: { w: [0, 1], i: 4, r: [5, 6] },
+        fx: { thrust: true, x: 60, y: -78, color: '#ffffff', color2: '#8fb0ff' },
+        dash: { from: 3, to: 14, vx: 9 },
+        dmg: 13, chip: 4, guardDmg: 42, box: { x1: 20, x2: 220, y1: -100, y2: -55 },
+        knock: 14, hitstun: 30, blockstun: 18, hitstop: 16, shake: 7, kd: true, launch: -8,
+        meterHit: 16, sfx: 'special', hitSfx: 'hitH',
       },
     },
   },

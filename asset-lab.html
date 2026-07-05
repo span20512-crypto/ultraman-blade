@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 · 素材账本 — 作者画了什么 / 引擎做了什么</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #12101d; color: #d8cdb4; font: 13px/1.7 "SF Mono", Menlo, monospace; padding: 28px 34px 80px; }
+  h1 { font-size: 20px; color: #ffc531; letter-spacing: 2px; margin-bottom: 4px; }
+  .sub { color: #9a8f78; margin-bottom: 26px; }
+  h2 { font-size: 15px; color: #ffc531; margin: 34px 0 6px; border-bottom: 1px solid #3d2b3a; padding-bottom: 6px; }
+  .packmeta { color: #9a8f78; margin-bottom: 14px; }
+  .bar { height: 8px; background: #241a33; border: 1px solid #3d2b3a; width: 340px; display: inline-block; vertical-align: middle; margin: 0 10px; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffc531, #ff8a3d); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card { background: #171126; border: 1px solid #3d2b3a; padding: 12px; }
+  .card.derived { border-color: #35e0d8; }
+  .card.fxonly { border-color: #7d5bff; }
+  .card.unused { opacity: 0.45; }
+  .cv { background: #0d0b16; border: 1px solid #241a33; display: block; margin-bottom: 8px; width: 100%; height: 150px; image-rendering: pixelated; }
+  .nm { color: #fff2c8; font-weight: bold; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 7px; margin-left: 6px; border: 1px solid; }
+  .b-full { color: #ffc531; border-color: #ffc531; }
+  .b-part { color: #ff8a3d; border-color: #ff8a3d; }
+  .b-derived { color: #35e0d8; border-color: #35e0d8; }
+  .b-fx { color: #b9a6ff; border-color: #7d5bff; }
+  .b-un { color: #6a6055; border-color: #6a6055; }
+  .note { color: #9a8f78; font-size: 12px; margin-top: 5px; }
+  .moves { color: #d8cdb4; font-size: 12px; margin-top: 3px; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0 8px; }
+  .who { background: #171126; border: 1px solid #3d2b3a; padding: 16px 18px; }
+  .who h3 { font-size: 14px; margin-bottom: 10px; }
+  .who.artist h3 { color: #ffc531; } .who.engine h3 { color: #35e0d8; }
+  .who li { margin-left: 18px; margin-bottom: 4px; }
+  .hl { color: #fff2c8; }
+</style>
+</head>
+<body>
+<h1>拳魂 SOUL FIST · 素材账本</h1>
+<div class="sub">开源画师 LuizMelo (itch.io, CC0 可自由商用) 画了什么 · 本引擎在其上做了什么 —— 逐表盘点</div>
+
+<div class="split">
+  <div class="who artist">
+    <h3>画师 LuizMelo 的工作(动画层, 100% 他画)</h3>
+    <ul>
+      <li>全部角色<span class="hl">动画帧</span>: 姿势、挥砍弧线、<span class="hl">刀光月牙笔迹</span>、受击、死亡</li>
+      <li>隼人 = Martial Hero 包 / 剑二 = Martial Hero 2 包(各 8 张表)</li>
+      <li>MH3 包(第三武者, 仅作刀光素材库引入)</li>
+    </ul>
+  </div>
+  <div class="who engine">
+    <h3>本引擎的工作(画师帧之上的一切)</h3>
+    <ul>
+      <li><span class="hl">招式设计</span>: 轻/重/变招/蹲/空/必杀/超杀的帧数据·判定框·连锁取消·击退挑空物理</li>
+      <li><span class="hl">帧序重组</span>: 同一张表倒放/重组/跨表引用拼出 12+ 招(素材只有 2 段攻击)</li>
+      <li><span class="hl">蹲姿烘焙</span>: Crouch/CrouchIn 由 Idle 分段压缩生成(非作者原图)</li>
+      <li><span class="hl">月牙提取重染管线</span>: 掩码→连通域→腐蚀→按招染色(所有刀光颜色)</li>
+      <li><span class="hl">打击感系统</span>: 冻结/星爆/喷溅/终结演出/slowmo/花瓣 — 全程序化</li>
+      <li>AI·UI·全合成音频·舞台等(与动画无关, 不在本页)</li>
+    </ul>
+  </div>
+</div>
+
+<div id="sections"></div>
+
+<script src="js/data.js"></script>
+<script>
+const INV = [
+  {
+    title: 'HAYATO 隼人 — Martial Hero (LuizMelo)',
+    meta: '原包 8 张动画表 · 全部在用 → 素材利用率 100%(已用尽, 无未启用动作)',
+    dir: 'assets/img/mack', pct: 100,
+    sheets: [
+      { f: 'Idle.png',    use: 'full', moves: '站立待机 / 选人 / 胜利画面', note: '8帧全用' },
+      { f: 'Run.png',     use: 'full', moves: '行走 / 前冲', note: '8帧全用' },
+      { f: 'Jump.png',    use: 'full', moves: '跳跃上升', note: '' },
+      { f: 'Fall.png',    use: 'full', moves: '下落 / 后闪残影', note: '' },
+      { f: 'Attack1.png', use: 'full', moves: 'J轻击 · K·K終結 · 蹲K升斬 · 空中J · 超杀cine交替斩', note: '6帧全用 + f4/f5 月牙提取入刀光库(J/超杀等的金红刀光都来自这两帧的重染)' },
+      { f: 'Attack2.png', use: 'full', moves: 'J·J变招 · K重击 · 必杀月牙疾斬 · 空中K断地斬 · 蹲J系刀光 · 超杀cine', note: '6帧全用 + f4/f5 月牙提取(蹲J/蹲J·J 的低位刀光 = 此月牙下沉压扁)' },
+      { f: 'TakeHit.png', use: 'full', moves: '受击硬直', note: '' },
+      { f: 'Death.png',   use: 'full', moves: '击倒 / 倒地 / 死亡', note: '' },
+      { f: 'Crouch.png',  use: 'derived', moves: '下蹲(含呼吸) / 蹲攻全程身体', note: '非作者原图: 由 Idle 分段压缩烘焙(头不缩/躯干0.76-0.8/腿0.4-0.45)' },
+      { f: 'CrouchIn.png',use: 'derived', moves: '入蹲过渡', note: '同上, 烘焙生成' },
+    ],
+  },
+  {
+    title: 'KENJI 剣二 — Martial Hero 2 (LuizMelo)',
+    meta: '原包 8 张动画表 · 全部在用 → 素材利用率 100% · 注意: 攻击表仅 4 帧且共用大月牙(素材上限, 待按隼人标准重做表现层)',
+    dir: 'assets/img/kenji', pct: 100,
+    sheets: [
+      { f: 'Idle.png',    use: 'full', moves: '站立待机 / 选人', note: '4帧' },
+      { f: 'Run.png',     use: 'full', moves: '行走 / 前冲', note: '8帧' },
+      { f: 'Jump.png',    use: 'full', moves: '跳跃上升', note: '' },
+      { f: 'Fall.png',    use: 'full', moves: '下落 / 后闪', note: '' },
+      { f: 'Attack1.png', use: 'full', moves: 'J轻击 · 变招 · 蹲刺 · 超杀cine', note: '仅4帧, 大月牙在 f1 — 帧数少是剑二动作显糙的根因' },
+      { f: 'Attack2.png', use: 'full', moves: 'K重击 · 終結 · 空中攻击 · 超杀cine', note: '仅4帧, 月牙 f1' },
+      { f: 'TakeHit.png', use: 'full', moves: '受击硬直', note: '3帧' },
+      { f: 'Death.png',   use: 'full', moves: '击倒 / 倒地 / 死亡', note: '7帧' },
+      { f: 'Crouch.png',  use: 'derived', moves: '下蹲 / 蹲攻身体', note: '烘焙生成' },
+      { f: 'CrouchIn.png',use: 'derived', moves: '入蹲过渡', note: '烘焙生成' },
+    ],
+  },
+  {
+    title: '刀光素材库 — Martial Hero 3 (LuizMelo, 仅取刀光层)',
+    meta: '原包 9 张表, 已引入 3 张攻击表 · 身体帧不用(服装不同角色) · 只提取月牙笔迹入库备用 — 这是"扩大素材边界"路线的第一批储备',
+    dir: 'assets/img/mh3', pct: 12,
+    sheets: [
+      { f: 'Attack1.png', use: 'fx', moves: '刀光库 fx:mh3a1(竖劈纵月牙 f4/f5)', note: '已烘焙入库, 暂未接招式 — 候选: 俯冲斩/新角色' },
+      { f: 'Attack2.png', use: 'fx', moves: '刀光库 fx:mh3a2(回旋巨弧 f3/f4, 全库最大笔迹)', note: '已入库备用 — 候选: 必杀/超杀级' },
+      { f: 'Attack3.png', use: 'fx', moves: '刀光库 fx:mh3a3(贴身小月牙 f6/f7)', note: '已入库备用 — 候选: 轻攻击族' },
+      { f: null, name: 'Idle / Run / Going Up / Going Down / Take Hit / Death', use: 'un', moves: '未下载', note: '身体动画对现有双角色无用; 若未来加第三角色, 整包可用(帧数最多: Idle 10 / Death 11 / 三段攻击)' },
+    ],
+  },
+];
+
+const root = document.getElementById('sections');
+for (const pack of INV) {
+  const h = document.createElement('div');
+  h.innerHTML = `<h2>${pack.title}</h2>
+    <div class="packmeta">${pack.meta}<br>利用率 <span class="bar"><i style="width:${pack.pct}%"></i></span> <b style="color:#ffc531">${pack.pct}%</b></div>`;
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  for (const sh of pack.sheets) {
+    const card = document.createElement('div');
+    const cls = { full: '', part: '', derived: 'derived', fx: 'fxonly', un: 'unused' }[sh.use];
+    card.className = 'card ' + cls;
+    const badge = {
+      full: '<span class="badge b-full">完整使用</span>',
+      part: '<span class="badge b-part">部分使用</span>',
+      derived: '<span class="badge b-derived">烘焙衍生(引擎生成)</span>',
+      fx: '<span class="badge b-fx">仅刀光层</span>',
+      un: '<span class="badge b-un">未使用</span>',
+    }[sh.use];
+    card.innerHTML = `<canvas class="cv" width="300" height="150"></canvas>
+      <div><span class="nm">${sh.name || sh.f}</span>${badge}</div>
+      <div class="moves">→ ${sh.moves}</div>
+      ${sh.note ? `<div class="note">${sh.note}</div>` : ''}`;
+    grid.appendChild(card);
+    if (sh.f) animate(card.querySelector('canvas'), `${pack.dir}/${sh.f}`);
+    else {
+      const g = card.querySelector('canvas').getContext('2d');
+      g.fillStyle = '#241a33'; g.font = '12px monospace'; g.fillText('(未下载)', 120, 78);
+    }
+  }
+  root.appendChild(h);
+  root.appendChild(grid);
+}
+
+function animate(cv, src) {
+  const img = new Image();
+  img.onload = () => {
+    const fs = img.height, n = Math.max(1, Math.round(img.width / fs));
+    const g = cv.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    let f = 0;
+    const scale = Math.min(140 / fs, 2.2);
+    const dw = fs * scale, dh = fs * scale;
+    setInterval(() => {
+      g.fillStyle = '#0d0b16'; g.fillRect(0, 0, cv.width, cv.height);
+      g.drawImage(img, f * fs, 0, fs, fs, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh);
+      g.fillStyle = '#6a6055'; g.font = '10px monospace';
+      g.fillText(`帧 ${f + 1}/${n}`, 6, 144);
+      f = (f + 1) % n;
+    }, 130);
+  };
+  img.src = src;
+}
+</script>
+</body>
+</html>
