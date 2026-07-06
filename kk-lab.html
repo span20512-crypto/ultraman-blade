@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 · KK实验室 — 剑二回升斩 smear 方案对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #12101d; color: #d8cdb4; font: 13px/1.7 "SF Mono", Menlo, monospace; padding: 26px 32px 80px; }
+  h1 { font-size: 19px; color: #ffc531; letter-spacing: 2px; }
+  .sub { color: #9a8f78; margin: 4px 0 16px; max-width: 980px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .cell { background: #171126; border: 1px solid #3d2b3a; padding: 10px; width: 300px; }
+  .cell.pick { border-color: #35e0d8; }
+  canvas { background: #1a1730; display: block; image-rendering: pixelated; border: 1px solid #241a33; }
+  .cap { color: #fff2c8; font-weight: bold; margin-top: 8px; font-size: 13px; }
+  .note { color: #9a8f78; font-size: 11.5px; margin-top: 3px; min-height: 48px; }
+  .research { background: #1a1420; border-left: 3px solid #ffc531; padding: 14px 18px; margin: 22px 0; max-width: 980px; }
+  .research b { color: #ffc531; }
+  .hl { color: #35e0d8; }
+  button { background: #241a33; color: #d8cdb4; border: 1px solid #3d2b3a; padding: 6px 16px; font: inherit; cursor: pointer; margin: 0 6px 18px 0; }
+  button:hover { border-color: #ffc531; color: #ffc531; }
+</style>
+</head>
+<body>
+<h1>KK 实验室 — 回升斩(第二段·上抡) smear 方案对比</h1>
+<div class="sub">
+  剑二 K·K = 先下劈(用画师原月牙, 公认没问题) → 再上抡(问题段)。下面 6 个方案全部循环播放同一招:
+  下劈(相同) → <b class="hl">上抡(各方案不同)</b>。身体帧一致, 只有第二段刀光不同。选一个, 或告诉我组合调整。
+</div>
+<button onclick="restart()">⟲ 全部重播</button>
+<button onclick="slow=!slow;restart()">切换 0.25x / 1x</button>
+<div class="row" id="grid"></div>
+
+<div class="research">
+  <b>调研结论(为什么"直接镜像"看着怪)</b><br>
+  1. 手绘 smear 的<b class="hl">月牙卷曲方向 = 手腕运动轨迹</b>: 下劈的弧从手腕位置向外"甩"出, 内钩(月牙尖的小卷)指向手腕收势的方向。
+  垂直镜像后弧的路径对了, 但<b class="hl">内钩的卷向反了</b> —— 看起来像"手腕反关节", 这就是违和感来源。<br>
+  2. 你给的月华剑士录屏里, Moriya 的上挑用的是<b class="hl">专属绘制的另一个形状</b>(开口朝下的大回旋), 不是下劈的任何镜像 ——
+  SNK 每种挥向都单独画。我们素材没有专属上挑月牙, 所以下面给出的最优近似里, 有两个用了<b class="hl">别的画师真笔迹</b>(剑二另一张表 / MH3 回旋弧)来当上挑。<br>
+  3. 通用规律: smear <b class="hl">厚端=刀刃当前位置, 薄端=起笔处</b> —— 上挑应厚在上、薄在下(方案里已按此摆放)。
+</div>
+
+<script src="js/data.js"></script>
+<script>
+/* 极简可视化: 只为对比第二段刀光的形状语言, 用真素材帧+真月牙位图。
+   时间轴: 下劈(i=f1+原月牙 10t) → 间隙4t → 上抡(身体f3 + 各方案月牙 10t) → 停12t */
+const VARIANTS = [
+  { key: 'A', cap: 'A·flipY(现状)', note: '下劈月牙垂直翻转。弧路对但内钩卷向反(违和感来源)。', tf: 'flipY', src: 'a2' },
+  { key: 'B', cap: 'B·flipY+镜像X(=旋转180°)', note: '翻转后再左右镜像: 内钩卷向修正, 开口转向身后。', tf: 'rot180', src: 'a2' },
+  { key: 'C', cap: 'C·借剑二另一张表(A1月牙)flipY', note: '换一个真笔迹: attack1 的紧凑月牙翻上挑 — 形状和第一刀不同, 有"两笔"感。', tf: 'flipY', src: 'a1' },
+  { key: 'D', cap: 'D·借MH3大回旋弧(不翻转)', note: '画师本来就画的回旋上挑弧(参照月华: 上挑用专属形状), 染剑二紫青。', tf: 'none', src: 'mh3' },
+  { key: 'E', cap: 'E·flipY+前倾20°', note: 'A 的基础上前倾, 让厚端更明确指向右上(收势方向)。', tf: 'flipYrot', src: 'a2' },
+  { key: 'F', cap: 'F·原月牙不动(对照组)', note: '第二段直接复用下劈月牙原样 — 物理错误的对照基准。', tf: 'none', src: 'a2' },
+];
+const grid = document.getElementById('grid');
+let slow = true, timers = [];
+
+const IMGS = {};
+function load(name, src) { return new Promise(res => { const i = new Image(); i.onload = () => { IMGS[name] = i; res(); }; i.src = src; }); }
+
+/* 提取近纯白月牙 -> 独立画布(含闭运算简化: 直接全白块, 判断阈值同引擎) */
+function crescent(img, fx, fs) {
+  const c = document.createElement('canvas'); c.width = fs; c.height = fs;
+  const g = c.getContext('2d');
+  g.drawImage(img, fx * fs, 0, fs, fs, 0, 0, fs, fs);
+  const d = g.getImageData(0, 0, fs, fs), p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    if (!(p[i] >= 240 && p[i+1] >= 240 && p[i+2] >= 235 && p[i+3] >= 200)) p[i+3] = 0;
+  }
+  g.putImageData(d, 0, 0);
+  // 简易闭运算 x3 补身体咬痕
+  for (let k = 0; k < 3; k++) dilate(g, fs);
+  for (let k = 0; k < 3; k++) erode(g, fs);
+  return c;
+}
+function dilate(g, S) {
+  const d = g.getImageData(0,0,S,S), p = d.data, q = p.slice();
+  for (let y=1;y<S-1;y++) for (let x=1;x<S-1;x++) {
+    const i=(y*S+x)*4+3;
+    if (!q[i] && (q[i-4]||q[i+4]||q[i-S*4]||q[i+S*4])) { p[i]=255;p[i-3]=255;p[i-2]=255;p[i-1]=255; }
+  }
+  g.putImageData(d,0,0);
+}
+function erode(g, S) {
+  const d = g.getImageData(0,0,S,S), p = d.data, q = p.slice();
+  for (let y=1;y<S-1;y++) for (let x=1;x<S-1;x++) {
+    const i=(y*S+x)*4+3;
+    if (q[i] && !(q[i-4]&&q[i+4]&&q[i-S*4]&&q[i+S*4])) p[i]=0;
+  }
+  g.putImageData(d,0,0);
+}
+function tint(cv, color) {
+  const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+  const g = c.getContext('2d');
+  g.drawImage(cv, 0, 0);
+  g.globalCompositeOperation = 'source-in';
+  g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+
+Promise.all([
+  load('a1', 'assets/img/kenji/Attack1.png'),
+  load('a2', 'assets/img/kenji/Attack2.png'),
+  load('mh3', 'assets/img/mh3/Attack2.png'),
+]).then(() => {
+  const cresA2 = crescent(IMGS.a2, 1, 200);
+  const cresA1 = crescent(IMGS.a1, 1, 200);
+  const cresM3 = crescent(IMGS.mh3, 3, 126);
+  const SRC = {
+    a2: { cv: tint(cresA2, '#8f6fff'), core: tint(cresA2, '#c8fff5'), fs: 200 },
+    a1: { cv: tint(cresA1, '#8f6fff'), core: tint(cresA1, '#c8fff5'), fs: 200 },
+    mh3: { cv: tint(cresM3, '#8f6fff'), core: tint(cresM3, '#c8fff5'), fs: 126 },
+  };
+  const down = { cv: tint(cresA2, '#7d5bff'), core: tint(cresA2, '#efe8ff') };
+
+  for (const v of VARIANTS) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.innerHTML = `<canvas width="280" height="230"></canvas><div class="cap">${v.cap}</div><div class="note">${v.note}</div>`;
+    grid.appendChild(cell);
+    runCell(cell.querySelector('canvas'), v, SRC[v.src], down);
+  }
+});
+
+function runCell(cv, v, src, down) {
+  const g = cv.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  let t = 0;
+  const SCALE = 1.35, BX = 60, BY = 210; // 角色脚底
+  function drawBody(frame) {
+    // kenji attack2 帧: 200px, 锚(100,126)
+    g.drawImage(IMGS.a2, frame * 200, 0, 200, 200, BX - 100 * SCALE * 0.7, BY - 172 * SCALE * 0.7, 200 * SCALE * 0.7, 200 * SCALE * 0.7);
+  }
+  function drawCres(img, opts = {}) {
+    const fs = opts.fs || 200;
+    const w = fs * SCALE * 0.7, h = w;
+    let x = BX - 100 * SCALE * 0.7 + (opts.dx || 0), y = BY - 172 * SCALE * 0.7 + (opts.dy || 0);
+    if (fs !== 200) { x = BX - w / 2 + (opts.dx || 0); y = BY - h + (opts.dy || 0); }
+    g.save();
+    const cx = x + w / 2, cy = y + h / 2;
+    if (opts.tf === 'flipY') { g.translate(0, cy); g.scale(1, -1); g.translate(0, -cy); }
+    if (opts.tf === 'rot180') { g.translate(cx, cy); g.rotate(Math.PI); g.translate(-cx, -cy); }
+    if (opts.tf === 'flipYrot') {
+      g.translate(0, cy); g.scale(1, -1); g.translate(0, -cy);
+      g.translate(cx, cy); g.rotate(-0.35); g.translate(-cx, -cy);
+    }
+    g.globalAlpha = opts.alpha !== undefined ? opts.alpha : 1;
+    g.drawImage(img, x, y, w, h);
+    g.restore();
+    g.globalAlpha = 1;
+  }
+  function frame() {
+    g.fillStyle = '#1a1730'; g.fillRect(0, 0, 280, 230);
+    g.fillStyle = '#241812'; g.fillRect(0, 212, 280, 18);
+    const T = t % 40;
+    if (T < 10) {          // 第一段: 下劈(公认OK的原月牙)
+      drawBody(1);
+      if (T < 7) { drawCres(down.cv); drawCres(down.core, { alpha: 0.9 }); }
+      else drawCres(down.cv, { alpha: 0.35 });
+    } else if (T < 14) {   // 间隙(前突)
+      drawBody(0);
+    } else if (T < 26) {   // 第二段: 上抡 — 各方案
+      drawBody(3);
+      const o = { tf: v.tf, fs: src.fs, dy: v.tf === 'none' && v.src === 'mh3' ? -10 : -14 };
+      if (T < 22) { drawCres(src.cv, o); drawCres(src.core, { ...o, alpha: 0.85 }); }
+      else drawCres(src.cv, { ...o, alpha: 0.35 });
+    } else {               // 收势停
+      drawBody(3);
+    }
+    g.fillStyle = '#6a6055'; g.font = '10px monospace';
+    g.fillText(T < 10 ? '① 下劈(相同)' : T < 14 ? '·' : T < 26 ? '② 上抡(本方案)' : '收势', 8, 14);
+    t++;
+  }
+  const iv = setInterval(frame, slow ? 132 : 33);
+  timers.push({ iv, cv, v, src, down, restartFn: () => { t = 0; } });
+  cv._restart = () => { t = 0; };
+}
+function restart() {
+  for (const tm of timers) { clearInterval(tm.iv); }
+  timers = [];
+  document.getElementById('grid').innerHTML = '';
+  const SRCRELOAD = null;
+  location.reload();
+}
+</script>
+</body>
+</html>

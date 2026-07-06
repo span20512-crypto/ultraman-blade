@@ -77,10 +77,44 @@ const Assets = {
       for (let i = 0; i < comp.mask.length; i++) {
         if (comp.mask[i]) { sx += i % fs; sy += (i / fs) | 0; sn++; }
       }
+      // 闭合版(standalone 专用): 画师把身体画在月牙前面, 掩码有身体形状的
+      // 咬痕 —— 原位显示时身体正好盖住, 平移/翻转使用就露"缺口"。闭运算补洞。
+      const edgeC = Assets._close(edge, 4);
       // 两档内芯腐蚀: rim=2 细色边(轻·快), rim=4 厚色边(重·豪)
-      frames[f] = { edge, core2: Assets._erode(edge, 2), core4: Assets._erode(edge, 4), cx: sx / sn, cy: sy / sn };
+      frames[f] = {
+        edge, core2: Assets._erode(edge, 2), core4: Assets._erode(edge, 4),
+        edgeC, core2C: Assets._erode(edgeC, 2), core4C: Assets._erode(edgeC, 4),
+        cx: sx / sn, cy: sy / sn,
+      };
     }
     if (Object.keys(frames).length) Assets.smears[key] = { fs, frames };
+  },
+
+  /* 形态学闭运算(膨胀 n 再腐蚀 n): 补掉月牙被身体咬出的洞, 外轮廓基本不变。
+     新长出的像素 alpha=255(重染只看 alpha, 颜色无所谓) */
+  _close(canvas, n) {
+    const S = canvas.width;
+    let a = canvas.getContext('2d').getImageData(0, 0, S, S).data.slice();
+    const pass = (src, grow) => {
+      const out = src.slice();
+      for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+        const i = (y * S + x) * 4 + 3;
+        const nb = src[i - 4] || src[i + 4] || src[i - S * 4] || src[i + S * 4];
+        if (grow ? (!src[i] && nb) : (src[i] && !(src[i - 4] && src[i + 4] && src[i - S * 4] && src[i + S * 4]))) {
+          if (grow) { out[i] = 255; out[i - 3] = 255; out[i - 2] = 255; out[i - 1] = 255; }
+          else out[i] = 0;
+        }
+      }
+      return out;
+    };
+    for (let k = 0; k < n; k++) a = pass(a, true);
+    for (let k = 0; k < n; k++) a = pass(a, false);
+    const out = document.createElement('canvas');
+    out.width = S; out.height = S;
+    const od = out.getContext('2d').createImageData(S, S);
+    od.data.set(a);
+    out.getContext('2d').putImageData(od, 0, 0);
+    return out;
   },
 
   /* 帧内近纯白掩码的最大 4-连通域(排除刀身/衣物上的零散白点) */
@@ -270,9 +304,9 @@ const Effects = {
     const key = sdef.sheet || `${fighter.c.id}:${animKey || fighter.move.def.anim}`;
     const bank = Assets.smears[key];
     if (!bank) return false;
-    // 动效用月牙主帧(最大的那帧)做画笔
+    // 动效用月牙主帧(最大的那帧)做画笔; standalone 走闭合版(无身体咬痕)
     const frames = Object.keys(bank.frames).map(Number).sort((a, b) => a - b);
-    const edge = Assets.tinted(key, frames[0], 'edge', sdef.edge);
+    const edge = Assets.tinted(key, frames[0], sdef.standalone ? 'edgeC' : 'edge', sdef.edge);
     if (!edge) return false;
     const bankCx = bank.frames[frames[0]].cx; // 镜像动效的翻转轴(月牙质心)
     const bankCy = bank.frames[frames[0]].cy;
@@ -282,12 +316,13 @@ const Effects = {
     let phaseImgs = null;
     if (sdef.standalone) {
       phaseImgs = [];
-      const coreLayer = `core${sdef.rim || 2}`;
+      // standalone 用闭合版(edgeC/coreNC): 补掉身体咬痕, 平移/翻转不露缺口
+      const coreLayer = `core${sdef.rim || 2}C`;
       for (const ph of sdef.phases) {
         const f = ph.f !== undefined ? ph.f : frames[0];
         if (!bank.frames[f]) continue;
         phaseImgs.push({
-          edge: Assets.tinted(key, f, 'edge', sdef.edge),
+          edge: Assets.tinted(key, f, 'edgeC', sdef.edge),
           core: Assets.tinted(key, f, coreLayer, sdef.core),
           t: ph.t,
         });

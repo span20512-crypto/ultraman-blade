@@ -219,6 +219,15 @@ const DATA = {
         knock: 3.5, hitstun: 16, blockstun: 9, hitstop: 4, shake: 2,
         meterHit: 7, sfx: 'whooshL', hitSfx: 'hitL',
       },
+      clight2: { // 蹲刺·返し(蹲J·J 第二段): 同笔迹微抬角+略深青, 高品质"同刀微变"(隼人定版同模式)
+        kind: 'light', anim: 'attack1', total: 17, startup: 4, active: 4, impact: 1,
+        seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 3 }, r: [{ a: 'crouch', f: 0 }] },
+        cullSmear: true,
+        smear: { standalone: true, phases: [{ f: 1, t: 4 }], decay: 2, dy: 24, squashY: 0.46, scale: 0.82, rot: -0.13, edge: '#35c8bc', core: '#d6fff8' },
+        dmg: 3, chip: 0, guardDmg: 9, box: { x1: 10, x2: 132, y1: -66, y2: -5 },
+        knock: 4, hitstun: 16, blockstun: 9, hitstop: 4, shake: 2,
+        meterHit: 7, sfx: 'whooshL', hitSfx: 'hitL',
+      },
       cheavy: { // 蹲撩·逆风: 独立挑空技,不参与连锁 · 青升弧
         kind: 'heavy', noChain: true, anim: 'attack2', total: 30, startup: 8, active: 5, impact: 1,
         seq: { w: [{ a: 'crouch', f: 0 }], i: 3, r: [3] }, hop: -7, // 身体 f3 举刀, 随小跳弹起
@@ -245,25 +254,25 @@ const DATA = {
         knock: 6.5, hitstun: 26, blockstun: 15, hitstop: 9, shake: 6, kd: true,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
-      special: { // 苦无·三連: 扇形三枚(上/中/下), 忍者道具语言 —— 与隼人纯近身彻底区分
-        kind: 'special', name: '苦無·三連', anim: 'attack1', total: 30,
+      special: { // 影·手裏剣: 单发旋转手里剑(Eric 定版: 最贴合日本忍者, 苦无导弹感被否)
+        kind: 'special', name: '影·手裏剣', anim: 'attack1', total: 30,
         startup: 11, active: 4, impact: 3, cooldown: 120,
-        seq: { w: [0], i: 3, r: [3] }, // 投掷用 f3 收势帧, 避开 f1 刀光月牙(苦无才是主视觉)
-        fx: { lean: true, x: 40, y: -95, r: 26, ry: 0.9, a0: -0.6, a1: 0.4, w: 4, life: 5, sweep: 0.7, color: '#d6fff8', color2: '#35e0d8' },
+        seq: { w: [0], i: 3, r: [3] }, // 投掷用 f3 收势帧, 避开 f1 刀光月牙
+        fx: { lean: true, x: 40, y: -95, r: 26, ry: 0.9, a0: -0.6, a1: 0.4, w: 4, life: 5, sweep: 0.7, color: '#eafffd', color2: '#7d5bff' },
         dmg: 0, chip: 0, box: null,
         knock: 0, hitstun: 0, blockstun: 0, hitstop: 0, shake: 0,
-        projectile: { kind: 'kunai', trail: 'rgba(53,224,216,0.7)', spread: [-3.4, 0, 3.4], speed: 10, dmg: 6, chip: 2, guardDmg: 12, y: -95, hitstun: 20, blockstun: 11, knock: 4, hitstop: 5, meterHit: 8 },
+        projectile: { speed: 9.5, dmg: 8, chip: 3, guardDmg: 16, y: -95, hitstun: 22, blockstun: 12, knock: 5, hitstop: 6, meterHit: 12 },
         meterHit: 0, sfx: 'projectile', hitSfx: 'hitL',
       },
-      airspecial: { // 空苦無(空中+U): 忍者空投, 斜下抛两枚苦无, 制空/压制起跳
-        kind: 'special', name: '空苦無', anim: 'attack1', air: true, total: 26,
+      airspecial: { // 空中手裏剣(空中+U): 滞空斜下掷, 制空/压制起跳
+        kind: 'special', name: '空中手裏剣', anim: 'attack1', air: true, total: 26,
         startup: 6, active: 4, impact: 3, cooldown: 90,
         seq: { w: [0], i: 3, r: [3] },
-        fx: { lean: true, x: 34, y: -60, r: 22, ry: 0.9, a0: -0.5, a1: 0.5, w: 4, life: 5, sweep: 0.7, color: '#d6fff8', color2: '#35e0d8' },
+        fx: { lean: true, x: 34, y: -60, r: 22, ry: 0.9, a0: -0.5, a1: 0.5, w: 4, life: 5, sweep: 0.7, color: '#eafffd', color2: '#7d5bff' },
         dmg: 0, chip: 0, box: null,
         knock: 0, hitstun: 0, blockstun: 0, hitstop: 0, shake: 0,
-        // vy 正=向下: 斜下抛(制空落点覆盖); y=-60 从空中腰位出手
-        projectile: { kind: 'kunai', trail: 'rgba(53,224,216,0.7)', spread: [4, 7], speed: 8.5, dmg: 6, chip: 2, guardDmg: 12, y: -60, hitstun: 20, blockstun: 11, knock: 4, hitstop: 5, meterHit: 8 },
+        // vy 正=向下: 斜下掷(制空落点覆盖); y=-60 从空中腰位出手
+        projectile: { spread: [5], speed: 8.5, dmg: 7, chip: 2, guardDmg: 14, y: -60, hitstun: 20, blockstun: 11, knock: 4, hitstop: 5, meterHit: 10 },
         meterHit: 0, sfx: 'projectile', hitSfx: 'hitL',
       },
       dashslash: { // 疾駆斬(dash+J): 借冲刺前突的横斩, 重残影拖尾 —— 疾影突进
