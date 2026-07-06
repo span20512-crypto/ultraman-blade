@@ -515,6 +515,11 @@ class Fighter {
     opp.state = 'hit'; opp.hitstun = 12; opp.setAnim('hit');
     opp.grounded = true; opp.y = STAGE.ground; opp.vy = 0; opp.vx = 0;
 
+    // 超杀演出编排分流(剑二三方案, lab 可切换预览; 未指定走通用月华式)
+    if (s.style === 'iai') return this.runCineIai(opp, s);
+    if (s.style === 'clones') return this.runCineClones(opp, s);
+    if (s.style === 'rain') return this.runCineRain(opp, s);
+
     if (s.t % s.interval === 0 && s.done < s.hits) {
       s.done++;
       const dmg = Math.max(1, Math.round(s.dmgPer * s.scale));
@@ -585,6 +590,150 @@ class Fighter {
       this.superSeq = null; this.cineSmear = null;
       this.state = 'idle'; this.move = null;
       this.setAnim('idle', true);
+    }
+  }
+
+  /* 通用: 演出内的一次伤害记账(与通用 cine 每 hit 完全一致的数额/连击计数) */
+  cineDamageTick(opp, s) {
+    s.done++;
+    const dmg = Math.max(1, Math.round(s.dmgPer * s.scale));
+    opp.hp = Math.max(0, opp.hp - dmg);
+    opp.lastHurt = this.world.tick;
+    opp.flash = 5;
+    opp.setAnim('hit', true);
+    this.combo.count++; this.combo.timer = 60;
+    this.world.stats.maxCombo = Math.max(this.world.stats.maxCombo, this.combo.count);
+  }
+
+  /* 通用: 演出终结(伤害数额与通用路径一致, 视觉可由调用方叠加) */
+  cineFinish(opp, launchVy = -12, launchVx = 18) {
+    const s = this.superSeq;
+    const dmg = Math.max(1, Math.round(s.final * s.scale));
+    opp.hp = Math.max(0, opp.hp - dmg);
+    opp.frozen = 0;
+    opp.state = 'hit'; opp.setAnim('hit', true);
+    opp.grounded = false; opp.vy = launchVy; opp.vx = this.facing * launchVx;
+    opp.kdPending = true;
+    this.combo.count++; this.combo.timer = 90;
+    this.world.stats.maxCombo = Math.max(this.world.stats.maxCombo, this.combo.count);
+    this.superSeq = null; this.cineSmear = null;
+    this.state = 'idle'; this.move = null;
+    this.setAnim('idle', true);
+  }
+
+  /* 方案① 影縫い·居合: 瞬身背后纳刀 → 八道斩线无声浮现 → 一拍寂静 →
+     全部伤害一齐爆发。居合"先斩后觉", 与隼人的狂暴突进两极。 */
+  runCineIai(opp, s) {
+    if (s.t === 1) {
+      // 瞬身到对手身后, 纳刀姿(idle 首帧定住)
+      this.x = opp.x + this.facing * 96;
+      this.facing = -this.facing;
+      this.setAnim('idle', true);
+      Effects.ring(this.x, this.y - 90, '#c9baff', 12);
+      AudioSys.sfx('tele');
+    }
+    this.anim.frame = 0; this.anim.t = 0;    // 纳刀静止
+    // t4..25: 八道斩线逐条浮现(伤害此刻不结算 —— 居合的"先斩后觉")
+    if (s.t >= 4 && s.t <= 25 && (s.t - 4) % 3 === 0) {
+      const i = (s.t - 4) / 3;
+      const angs = [-0.5, 0.6, -1.1, 1.3, 0.1, -1.7, 0.9, -0.2];
+      Effects.cutLine(opp.x + (i % 3 - 1) * 9, opp.y - 96 + ((i * 37) % 60) - 30,
+        angs[i % 8], 96 + (i % 3) * 22, '#b9fff7');
+      AudioSys.sfx('whooshL');
+    }
+    // t26..27: 三段伤害记账(静止中无声结算, 视觉仍无动静 —— 蓄)
+    if (s.t === 26) { this.cineDamageTick(opp, s); this.cineDamageTick(opp, s); this.cineDamageTick(opp, s); }
+    // t28..36: 一拍寂静
+    // t37: 爆发 —— 全部斩线碎裂 + 终结
+    if (s.t === 37) {
+      Effects.burstCutLines();
+      Effects.impact(opp.x, opp.y - 100, -this.facing, { tier: 4, color: this.c.theme2 });
+      Effects.flashFrame({ alpha: 0.55, t: 3 });
+      Effects.shockRing(opp.x, opp.y - 60, this.c.theme2);
+      this.world.hitstop(14);
+      this.world.shake(12, 14);
+      this.world.slowmoT = 14; this.world.slowmo = 0.4; this.world.slowAcc = 0;
+      AudioSys.sfx('hitH');
+      // 崩飞方向: 朝剑二背对的方向(他已换边)
+      this.cineFinish(opp, -12, -18);
+    }
+  }
+
+  /* 方案② 残影分身·輪舞: 三个暗影分身轮流穿斩, 终结四人合击 */
+  runCineClones(opp, s) {
+    if (s.t === 1) {
+      this.x = opp.x - this.facing * 150;   // 本体退开压阵
+      this.setAnim('idle', true);
+    }
+    // 每 interval 一个分身从交替方向穿过对手
+    if (s.t % s.interval === 3 && s.done < s.hits) {
+      const dir = s.done % 2 === 0 ? 1 : -1;
+      const self = this;
+      Effects.cloneRun(this, s.done % 2 === 0 ? 'attack1' : 'attack2',
+        opp.x - dir * 230, opp.x + dir * 230, opp.y, 14, () => {
+          self.cineDamageTick(opp, s);
+          Effects.smearFx(self, {
+            standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 1,
+            dx: opp.x - self.x, dy: -6, scale: 0.9, edge: '#7d5bff', core: '#efe8ff',
+          }, 'attack1');
+          Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
+          self.world.hitstop(5);
+          self.world.shake(4, 5);
+          AudioSys.sfx('hitH');
+        });
+      AudioSys.sfx('dash');
+    }
+    // 终结: 分身们回到四方 + 同时合击
+    if (s.done >= s.hits && s.t >= s.hits * s.interval + 16) {
+      for (const dir of [1, -1]) {
+        Effects.cloneRun(this, 'attack1', opp.x - dir * 200, opp.x + dir * 200, opp.y, 10, null);
+      }
+      Effects.smearFx(this, { standalone: true, sheet: 'fx:ka2', phases: [{ f: 0, t: 5 }], decay: 2, dx: opp.x - this.x, dy: -8, edge: '#7d5bff', core: '#c8fff5' }, 'attack2');
+      Effects.smearFx(this, { standalone: true, sheet: 'fx:ka2', phases: [{ f: 0, t: 5 }], decay: 2, flipY: true, dx: opp.x - this.x, dy: -4, scale: 0.9, edge: '#35e0d8', core: '#d6fff8' }, 'attack2');
+      Effects.impact(opp.x, opp.y - 100, this.facing, { tier: 4, color: this.c.theme2 });
+      Effects.flashFrame({ alpha: 0.5, t: 3 });
+      this.world.hitstop(16);
+      this.world.shake(12, 15);
+      AudioSys.sfx('hitH');
+      this.cineFinish(opp, -13, 14);
+    }
+  }
+
+  /* 方案③ 手裏剣·封殺陣: 后跃撒镖钉住对手 → 突进终结 */
+  runCineRain(opp, s) {
+    if (s.t === 1) {
+      this.x = opp.x - this.facing * 250;   // 后跃拉开
+      this.setAnim('jump', true);
+      Effects.dust(this.x, this.y, 8);
+      AudioSys.sfx('jump');
+    }
+    if (s.t < 30) { this.anim.name = 'jump'; this.anim.frame = 0; }
+    // 三波手里剑: 从剑二上方弧线飞向对手, 到达即钉住+结算
+    if (s.t % s.interval === 4 && s.done < s.hits) {
+      const i = s.done;
+      const self = this;
+      Effects.pinStar(this.x + this.facing * 20, this.y - 130 - i * 14,
+        opp.x + (i - 1) * 10, opp.y - 70 - ((i * 43) % 50), 9, () => {
+          self.cineDamageTick(opp, s);
+          Effects.spark(opp.x, opp.y - 90, self.facing, ['#c9baff', '#7d5bff'], 6, 4);
+          self.world.hitstop(4);
+          AudioSys.sfx('hitL');
+        });
+      AudioSys.sfx('projectile');
+    }
+    // 终结: 突进穿过被钉住的对手, 镖齐爆
+    if (s.done >= s.hits && s.t >= s.hits * s.interval + 18) {
+      const from = this.x;
+      this.x = opp.x + this.facing * 110;   // 瞬身穿过
+      Effects.cloneRun(this, 'attack1', from, this.x, this.y, 8, null);
+      Effects.smearFx(this, { standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 2, dx: opp.x - this.x, dy: -6, edge: '#35e0d8', core: '#eafffd' }, 'attack1');
+      Effects.burstPinStars();
+      Effects.impact(opp.x, opp.y - 100, this.facing, { tier: 4, color: this.c.theme2 });
+      Effects.flashFrame({ alpha: 0.5, t: 3 });
+      this.world.hitstop(15);
+      this.world.shake(11, 14);
+      AudioSys.sfx('hitH');
+      this.cineFinish(opp, -12, 16);
     }
   }
 

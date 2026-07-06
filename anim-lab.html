@@ -83,6 +83,9 @@ const SEQS = [
   { key: 'I',     label: 'I 超必杀·終A 桜吹雪', chain: ['super'], finisher: 'A' },
   { key: 'IB',    label: 'I 超必杀·終B 月輪爆', chain: ['super'], finisher: 'B' },
   { key: 'IC',    label: 'I 超必杀·終C 斬鉄十字', chain: ['super'], finisher: 'C' },
+  { key: 'IK1',   label: 'I 超杀①影縫い·居合(剑二)', chain: ['super'], cineStyle: 'iai' },
+  { key: 'IK2',   label: 'I 超杀②残影分身·輪舞(剑二)', chain: ['super'], cineStyle: 'clones' },
+  { key: 'IK3',   label: 'I 超杀③手裏剣·封殺陣(剑二)', chain: ['super'], cineStyle: 'rain' },
   { key: 'JJKK',  label: '连招 J·J·K·K', chain: ['light', 'light', 'heavy', 'heavy'] },
   { key: 'JJKU',  label: '连招 J·J·K·U', chain: ['light', 'light', 'heavy', 'special'] },
   { key: 'JJKI',  label: '连招 J·J·K·I', chain: ['light', 'light', 'heavy', 'super'] },
@@ -118,6 +121,7 @@ function resetScene() {
   A.legacyFx = !!seq.legacy; // (旧) 对照按钮: 白月牙+椭圆弧+旧火花, 仅实验室
   A.finisherOverride = seq.finisher || null; // 超杀终结变体预览(A/B/C)
   A.cjjVariant = seq.cjj || null;            // 蹲J·J 第二段方案预览(V1/V2/V3)
+  A.cineStyleOverride = seq.cineStyle || null; // 剑二超杀演出方案预览(①②③)
   A.meter = seq.chain.includes('super') ? 100 : 0; // 满气光环只在超杀序列出现
   W.projectiles = []; W.hitstopT = 0; W.banner = null;
   W.slowmoT = 0; W.slowmo = 1; W.slowAcc = 0;
@@ -165,7 +169,7 @@ function miniResolve() {
       }
       if (d.kind === 'super' && d.cine && A.state === 'attack') {
         A.vx = 0; A.move = null;
-        A.superSeq = { hits: d.cine.hits, interval: d.cine.interval, dmgPer: d.cine.dmgPer, final: d.cine.final, t: 0, done: 0, scale: preScale };
+        A.superSeq = { hits: d.cine.hits, interval: d.cine.interval, dmgPer: d.cine.dmgPer, final: d.cine.final, t: 0, done: 0, scale: preScale, style: A.cineStyleOverride || d.cine.style || null };
         B.frozen = 2;
       }
     } else { mA.hasHit = true; }

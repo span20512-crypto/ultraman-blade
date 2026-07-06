@@ -13,6 +13,11 @@ const FX_SHEETS = {
   mh3a1: { file: 'assets/img/mh3/Attack1.png', frames: 7, smearFrames: [4, 5] },
   mh3a2: { file: 'assets/img/mh3/Attack2.png', frames: 6, smearFrames: [3, 4] },
   mh3a3: { file: 'assets/img/mh3/Attack3.png', frames: 9, smearFrames: [6, 7] },
+  // 离线修复的干净月牙(assets/img/fxcres): 豁口边界插值补齐+闭运算,
+  // 逐张人工验收过 —— standalone 招式一律用这些, 不再用带身体咬痕的原始帧
+  ka1: { file: 'assets/img/fxcres/kenji-a1.png', frames: 1, smearFrames: [0] },
+  ka2: { file: 'assets/img/fxcres/kenji-a2.png', frames: 1, smearFrames: [0] },
+  ma2: { file: 'assets/img/fxcres/mack-a2.png', frames: 2, smearFrames: [0, 1] },
 };
 
 const CHAIN_RANK = { light: 1, heavy: 2, special: 3, super: 4 };
@@ -81,7 +86,7 @@ const DATA = {
       clight: { // 蹲斩·削足: 身体全程蹲姿(合成), 刀光低位平扫作独立基底 —— 蹲着快速出刀
         kind: 'light', anim: 'attack2', total: 22, startup: 6, active: 5, impact: 4,
         seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 2 }, r: [{ a: 'crouch', f: 0 }] },
-        smear: { standalone: true, phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, dy: 26, squashY: 0.8, edge: '#ffc531', core: '#fff2c8' },
+        smear: { standalone: true, sheet: 'fx:ma2', phases: [{ f: 0, t: 4 }, { f: 1, t: 3 }], decay: 2, dy: 26, squashY: 0.8, edge: '#ffc531', core: '#fff2c8' },
         fx: { x: 100, y: -70, r: 110, ry: 0.42, a0: 2.75, a1: 0.05, w: 12, life: 10, color: '#fff2c8', color2: '#ffc531' },
         dmg: 5, chip: 0, guardDmg: 10, box: { x1: 10, x2: 128, y1: -70, y2: -5 },
         knock: 3.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
@@ -95,7 +100,7 @@ const DATA = {
         // (历史: 镜像/缩小/细线/MH3借笔迹 四路都被否, 定位就是快速二连同刀)
         cullSmear: true,
         // 定版(Eric 拍板 A): 同刀微抬角(-7°), 第二刀收势略向上挑
-        smear: { standalone: true, phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, dy: 26, squashY: 0.8, rot: -0.12, edge: '#ffc531', core: '#fff2c8' },
+        smear: { standalone: true, sheet: 'fx:ma2', phases: [{ f: 0, t: 4 }, { f: 1, t: 3 }], decay: 2, dy: 26, squashY: 0.8, rot: -0.12, edge: '#ffc531', core: '#fff2c8' },
         dmg: 4, chip: 0, guardDmg: 10, box: { x1: 10, x2: 135, y1: -70, y2: -5 },
         knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
@@ -183,11 +188,10 @@ const DATA = {
         knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
-      light2: { // 逆袈裟回斩(J·J 第二段): 举刀身(f3) + f1 好月牙垂直翻转成上挑弧
+      light2: { // 逆袈裟回斩(J·J 第二段): F模式 —— 同月牙微变(缩0.94+转角), Eric定版
         kind: 'light', anim: 'attack1', total: 18, startup: 4, active: 5, impact: 1,
-        // 身体用 f3(举刀姿, 无生月牙); 刀光=画师 f1 月牙 flipY(下劈笔迹→上挑, 真笔迹质感)
         seq: { w: [0], i: 3, r: [3] },
-        smear: { standalone: true, flipY: true, phases: [{ f: 1, t: 4 }], decay: 2, dy: -6, scale: 0.9, edge: '#35e0d8', core: '#eafffd' },
+        smear: { standalone: true, sheet: 'fx:ka1', cullPrev: true, phases: [{ f: 0, t: 4 }], decay: 2, dy: -4, scale: 0.94, rot: -0.1, edge: '#35e0d8', core: '#ddfffa' },
         dmg: 6, chip: 0, guardDmg: 10, box: { x1: 12, x2: 140, y1: -165, y2: -40 },
         knock: 4.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
@@ -204,8 +208,8 @@ const DATA = {
       heavy2: { // 回升斩(K·K 第二段): 低位前突撩起 · 紫青升弧(与下劈相反)
         kind: 'heavy', anim: 'attack2', total: 29, startup: 8, active: 5, impact: 1,
         seq: { w: [0], i: 3, r: [3] }, dash: { from: 2, to: 9, vx: 7 }, // 身体 f3 举刀, 随前突移动
-        // 回升斩=前突撩起: 画师 f1 月牙 flipY(下劈→上挑) + attach 随突进走, 真笔迹质感
-        smear: { standalone: true, flipY: true, attach: true, phases: [{ f: 1, t: 5 }], decay: 2, dy: -16, edge: '#8f6fff', core: '#c8fff5' },
+        // F模式(Eric 拍板: 正反动作月牙几乎不动): 同下劈月牙, 缩0.92+微转角, attach 随突进
+        smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 5 }], decay: 2, dy: -8, scale: 0.92, rot: -0.12, edge: '#8f6fff', core: '#c8fff5' },
         dmg: 10, chip: 2, guardDmg: 20, box: { x1: 12, x2: 155, y1: -180, y2: -35 },
         knock: 8.5, hitstun: 26, blockstun: 14, hitstop: 11, shake: 5,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
@@ -214,7 +218,7 @@ const DATA = {
         kind: 'light', anim: 'attack1', total: 18, startup: 5, active: 4, impact: 1,
         seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 3 }, r: [{ a: 'crouch', f: 0 }] },
         // 削足=贴地横扫: 画师 f1 月牙压扁成低平弧(真笔迹, 非手画), 蹲身+低位清晰可见
-        smear: { standalone: true, phases: [{ f: 1, t: 4 }], decay: 2, dy: 30, squashY: 0.42, scale: 0.86, edge: '#5ce8da', core: '#eafffd' },
+        smear: { standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 2, dy: 30, squashY: 0.42, scale: 0.86, edge: '#5ce8da', core: '#eafffd' },
         dmg: 4, chip: 0, guardDmg: 9, box: { x1: 10, x2: 128, y1: -62, y2: -5 },
         knock: 3.5, hitstun: 16, blockstun: 9, hitstop: 4, shake: 2,
         meterHit: 7, sfx: 'whooshL', hitSfx: 'hitL',
@@ -223,7 +227,7 @@ const DATA = {
         kind: 'light', anim: 'attack1', total: 17, startup: 4, active: 4, impact: 1,
         seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 3 }, r: [{ a: 'crouch', f: 0 }] },
         cullSmear: true,
-        smear: { standalone: true, phases: [{ f: 1, t: 4 }], decay: 2, dy: 24, squashY: 0.46, scale: 0.82, rot: -0.13, edge: '#35c8bc', core: '#d6fff8' },
+        smear: { standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 2, dy: 24, squashY: 0.46, scale: 0.82, rot: -0.13, edge: '#35c8bc', core: '#d6fff8' },
         dmg: 3, chip: 0, guardDmg: 9, box: { x1: 10, x2: 132, y1: -66, y2: -5 },
         knock: 4, hitstun: 16, blockstun: 9, hitstop: 4, shake: 2,
         meterHit: 7, sfx: 'whooshL', hitSfx: 'hitL',
@@ -232,7 +236,7 @@ const DATA = {
         kind: 'heavy', noChain: true, anim: 'attack2', total: 30, startup: 8, active: 5, impact: 1,
         seq: { w: [{ a: 'crouch', f: 0 }], i: 3, r: [3] }, hop: -7, // 身体 f3 举刀, 随小跳弹起
         // 升斩=蹲身弹起上挑: 画师 f1 月牙 flipY(下劈→上挑) + attach 随小跳身体上升, 真笔迹
-        smear: { standalone: true, flipY: true, attach: true, phases: [{ f: 1, t: 5 }], decay: 2, dy: -12, edge: '#35e0d8', core: '#d6fff8' },
+        smear: { standalone: true, sheet: 'fx:ka2', flipY: true, attach: true, phases: [{ f: 0, t: 5 }], decay: 2, dy: -12, edge: '#35e0d8', core: '#d6fff8' },
         dmg: 9, chip: 2, guardDmg: 20, box: { x1: 5, x2: 125, y1: -190, y2: -20 },
         knock: 5, hitstun: 24, blockstun: 13, hitstop: 8, shake: 4, kd: true, launch: -11,
         meterHit: 11, sfx: 'whooshH', hitSfx: 'hitH',

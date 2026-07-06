@@ -284,12 +284,52 @@ const Stage = {
 };
 
 const Effects = {
-  parts: [], texts: [], ghosts: [], slashes: [], smears: [], impacts: [], shocks: [], flashes: [], pillars: [], crossCuts: [],
+  parts: [], texts: [], ghosts: [], slashes: [], smears: [], impacts: [], shocks: [], flashes: [], pillars: [], crossCuts: [], cutLines: [], cloneRuns: [], pinStars: [],
 
   reset() {
     this.parts = []; this.texts = []; this.ghosts = []; this.slashes = [];
     this.smears = []; this.impacts = []; this.shocks = []; this.flashes = [];
-    this.pillars = []; this.crossCuts = [];
+    this.pillars = []; this.crossCuts = []; this.cutLines = []; this.cloneRuns = []; this.pinStars = [];
+  },
+
+  /* ── 超杀演出专用 ────────────────────────────────────────────────
+     cutLine  影縫い·居合: 无声浮现的细斩线, 停驻等待, burst 时碎裂
+     cloneRun 残影分身: 暗影分身横穿画面(拖残影), 到中点触发回调
+     pinStar  手裏剣封殺: 弧线飞向目标的小手里剑, 到达后钉住旋转减速 */
+  cutLine(x, y, ang, len, color) {
+    this.cutLines.push({ x, y, ang, len, color, t: 0, burst: false });
+  },
+  burstCutLines() {
+    for (const l of this.cutLines) {
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        const u = i / (n - 1) - 0.5;
+        this.parts.push({
+          x: l.x + Math.cos(l.ang) * l.len * u, y: l.y + Math.sin(l.ang) * l.len * u,
+          vx: Math.cos(l.ang + Math.PI / 2) * (2 + Math.random() * 3) * (Math.random() < 0.5 ? 1 : -1),
+          vy: -1 - Math.random() * 2,
+          life: 12 + Math.random() * 8, maxLife: 20,
+          size: 2 + Math.floor(Math.random() * 2), color: l.color, grav: 0.15,
+        });
+      }
+    }
+    this.cutLines = [];
+  },
+  cloneRun(fighter, animName, x0, x1, y, dur, onMid) {
+    this.cloneRuns.push({
+      sheet: `${fighter.c.id}:${animName}`, fs: fighter.c.fw || 200, sc: fighter.c.scale,
+      anchorX: fighter.c.anchor.x, anchorY: fighter.c.anchor.y,
+      x0, x1, y, t: 0, dur, onMid, midFired: false, flip: x1 < x0,
+    });
+  },
+  pinStar(x0, y0, x1, y1, dur, onHit) {
+    this.pinStars.push({ x0, y0, x1, y1, t: 0, dur, onHit, hitFired: false, pinned: false, spin: 0 });
+  },
+  burstPinStars() {
+    for (const p of this.pinStars) {
+      this.spark(p.x1, p.y1, 0, ['#c9baff', '#7d5bff', '#ffffff'], 6, 4);
+    }
+    this.pinStars = [];
   },
 
   /* 月华式 smear 动效层: 基底重染由 fighter.draw 帧同步覆盖完成(见
@@ -681,6 +721,19 @@ const Effects = {
       }
     }
     this.crossCuts = this.crossCuts.filter(cc => cc.t < 8);
+    for (const l of this.cutLines) l.t += rate;   // 斩线常驻, burst 时统一清
+    for (const c of this.cloneRuns) {
+      c.t += rate;
+      if (!c.midFired && c.t >= c.dur * 0.5) { c.midFired = true; if (c.onMid) c.onMid(); }
+    }
+    this.cloneRuns = this.cloneRuns.filter(c => c.t < c.dur + 6);
+    for (const p of this.pinStars) {
+      if (!p.pinned) {
+        p.t += rate;
+        if (p.t >= p.dur) { p.pinned = true; if (!p.hitFired) { p.hitFired = true; if (p.onHit) p.onHit(); } }
+      }
+      p.spin += p.pinned ? 0.08 : 0.5;
+    }
   },
 
   drawGhosts(ctx) {
@@ -850,6 +903,66 @@ const Effects = {
     }
   },
 
+  drawCutLines(ctx) {
+    for (const l of this.cutLines) {
+      // 浮现: 前3tick 从中心向两端擦出; 之后常驻微闪
+      const grow = Math.min(1, (l.t + 1) / 3);
+      const hl = l.len * grow / 2;
+      const dx = Math.cos(l.ang), dy = Math.sin(l.ang);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const shimmer = 0.75 + 0.25 * Math.sin(l.t * 0.9);
+      ctx.strokeStyle = l.color; ctx.lineWidth = 3; ctx.globalAlpha = 0.5 * shimmer;
+      ctx.beginPath(); ctx.moveTo(l.x - dx * hl, l.y - dy * hl); ctx.lineTo(l.x + dx * hl, l.y + dy * hl); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.9 * shimmer;
+      ctx.beginPath(); ctx.moveTo(l.x - dx * hl, l.y - dy * hl); ctx.lineTo(l.x + dx * hl, l.y + dy * hl); ctx.stroke();
+      ctx.restore();
+    }
+  },
+
+  drawCloneRuns(ctx) {
+    for (const c of this.cloneRuns) {
+      const img = Assets.img(c.sheet);
+      if (!img) continue;
+      const u = Math.min(1, c.t / c.dur);
+      const x = c.x0 + (c.x1 - c.x0) * u;
+      // 攻击帧序: 前半程 f0(奔), 中段 f1(斩), 后段 f2/f3(收)
+      const f = u < 0.35 ? 0 : u < 0.6 ? 1 : u < 0.8 ? 2 : 3;
+      const dw = c.fs * c.sc, dh = c.fs * c.sc;
+      const dx = x - c.anchorX * c.sc, dy = c.y - c.anchorY * c.sc;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      if (c.flip) { ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0); }
+      // 暗影分身: 压暗+紫化(滤镜), 半透
+      ctx.globalAlpha = c.t > c.dur ? 0.5 * (1 - (c.t - c.dur) / 6) : 0.82;
+      ctx.filter = 'brightness(0.4) sepia(1) hue-rotate(215deg) saturate(3.2)';
+      ctx.drawImage(img, f * c.fs, 0, c.fs, c.fs, dx, dy, dw, dh);
+      ctx.filter = 'none';
+      ctx.restore();
+    }
+  },
+
+  drawPinStars(ctx) {
+    for (const p of this.pinStars) {
+      let x, y;
+      if (p.pinned) { x = p.x1; y = p.y1; }
+      else {
+        const u = p.t / p.dur;
+        x = p.x0 + (p.x1 - p.x0) * u;
+        y = p.y0 + (p.y1 - p.y0) * u - Math.sin(u * Math.PI) * 46; // 弧线飞行
+      }
+      ctx.save();
+      ctx.translate(Math.round(x), Math.round(y));
+      ctx.rotate(p.spin);
+      ctx.fillStyle = p.pinned ? '#9f8fdf' : '#c9baff';
+      ctx.fillRect(-9, -2, 18, 4);
+      ctx.fillRect(-2, -9, 4, 18);
+      ctx.fillStyle = '#35e0d8';
+      ctx.fillRect(-3, -3, 6, 6);
+      ctx.restore();
+    }
+  },
+
   drawShocks(ctx) {
     for (const sh of this.shocks) {
       if (sh.t < 0) continue; // 延时起爆
@@ -953,6 +1066,9 @@ const Effects = {
       }
     }
     ctx.globalAlpha = 1;
+    this.drawCloneRuns(ctx);
+    this.drawCutLines(ctx);
+    this.drawPinStars(ctx);
     this.drawPillars(ctx);
     this.drawCrossCuts(ctx);
     this.drawShocks(ctx);

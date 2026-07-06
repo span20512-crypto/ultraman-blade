@@ -227,6 +227,7 @@ function tryHit(a, b, boxA, moveA) {
       a.superSeq = {
         hits: d.cine.hits, interval: d.cine.interval, dmgPer: d.cine.dmgPer,
         final: d.cine.final, t: 0, done: 0, scale: preScale,
+        style: a.cineStyleOverride || d.cine.style || null,
       };
       b.frozen = 2;
     }
