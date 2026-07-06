@@ -208,8 +208,8 @@ const DATA = {
       heavy2: { // 回升斩(K·K 第二段): 低位前突撩起 · 紫青升弧(与下劈相反)
         kind: 'heavy', anim: 'attack2', total: 29, startup: 8, active: 5, impact: 1,
         seq: { w: [0], i: 3, r: [3] }, dash: { from: 2, to: 9, vx: 7 }, // 身体 f3 举刀, 随前突移动
-        // F模式(Eric 拍板: 正反动作月牙几乎不动): 同下劈月牙, 缩0.92+微转角, attach 随突进
-        smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 5 }], decay: 2, dy: -8, scale: 0.92, rot: -0.12, edge: '#8f6fff', core: '#c8fff5' },
+        // F模式改(Eric: 重击第二下更有力): 同下劈月牙, 放大1.14+微转角, attach 随突进
+        smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 5 }], decay: 2, dy: -14, scale: 1.14, rot: -0.12, edge: '#8f6fff', core: '#c8fff5' },
         dmg: 10, chip: 2, guardDmg: 20, box: { x1: 12, x2: 155, y1: -180, y2: -35 },
         knock: 8.5, hitstun: 26, blockstun: 14, hitstop: 11, shake: 5,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
@@ -235,10 +235,10 @@ const DATA = {
       cheavy: { // 蹲撩·逆风: 独立挑空技,不参与连锁 · 青升弧
         kind: 'heavy', noChain: true, anim: 'attack2', total: 30, startup: 8, active: 5, impact: 1,
         seq: { w: [{ a: 'crouch', f: 0 }], i: 3, r: [3] }, hop: -7, // 身体 f3 举刀, 随小跳弹起
-        // 升斩=蹲身弹起上挑: 画师 f1 月牙 flipY(下劈→上挑) + attach 随小跳身体上升, 真笔迹
-        smear: { standalone: true, sheet: 'fx:ka2', flipY: true, attach: true, phases: [{ f: 0, t: 5 }], decay: 2, dy: -12, edge: '#35e0d8', core: '#d6fff8' },
+        // 升斩=KK第二下同源月牙(Eric: 保持一致)但更夸张(1.28, 力道最大) + attach 随弹起
+        smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 6 }], decay: 2, dy: -18, scale: 1.28, rot: -0.18, edge: '#35e0d8', core: '#d6fff8' },
         dmg: 9, chip: 2, guardDmg: 20, box: { x1: 5, x2: 125, y1: -190, y2: -20 },
-        knock: 5, hitstun: 24, blockstun: 13, hitstop: 8, shake: 4, kd: true, launch: -11,
+        knock: 5, hitstun: 24, blockstun: 13, hitstop: 10, shake: 5, kd: true, launch: -12.5,
         meterHit: 11, sfx: 'whooshH', hitSfx: 'hitH',
       },
       air: {
@@ -250,12 +250,13 @@ const DATA = {
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
       dive: {
-        kind: 'heavy', name: '影·墜滅', anim: 'attack2', air: true, dive: true, impact: 1,
+        kind: 'heavy', name: '影·墜滅', anim: 'attack2', air: true, dive: true, impact: 2,
         startup: 7, diveSpeed: 16, diveDrift: 5, recovery: 22, slamActive: 8, slamRange: 110,
-        // 签名借笔: MH3 竖劈月牙染妖紫, 落地瞬间纵斩炸开(与隼人断地斬的横扫区分)
-        smear: { standalone: true, sheet: 'fx:mh3a1', phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, dy: 6, edge: '#7d5bff', core: '#efe8ff' },
+        // Eric 定版: 倾身抡劈下砸 —— 俯冲期直接显示 f1 斩帧(impact:2 → 俯冲帧=f1),
+        // 身体带 dive 前倾角, 月牙帧同步重染妖紫随身而落; 落地卡帧 12
+        smear: { phases: [{ f: 1, t: 5 }], decay: 2, echo: { t: 3, dy: 8 }, edge: '#7d5bff', core: '#efe8ff' },
         dmg: 9, chip: 2, guardDmg: 28,
-        knock: 6.5, hitstun: 26, blockstun: 15, hitstop: 9, shake: 6, kd: true,
+        knock: 6.5, hitstun: 26, blockstun: 15, hitstop: 12, shake: 7, kd: true,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
       special: { // 影·手裏剣: 单发旋转手里剑(Eric 定版: 最贴合日本忍者, 苦无导弹感被否)
@@ -296,7 +297,7 @@ const DATA = {
         dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 155, y1: -180, y2: -25 },
         knock: 4, hitstun: 24, blockstun: 24, hitstop: 8, shake: 6, kd: true,
         teleport: { at: 6, offset: 92, invuln: 26 },
-        cine: { hits: 3, interval: 11, dmgPer: 7, final: 12 },
+        cine: { hits: 3, interval: 11, dmgPer: 7, final: 12, style: 'clones' }, // Eric 定版: 残影分身
         meterHit: 0, sfx: 'tele', hitSfx: 'hitH',
       },
     },

@@ -396,6 +396,10 @@ class Fighter {
         }
       }
     }
+    // 俯冲斩速度感: 下坠期间密集残影拖尾(影·墜滅)
+    if (d.dive && !m.landed && m.t >= d.startup && m.t % 2 === 0) {
+      Effects.ghost(this.spriteParams());
+    }
     // forward motion (dash specials / supers)
     if (d.dash && m.t >= d.dash.from && m.t <= d.dash.to) {
       this.vx = this.facing * d.dash.vx;
@@ -659,43 +663,69 @@ class Fighter {
     }
   }
 
-  /* 方案② 残影分身·輪舞: 三个暗影分身轮流穿斩, 终结四人合击 */
+  /* 定版超杀 残影分身(Eric 拍板): 瞬身背后起手(可被防, 防住即作废 —— 由
+     tryHit 的命中前置保证) → 本体与分身双向夹击, 每波两侧同时有身影穿过
+     (动感/移动感) → 收招借居合的斩线浮现+一齐爆发。 */
   runCineClones(opp, s) {
+    const self = this;
     if (s.t === 1) {
-      this.x = opp.x - this.facing * 150;   // 本体退开压阵
+      // 瞬身到对手身后(演出起点), 面向对手
+      this.x = opp.x + this.facing * 100;
+      this.facing = -this.facing;
+      Effects.ring(this.x, this.y - 90, '#c9baff', 12);
+      Effects.dust(this.x, this.y, 6);
+      AudioSys.sfx('tele');
       this.setAnim('idle', true);
     }
-    // 每 interval 一个分身从交替方向穿过对手
+    // 每 interval 一波双向夹击: 本体从一侧瞬身穿过, 分身同时从另一侧反向穿过
     if (s.t % s.interval === 3 && s.done < s.hits) {
       const dir = s.done % 2 === 0 ? 1 : -1;
-      const self = this;
-      Effects.cloneRun(this, s.done % 2 === 0 ? 'attack1' : 'attack2',
-        opp.x - dir * 230, opp.x + dir * 230, opp.y, 14, () => {
-          self.cineDamageTick(opp, s);
-          Effects.smearFx(self, {
-            standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 1,
-            dx: opp.x - self.x, dy: -6, scale: 0.9, edge: '#7d5bff', core: '#efe8ff',
-          }, 'attack1');
-          Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
-          self.world.hitstop(5);
-          self.world.shake(4, 5);
-          AudioSys.sfx('hitH');
-        });
+      // 本体: 瞬身到起点 → 下一拍出现在对面(穿过感由残影 cloneRun 补)
+      const fromX = opp.x - dir * 210, toX = opp.x + dir * 210;
+      this.x = toX; this.facing = -dir;
+      Effects.ring(this.x, this.y - 90, '#35e0d8', 10);
+      this.setAnim(s.done % 2 === 0 ? 'attack1' : 'attack2', true);
+      this.anim.frame = 2; this.anim.t = 0;
+      // 本体的穿越轨迹残影
+      Effects.cloneRun(this, s.done % 2 === 0 ? 'attack1' : 'attack2', fromX, toX, opp.y, 10, () => {
+        self.cineDamageTick(opp, s);
+        Effects.smearFx(self, {
+          standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 1,
+          dx: opp.x - self.x, dy: -6, edge: '#7d5bff', core: '#efe8ff',
+        }, 'attack1');
+        Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
+        self.world.hitstop(5);
+        self.world.shake(4, 5);
+        AudioSys.sfx('hitH');
+      });
+      // 分身: 同一拍从反方向穿过(双向夹击, 两侧不求统一但同等声势)
+      Effects.cloneRun(this, s.done % 2 === 0 ? 'attack2' : 'attack1', toX, fromX, opp.y, 12, () => {
+        Effects.smearFx(self, {
+          standalone: true, sheet: 'fx:ka2', phases: [{ f: 0, t: 3 }], decay: 1,
+          dx: opp.x - self.x, dy: -10, scale: 0.9, flipY: s.done % 2 === 1, edge: '#35e0d8', core: '#d6fff8',
+        }, 'attack2');
+      });
       AudioSys.sfx('dash');
     }
-    // 终结: 分身们回到四方 + 同时合击
-    if (s.done >= s.hits && s.t >= s.hits * s.interval + 16) {
-      for (const dir of [1, -1]) {
-        Effects.cloneRun(this, 'attack1', opp.x - dir * 200, opp.x + dir * 200, opp.y, 10, null);
-      }
-      Effects.smearFx(this, { standalone: true, sheet: 'fx:ka2', phases: [{ f: 0, t: 5 }], decay: 2, dx: opp.x - this.x, dy: -8, edge: '#7d5bff', core: '#c8fff5' }, 'attack2');
-      Effects.smearFx(this, { standalone: true, sheet: 'fx:ka2', phases: [{ f: 0, t: 5 }], decay: 2, flipY: true, dx: opp.x - this.x, dy: -4, scale: 0.9, edge: '#35e0d8', core: '#d6fff8' }, 'attack2');
+    // 收招·借居合: 三波打完 → 斩线快速浮现于对手 → 一齐爆发
+    const linesAt = s.hits * s.interval + 8;
+    if (s.done >= s.hits && s.t >= linesAt && s.t < linesAt + 12 && (s.t - linesAt) % 2 === 0) {
+      const i = (s.t - linesAt) / 2;
+      const angs = [-0.6, 0.7, -1.2, 1.4, 0.1, -1.8];
+      Effects.cutLine(opp.x + (i % 3 - 1) * 8, opp.y - 92 + ((i * 41) % 54) - 27,
+        angs[i % 6], 92 + (i % 3) * 20, '#c9baff');
+      AudioSys.sfx('whooshL');
+    }
+    if (s.done >= s.hits && s.t >= linesAt + 18) {
+      Effects.burstCutLines();
       Effects.impact(opp.x, opp.y - 100, this.facing, { tier: 4, color: this.c.theme2 });
-      Effects.flashFrame({ alpha: 0.5, t: 3 });
+      Effects.shockRing(opp.x, opp.y - 60, this.c.theme2);
+      Effects.flashFrame({ alpha: 0.55, t: 3 });
       this.world.hitstop(16);
-      this.world.shake(12, 15);
+      this.world.shake(13, 15);
+      this.world.slowmoT = 14; this.world.slowmo = 0.4; this.world.slowAcc = 0;
       AudioSys.sfx('hitH');
-      this.cineFinish(opp, -13, 14);
+      this.cineFinish(opp, -13, -16); // 朝本体背对方向崩飞
     }
   }
 
