@@ -663,60 +663,89 @@ class Fighter {
     }
   }
 
-  /* 定版超杀 残影分身(Eric 拍板): 瞬身背后起手(可被防, 防住即作废 —— 由
-     tryHit 的命中前置保证) → 本体与分身双向夹击, 每波两侧同时有身影穿过
-     (动感/移动感) → 收招借居合的斩线浮现+一齐爆发。 */
+  /* 定版超杀 残影分身 v2(Eric 流程):
+     ① 瞬身敌后向下抡击(重击smear=重击动作, 原位帧同步 —— 物理一致)
+     ② 同拍对侧浮现 ghost 剑二
+     ③ 两波双向真冲刺交叉(本体连续移动+拖尾, 中点各自挥刀, 月牙钉在挥刀
+        身影的位置与朝向上)
+     ④ ghost 幻化消散 → 居合斩线浮现 → 一齐爆发
+     smear 物理一致性规则: 谁挥刀, 月牙就出现在谁的位置、用谁的动作对应的
+     月牙(attack2下劈=ka2 / attack1横斩=ka1)、朝向=挥刀方向。 */
   runCineClones(opp, s) {
     const self = this;
+    const WAVE_T = 12;                       // 单次冲刺时长
+    const w1 = 14, w2 = w1 + WAVE_T + 8;     // 两波起点
+    const linesAt = w2 + WAVE_T + 8;
+
+    // ── ① t1: 瞬身敌后, 向下抡击(本体真身体帧 + 原位重染月牙) ──
     if (s.t === 1) {
-      // 瞬身到对手身后(演出起点), 面向对手
-      this.x = opp.x + this.facing * 100;
-      this.facing = -this.facing;
+      this.x = opp.x + this.facing * 84;     // 背后
+      this.facing = -this.facing;            // 转身面向对手
       Effects.ring(this.x, this.y - 90, '#c9baff', 12);
       Effects.dust(this.x, this.y, 6);
       AudioSys.sfx('tele');
-      this.setAnim('idle', true);
+      this.setAnim('attack2', true);         // 下劈动作
+      this.cineSmear = { edge: '#7d5bff', core: '#efe8ff', rim: 2 };
+      s.hold = { name: 'attack2', frame: 1, until: 9 };  // 斩帧定住几拍(可读)
+      this.cineDamageTick(opp, s);           // 第 1 段
+      Effects.impact(opp.x, opp.y - 96, this.facing, { tier: 3, color: '#7d5bff' });
+      this.world.hitstop(6); this.world.shake(5, 6);
+      AudioSys.sfx('hitH');
+      // ② 同拍: 对侧浮现 ghost(静立现身, 下一波才动)
+      const gx = opp.x + this.facing * 190;
+      Effects.cloneRun(this, 'attack1', gx, gx + 1, opp.y, w1 + 2, null);
     }
-    // 每 interval 一波双向夹击: 本体从一侧瞬身穿过, 分身同时从另一侧反向穿过
-    if (s.t % s.interval === 3 && s.done < s.hits) {
-      const dir = s.done % 2 === 0 ? 1 : -1;
-      // 本体: 瞬身到起点 → 下一拍出现在对面(穿过感由残影 cloneRun 补)
-      const fromX = opp.x - dir * 210, toX = opp.x + dir * 210;
-      this.x = toX; this.facing = -dir;
-      Effects.ring(this.x, this.y - 90, '#35e0d8', 10);
-      this.setAnim(s.done % 2 === 0 ? 'attack1' : 'attack2', true);
-      this.anim.frame = 2; this.anim.t = 0;
-      // 本体的穿越轨迹残影
-      Effects.cloneRun(this, s.done % 2 === 0 ? 'attack1' : 'attack2', fromX, toX, opp.y, 10, () => {
-        self.cineDamageTick(opp, s);
-        Effects.smearFx(self, {
-          standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 1,
-          dx: opp.x - self.x, dy: -6, edge: '#7d5bff', core: '#efe8ff',
-        }, 'attack1');
-        Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
-        self.world.hitstop(5);
-        self.world.shake(4, 5);
-        AudioSys.sfx('hitH');
-      });
-      // 分身: 同一拍从反方向穿过(双向夹击, 两侧不求统一但同等声势)
-      Effects.cloneRun(this, s.done % 2 === 0 ? 'attack2' : 'attack1', toX, fromX, opp.y, 12, () => {
-        Effects.smearFx(self, {
-          standalone: true, sheet: 'fx:ka2', phases: [{ f: 0, t: 3 }], decay: 1,
-          dx: opp.x - self.x, dy: -10, scale: 0.9, flipY: s.done % 2 === 1, edge: '#35e0d8', core: '#d6fff8',
-        }, 'attack2');
-      });
-      AudioSys.sfx('dash');
+    // 斩帧保持(月牙原位停驻, 不乱飞)
+    if (s.hold && s.t <= s.hold.until) {
+      this.anim.name = s.hold.name; this.anim.frame = s.hold.frame;
     }
-    // 收招·借居合: 三波打完 → 斩线快速浮现于对手 → 一齐爆发
-    const linesAt = s.hits * s.interval + 8;
-    if (s.done >= s.hits && s.t >= linesAt && s.t < linesAt + 12 && (s.t - linesAt) % 2 === 0) {
+
+    // ── ③ 两波双向交叉冲刺 ──
+    for (const [wStart, dir] of [[w1, -1], [w2, 1]]) {
+      if (s.t === wStart) {
+        s.run = { from: opp.x - dir * 190, to: opp.x + dir * 190, dir, t0: wStart };
+        this.x = s.run.from; this.facing = dir;
+        this.setAnim('attack1', true); this.anim.frame = 0;
+        this.cineSmear = null;
+        // ghost 同拍从反向出发(交叉)
+        Effects.cloneRun(this, 'attack1', opp.x + dir * 190, opp.x - dir * 190, opp.y, WAVE_T, () => {
+          // ghost 的月牙: 钉在 ghost 交汇点(=对手位置), 朝向=ghost 冲向(-dir)
+          Effects.smearFx(self, {
+            standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 3 }], decay: 1,
+            atX: opp.x - dir * 14, atY: opp.y, dir: -dir, scale: 0.88,
+            edge: '#35e0d8', core: '#d6fff8',
+          }, 'attack1');
+        });
+        AudioSys.sfx('dash');
+      }
+      if (s.run && s.run.dir === dir && s.t > wStart && s.t <= wStart + WAVE_T) {
+        // 本体连续冲刺(真移动 + 拖尾残影)
+        const u = (s.t - wStart) / WAVE_T;
+        this.x = s.run.from + (s.run.to - s.run.from) * u;
+        if (s.t % 2 === 0) Effects.ghost(this.spriteParams());
+        if (s.t === wStart + (WAVE_T >> 1)) {
+          // 中点(=对手位置)挥刀: 真身体帧 + 原位重染月牙(物理一致)
+          this.setAnim('attack1', true);
+          this.cineSmear = { edge: '#35e0d8', core: '#eafffd', rim: 2 };
+          s.hold = { name: 'attack1', frame: 1, until: s.t + 4 };
+          this.cineDamageTick(opp, s);       // 第 2/3 段
+          Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
+          this.world.hitstop(5); this.world.shake(4, 5);
+          AudioSys.sfx('hitH');
+        }
+      }
+    }
+
+    // ── ④ ghost 已自然消散(cloneRun 淡出) → 居合斩线 → 一齐爆发 ──
+    if (s.t >= linesAt && s.t < linesAt + 12 && (s.t - linesAt) % 2 === 0) {
+      if (s.t === linesAt) { this.setAnim('idle', true); this.cineSmear = null; }
       const i = (s.t - linesAt) / 2;
       const angs = [-0.6, 0.7, -1.2, 1.4, 0.1, -1.8];
       Effects.cutLine(opp.x + (i % 3 - 1) * 8, opp.y - 92 + ((i * 41) % 54) - 27,
         angs[i % 6], 92 + (i % 3) * 20, '#c9baff');
       AudioSys.sfx('whooshL');
     }
-    if (s.done >= s.hits && s.t >= linesAt + 18) {
+    if (s.t >= linesAt + 18) {
       Effects.burstCutLines();
       Effects.impact(opp.x, opp.y - 100, this.facing, { tier: 4, color: this.c.theme2 });
       Effects.shockRing(opp.x, opp.y - 60, this.c.theme2);
@@ -725,7 +754,7 @@ class Fighter {
       this.world.shake(13, 15);
       this.world.slowmoT = 14; this.world.slowmo = 0.4; this.world.slowAcc = 0;
       AudioSys.sfx('hitH');
-      this.cineFinish(opp, -13, -16); // 朝本体背对方向崩飞
+      this.cineFinish(opp, -13, 16);
     }
   }
 

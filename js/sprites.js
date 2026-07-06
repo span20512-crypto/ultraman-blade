@@ -371,18 +371,22 @@ const Effects = {
     }
     // 变换显式按攻击表计算(不用 spriteParams 瞬时状态 —— 出生 tick 时
     // anim 可能还停在 seq 引用的蹲姿帧, 会丢 yOff)。
-    // 外部 fx 表(fs≠200)无角色锚点: 水平居中角色、底边贴脚, 再靠 dx/dy 微调
+    // 外部 fx 表(fs≠200)无角色锚点: 水平居中角色、底边贴脚, 再靠 dx/dy 微调。
+    // atX/atY: 绝对世界坐标锚定(演出用 —— 月牙钉在"挥刀的那个身影"的位置,
+    // 物理一致性); dir: 朝向覆盖(ghost 的挥向≠本体朝向时用)
     const c = fighter.c, sc = c.scale;
     const yOff = (fighter.move && fighter.move.def.yOff) || 0;
     const dw = fs * sc, dh = fs * sc;
-    const baseX = fs === 200 ? fighter.x - c.anchor.x * sc : fighter.x - dw / 2;
-    const baseY = fs === 200 ? fighter.y - c.anchor.y * sc + yOff : fighter.y - dh;
+    const ax = sdef.atX !== undefined ? sdef.atX : fighter.x;
+    const ay = sdef.atY !== undefined ? sdef.atY : fighter.y;
+    const baseX = fs === 200 ? ax - c.anchor.x * sc : ax - dw / 2;
+    const baseY = fs === 200 ? ay - c.anchor.y * sc + yOff : ay - dh;
     const tPhases = sdef.phases.reduce((s, x) => s + x.t, 0);
     const decay = sdef.decay !== undefined ? sdef.decay : 2;
     const echo = sdef.echo || null;
     this.smears.push({
       dx: baseX, dy: baseY, dw, dh, fs,
-      flip: fighter.facing !== c.native, mirrorX: fighter.x,
+      flip: (sdef.dir !== undefined ? sdef.dir : fighter.facing) !== c.native, mirrorX: ax,
       edge, t: 0, tPhases, decayEnd: tPhases + decay, echo,
       gale: sdef.gale || 0, // 必杀刃风: 放大 additive 重影 (1.06 = +6%)
       mirror: !!sdef.mirror, flipY: !!sdef.flipY, bankCx, bankCy, owner: fighter,
