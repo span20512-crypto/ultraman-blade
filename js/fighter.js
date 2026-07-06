@@ -689,8 +689,12 @@ class Fighter {
       this.cineSmear = null;
     }
     if (s.t >= 2 && s.t <= 15) {                     // 完整挥击脚本
+      // 注意: updateAnim 在本函数之后运行并按 anim.t 重算帧 —— 必须写计时器
+      // 而非帧号, 否则脚本帧被覆盖(曾致"举刀"根本没显示)
+      const fr = s.t <= 6 ? 2 : s.t <= 11 ? 3 : 1;   // 举刀→过顶→抡下
       this.anim.name = 'attack2';
-      this.anim.frame = s.t <= 6 ? 2 : s.t <= 11 ? 3 : 1;  // 举刀→过顶→抡下
+      this.anim.t = fr * this.c.anims.attack2.hold;
+      this.anim.frame = fr;
       if (s.t === 12) {                              // 斩落瞬间
         this.cineSmear = { edge: '#7d5bff', core: '#efe8ff', rim: 2 };
         this.cineDamageTick(opp, s);                 // 第 1 段
@@ -701,11 +705,12 @@ class Fighter {
     }
     if (s.t === 16) this.cineSmear = null;
 
-    // ── ② ghost 登场拍(背刺 smear 已消退, 画面干净) ──
+    // ── ② ghost 登场拍(背刺 smear 已消退, 画面干净; 面向敌人) ──
     if (s.t === ghostAt) {
       s.gside = -this.facing;                        // ghost 在剑二对侧
       const gx = opp.x - this.facing * 170;
-      Effects.cloneRun(this, 'idle', gx, gx + 1, opp.y, w[0] - ghostAt + 2, null, { fadeIn: 6 });
+      Effects.cloneRun(this, 'idle', gx, gx + 1, opp.y, w[0] - ghostAt + 2, null,
+        { fadeIn: 6, face: Math.sign(opp.x - gx) || 1 });
       Effects.ring(gx, opp.y - 90, '#7d5bff', 10);
       AudioSys.sfx('tele');
     }
@@ -760,9 +765,11 @@ class Fighter {
         AudioSys.sfx('dash');
       }
     }
-    // 斩帧保持
+    // 斩帧保持(写计时器, 防 updateAnim 覆盖)
     if (s.hold && s.t <= s.hold.until) {
-      this.anim.name = s.hold.name; this.anim.frame = s.hold.frame;
+      this.anim.name = s.hold.name;
+      this.anim.t = s.hold.frame * this.c.anims[s.hold.name].hold;
+      this.anim.frame = s.hold.frame;
     }
 
     // ── ④ ghost 优雅消散 → 居合斩线 → 爆发(炸离剑二) ──

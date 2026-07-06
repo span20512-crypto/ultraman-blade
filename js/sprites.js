@@ -315,14 +315,18 @@ const Effects = {
     }
     this.cutLines = [];
   },
-  /* opts: y1(垂直轨迹终点, 俯冲ghost用) / fadeIn(现身淡入拍数, 优雅登场) */
+  /* opts: y1(垂直轨迹终点, 俯冲ghost用) / fadeIn(现身淡入拍数) / face(朝向覆盖±1)
+     翻转规则: 显示朝向(默认=运动方向) ≠ 角色素材原生朝向时翻转
+     (剑二 native=-1 素材面朝左 —— 曾因"向左跑就翻"的错误通用逻辑背对敌人) */
   cloneRun(fighter, animName, x0, x1, y, dur, onMid, opts = {}) {
+    const mvDir = Math.sign(x1 - x0) || 1;
+    const face = opts.face !== undefined ? opts.face : mvDir;
     this.cloneRuns.push({
       sheet: `${fighter.c.id}:${animName}`, fs: fighter.c.fw || 200, sc: fighter.c.scale,
       anchorX: fighter.c.anchor.x, anchorY: fighter.c.anchor.y,
       x0, x1, y, y1: opts.y1 !== undefined ? opts.y1 : y,
       fadeIn: opts.fadeIn || 0,
-      t: 0, dur, onMid, midFired: false, flip: x1 < x0,
+      t: 0, dur, onMid, midFired: false, flip: face !== fighter.c.native,
     });
   },
   pinStar(x0, y0, x1, y1, dur, onHit) {
