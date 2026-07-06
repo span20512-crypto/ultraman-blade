@@ -315,11 +315,14 @@ const Effects = {
     }
     this.cutLines = [];
   },
-  cloneRun(fighter, animName, x0, x1, y, dur, onMid) {
+  /* opts: y1(垂直轨迹终点, 俯冲ghost用) / fadeIn(现身淡入拍数, 优雅登场) */
+  cloneRun(fighter, animName, x0, x1, y, dur, onMid, opts = {}) {
     this.cloneRuns.push({
       sheet: `${fighter.c.id}:${animName}`, fs: fighter.c.fw || 200, sc: fighter.c.scale,
       anchorX: fighter.c.anchor.x, anchorY: fighter.c.anchor.y,
-      x0, x1, y, t: 0, dur, onMid, midFired: false, flip: x1 < x0,
+      x0, x1, y, y1: opts.y1 !== undefined ? opts.y1 : y,
+      fadeIn: opts.fadeIn || 0,
+      t: 0, dur, onMid, midFired: false, flip: x1 < x0,
     });
   },
   pinStar(x0, y0, x1, y1, dur, onHit) {
@@ -930,15 +933,19 @@ const Effects = {
       if (!img) continue;
       const u = Math.min(1, c.t / c.dur);
       const x = c.x0 + (c.x1 - c.x0) * u;
+      const y = c.y + (c.y1 - c.y) * u;
       // 攻击帧序: 前半程 f0(奔), 中段 f1(斩), 后段 f2/f3(收)
       const f = u < 0.35 ? 0 : u < 0.6 ? 1 : u < 0.8 ? 2 : 3;
       const dw = c.fs * c.sc, dh = c.fs * c.sc;
-      const dx = x - c.anchorX * c.sc, dy = c.y - c.anchorY * c.sc;
+      const dx = x - c.anchorX * c.sc, dy = y - c.anchorY * c.sc;
       ctx.save();
       ctx.imageSmoothingEnabled = false;
       if (c.flip) { ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0); }
-      // 暗影分身: 压暗+紫化(滤镜), 半透
-      ctx.globalAlpha = c.t > c.dur ? 0.5 * (1 - (c.t - c.dur) / 6) : 0.82;
+      // 暗影分身: 压暗+紫化(滤镜), 半透; fadeIn 优雅登场 / 结束缓退场
+      let alpha = 0.82;
+      if (c.fadeIn && c.t < c.fadeIn) alpha = 0.82 * (c.t / c.fadeIn);
+      if (c.t > c.dur) alpha = 0.5 * Math.max(0, 1 - (c.t - c.dur) / 6);
+      ctx.globalAlpha = alpha;
       ctx.filter = 'brightness(0.4) sepia(1) hue-rotate(215deg) saturate(3.2)';
       ctx.drawImage(img, f * c.fs, 0, c.fs, c.fs, dx, dy, dw, dh);
       ctx.filter = 'none';

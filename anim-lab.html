@@ -78,7 +78,9 @@ const SEQS = [
   { key: 'U',     label: 'U 必杀',      chain: ['special'] },
   { key: 'airU',  label: '空中U 手裏剣(剑二)', chain: ['special'], air: true },
   { key: 'dashJ', label: '冲刺J 疾駆斬(剑二)', chain: ['light'], dash: true },
-  { key: 'I',     label: 'I 超必杀',    chain: ['super'] },
+  { key: 'I',     label: 'I 超必杀·案A 一横一竖', chain: ['super'], cineVar: 'A' },
+  { key: 'Ib',    label: 'I 超必杀·案B 雁行错拍', chain: ['super'], cineVar: 'B' },
+  { key: 'Ic',    label: 'I 超必杀·案C 上下挟撃', chain: ['super'], cineVar: 'C' },
   { key: 'JJKK',  label: '连招 J·J·K·K', chain: ['light', 'light', 'heavy', 'heavy'] },
   { key: 'JJKU',  label: '连招 J·J·K·U', chain: ['light', 'light', 'heavy', 'special'] },
   { key: 'JJKI',  label: '连招 J·J·K·I', chain: ['light', 'light', 'heavy', 'super'] },
@@ -115,6 +117,7 @@ function resetScene() {
   A.finisherOverride = seq.finisher || null; // 超杀终结变体预览(A/B/C)
   A.cjjVariant = seq.cjj || null;            // 蹲J·J 第二段方案预览(V1/V2/V3)
   A.cineStyleOverride = seq.cineStyle || null; // 剑二超杀演出方案预览(①②③)
+  A.cineVarOverride = seq.cineVar || null;     // 交叉回合动作组合方案(A/B/C)
   A.meter = seq.chain.includes('super') ? 100 : 0; // 满气光环只在超杀序列出现
   W.projectiles = []; W.hitstopT = 0; W.banner = null;
   W.slowmoT = 0; W.slowmo = 1; W.slowAcc = 0;

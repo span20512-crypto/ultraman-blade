@@ -663,89 +663,124 @@ class Fighter {
     }
   }
 
-  /* 定版超杀 残影分身 v2(Eric 流程):
-     ① 瞬身敌后向下抡击(重击smear=重击动作, 原位帧同步 —— 物理一致)
-     ② 同拍对侧浮现 ghost 剑二
-     ③ 两波双向真冲刺交叉(本体连续移动+拖尾, 中点各自挥刀, 月牙钉在挥刀
-        身影的位置与朝向上)
-     ④ ghost 幻化消散 → 居合斩线浮现 → 一齐爆发
-     smear 物理一致性规则: 谁挥刀, 月牙就出现在谁的位置、用谁的动作对应的
-     月牙(attack2下劈=ka2 / attack1横斩=ka1)、朝向=挥刀方向。 */
+  /* 定版超杀 残影分身 v3(Eric 分镜定稿, 三方案共享骨架):
+     ① 瞬身敌后 → 完整重击(举刀过顶 → 抡下, 全程动作帧)
+     ② 背刺 smear 消退后, 对侧 ghost 清晰淡入登场(专属拍, 不被遮挡)
+     ③ 三回合双向交叉(前两回合有伤害, 第三回合双人同拍对穿纯声势);
+        方案差异在交叉的动作组合(A一横一竖 / B雁行错拍 / C上下挟撃)
+     ④ ghost 优雅消散(淡出+升华残光) → 居合斩线 → 一齐爆发(炸离剑二)
+     smear 物理一致性: 谁挥刀月牙在谁位置, 动作对应月牙, 朝向=挥刀方向。 */
   runCineClones(opp, s) {
     const self = this;
-    const WAVE_T = 12;                       // 单次冲刺时长
-    const w1 = 14, w2 = w1 + WAVE_T + 8;     // 两波起点
-    const linesAt = w2 + WAVE_T + 8;
+    // 演出期间连击窗口保活(v3 节奏放慢后, 波与爆发间隔可超过 60tick 计时器)
+    if (this.combo.count > 0) this.combo.timer = Math.max(this.combo.timer, 30);
+    const V = this.cineVarOverride || (this.c.moves.super.cine && this.c.moves.super.cine.variant) || 'A';
+    const W = 16;                                    // 单回合冲刺时长(放慢)
+    const w = [30, 56, 82];                          // 三回合起点
+    const ghostAt = 20, linesAt = w[2] + W + 10, burstAt = linesAt + 16;
 
-    // ── ① t1: 瞬身敌后, 向下抡击(本体真身体帧 + 原位重染月牙) ──
+    // ── ① 瞬身敌后 + 完整重击: 举刀(f2→f3) → 抡下(f1 斩+月牙) ──
     if (s.t === 1) {
-      this.x = opp.x + this.facing * 84;     // 背后
-      this.facing = -this.facing;            // 转身面向对手
+      this.x = opp.x + this.facing * 84;
+      this.facing = -this.facing;
       Effects.ring(this.x, this.y - 90, '#c9baff', 12);
       Effects.dust(this.x, this.y, 6);
       AudioSys.sfx('tele');
-      this.setAnim('attack2', true);         // 下劈动作
-      this.cineSmear = { edge: '#7d5bff', core: '#efe8ff', rim: 2 };
-      s.hold = { name: 'attack2', frame: 1, until: 9 };  // 斩帧定住几拍(可读)
-      this.cineDamageTick(opp, s);           // 第 1 段
-      Effects.impact(opp.x, opp.y - 96, this.facing, { tier: 3, color: '#7d5bff' });
-      this.world.hitstop(6); this.world.shake(5, 6);
-      AudioSys.sfx('hitH');
-      // ② 同拍: 对侧浮现 ghost(静立现身, 下一波才动)
-      const gx = opp.x + this.facing * 190;
-      Effects.cloneRun(this, 'attack1', gx, gx + 1, opp.y, w1 + 2, null);
+      this.cineSmear = null;
     }
-    // 斩帧保持(月牙原位停驻, 不乱飞)
-    if (s.hold && s.t <= s.hold.until) {
-      this.anim.name = s.hold.name; this.anim.frame = s.hold.frame;
+    if (s.t >= 2 && s.t <= 15) {                     // 完整挥击脚本
+      this.anim.name = 'attack2';
+      this.anim.frame = s.t <= 6 ? 2 : s.t <= 11 ? 3 : 1;  // 举刀→过顶→抡下
+      if (s.t === 12) {                              // 斩落瞬间
+        this.cineSmear = { edge: '#7d5bff', core: '#efe8ff', rim: 2 };
+        this.cineDamageTick(opp, s);                 // 第 1 段
+        Effects.impact(opp.x, opp.y - 96, this.facing, { tier: 3, color: '#7d5bff' });
+        this.world.hitstop(7); this.world.shake(5, 6);
+        AudioSys.sfx('hitH');
+      }
+    }
+    if (s.t === 16) this.cineSmear = null;
+
+    // ── ② ghost 登场拍(背刺 smear 已消退, 画面干净) ──
+    if (s.t === ghostAt) {
+      s.gside = -this.facing;                        // ghost 在剑二对侧
+      const gx = opp.x - this.facing * 170;
+      Effects.cloneRun(this, 'idle', gx, gx + 1, opp.y, w[0] - ghostAt + 2, null, { fadeIn: 6 });
+      Effects.ring(gx, opp.y - 90, '#7d5bff', 10);
+      AudioSys.sfx('tele');
     }
 
-    // ── ③ 两波双向交叉冲刺 ──
-    for (const [wStart, dir] of [[w1, -1], [w2, 1]]) {
+    // ── ③ 三回合交叉(方案差异) ──
+    w.forEach((wStart, wi) => {
+      const dir = wi % 2 === 0 ? -1 : 1;             // 本体交替方向
       if (s.t === wStart) {
         s.run = { from: opp.x - dir * 190, to: opp.x + dir * 190, dir, t0: wStart };
         this.x = s.run.from; this.facing = dir;
         this.setAnim('attack1', true); this.anim.frame = 0;
         this.cineSmear = null;
-        // ghost 同拍从反向出发(交叉)
-        Effects.cloneRun(this, 'attack1', opp.x + dir * 190, opp.x - dir * 190, opp.y, WAVE_T, () => {
-          // ghost 的月牙: 钉在 ghost 交汇点(=对手位置), 朝向=ghost 冲向(-dir)
-          Effects.smearFx(self, {
-            standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 3 }], decay: 1,
-            atX: opp.x - dir * 14, atY: opp.y, dir: -dir, scale: 0.88,
-            edge: '#35e0d8', core: '#d6fff8',
-          }, 'attack1');
-        });
-        AudioSys.sfx('dash');
+        // ghost 的反向穿越: 方案决定动作/轨迹/时机
+        const gDelay = V === 'B' ? 8 : 0;            // B: 雁行错半拍
+        const gAnim = V === 'A' ? 'attack2' : 'attack1'; // A: ghost 用下劈(一横一竖)
+        const gY0 = V === 'C' ? opp.y - 150 : opp.y; // C: ghost 从高处俯冲
+        s.gq = s.gq || [];
+        s.gq.push({ at: wStart + gDelay, dir, gAnim, gY0, wi });
       }
-      if (s.run && s.run.dir === dir && s.t > wStart && s.t <= wStart + WAVE_T) {
-        // 本体连续冲刺(真移动 + 拖尾残影)
-        const u = (s.t - wStart) / WAVE_T;
+      // 本体连续冲刺 + 中点挥刀(横斩, 月牙原位帧同步)
+      if (s.run && s.run.t0 === wStart && s.t > wStart && s.t <= wStart + W) {
+        const u = (s.t - wStart) / W;
         this.x = s.run.from + (s.run.to - s.run.from) * u;
         if (s.t % 2 === 0) Effects.ghost(this.spriteParams());
-        if (s.t === wStart + (WAVE_T >> 1)) {
-          // 中点(=对手位置)挥刀: 真身体帧 + 原位重染月牙(物理一致)
+        if (s.t === wStart + (W >> 1)) {
           this.setAnim('attack1', true);
           this.cineSmear = { edge: '#35e0d8', core: '#eafffd', rim: 2 };
           s.hold = { name: 'attack1', frame: 1, until: s.t + 4 };
-          this.cineDamageTick(opp, s);       // 第 2/3 段
-          Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
-          this.world.hitstop(5); this.world.shake(4, 5);
-          AudioSys.sfx('hitH');
+          if (wi < 2) {                              // 前两回合有伤害
+            this.cineDamageTick(opp, s);
+            Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
+            this.world.hitstop(5); this.world.shake(4, 5);
+            AudioSys.sfx('hitH');
+          } else {
+            AudioSys.sfx('whooshH');                 // 第三回合: 纯声势对穿
+          }
         }
       }
+    });
+    // ghost 穿越队列(支持错拍)
+    if (s.gq) {
+      for (const g of s.gq.filter(g => g.at === s.t)) {
+        Effects.cloneRun(this, g.gAnim, opp.x + g.dir * 190, opp.x - g.dir * 190, g.gY0, W, () => {
+          const sheet = g.gAnim === 'attack2' ? 'fx:ka2' : 'fx:ka1';
+          Effects.smearFx(self, {
+            standalone: true, sheet, phases: [{ f: 0, t: 3 }], decay: 1,
+            atX: opp.x - g.dir * 14, atY: opp.y, dir: -g.dir, scale: 0.88,
+            dy: g.gAnim === 'attack2' ? -12 : 0,
+            edge: '#35e0d8', core: '#d6fff8',
+          }, g.gAnim);
+        }, { y1: opp.y });
+        AudioSys.sfx('dash');
+      }
+    }
+    // 斩帧保持
+    if (s.hold && s.t <= s.hold.until) {
+      this.anim.name = s.hold.name; this.anim.frame = s.hold.frame;
     }
 
-    // ── ④ ghost 已自然消散(cloneRun 淡出) → 居合斩线 → 一齐爆发 ──
+    // ── ④ ghost 优雅消散 → 居合斩线 → 爆发(炸离剑二) ──
+    if (s.t === w[2] + W + 4) {
+      const gx = opp.x - s.run.dir * 150;
+      Effects.rise(gx, opp.y - 40, '#c9baff', 7);
+      Effects.rise(gx, opp.y - 80, '#7d5bff', 5);
+      this.setAnim('idle', true); this.cineSmear = null;
+      this.facing = Math.sign(opp.x - this.x) || 1;  // 面向对手(爆炸方向基准)
+    }
     if (s.t >= linesAt && s.t < linesAt + 12 && (s.t - linesAt) % 2 === 0) {
-      if (s.t === linesAt) { this.setAnim('idle', true); this.cineSmear = null; }
       const i = (s.t - linesAt) / 2;
       const angs = [-0.6, 0.7, -1.2, 1.4, 0.1, -1.8];
       Effects.cutLine(opp.x + (i % 3 - 1) * 8, opp.y - 92 + ((i * 41) % 54) - 27,
         angs[i % 6], 92 + (i % 3) * 20, '#c9baff');
       AudioSys.sfx('whooshL');
     }
-    if (s.t >= linesAt + 18) {
+    if (s.t >= burstAt) {
       Effects.burstCutLines();
       Effects.impact(opp.x, opp.y - 100, this.facing, { tier: 4, color: this.c.theme2 });
       Effects.shockRing(opp.x, opp.y - 60, this.c.theme2);
@@ -754,6 +789,7 @@ class Fighter {
       this.world.shake(13, 15);
       this.world.slowmoT = 14; this.world.slowmo = 0.4; this.world.slowAcc = 0;
       AudioSys.sfx('hitH');
+      // 爆炸方向 = 炸离剑二(facing 已在消散拍指向对手)
       this.cineFinish(opp, -13, 16);
     }
   }
