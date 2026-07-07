@@ -162,7 +162,7 @@ const DATA = {
     theme: '#7d5bff', theme2: '#35e0d8',
     dir: 'assets/img/kenji', native: -1, scale: 2.75,
     anchor: { x: 100, y: 126 },
-    walk: 4.2, jumpVy: -16.5,
+    walk: 4.3, jumpVy: -16.5, // 微加强: 4.2->4.3
     stats: { pow: 3, spd: 5, rng: 4 },
     quoteWin: '遅すぎる。', quoteLose: '影が……消える……',
     portrait: { x: 78, y: 50, w: 46, h: 46 },
@@ -261,7 +261,7 @@ const DATA = {
       },
       special: { // 影·手裏剣: 单发旋转手里剑(Eric 定版: 最贴合日本忍者, 苦无导弹感被否)
         kind: 'special', name: '影·手裏剣', anim: 'attack1', total: 30,
-        startup: 11, active: 4, impact: 3, cooldown: 120,
+        startup: 11, active: 4, impact: 3, cooldown: 100, // 微加强: CD 120->100
         seq: { w: [0], i: 3, r: [3] }, // 投掷用 f3 收势帧, 避开 f1 刀光月牙
         fx: { lean: true, x: 40, y: -95, r: 26, ry: 0.9, a0: -0.6, a1: 0.4, w: 4, life: 5, sweep: 0.7, color: '#eafffd', color2: '#7d5bff' },
         dmg: 0, chip: 0, box: null,
@@ -271,7 +271,7 @@ const DATA = {
       },
       airspecial: { // 空中手裏剣(空中+U): 滞空斜下掷, 制空/压制起跳
         kind: 'special', name: '空中手裏剣', anim: 'attack1', air: true, total: 26,
-        startup: 6, active: 4, impact: 3, cooldown: 90,
+        startup: 6, active: 4, impact: 3, cooldown: 80, // 微加强
         seq: { w: [0], i: 3, r: [3] },
         fx: { lean: true, x: 34, y: -60, r: 22, ry: 0.9, a0: -0.5, a1: 0.5, w: 4, life: 5, sweep: 0.7, color: '#eafffd', color2: '#7d5bff' },
         dmg: 0, chip: 0, box: null,
@@ -285,7 +285,7 @@ const DATA = {
         seq: { w: [0], i: 1, r: [2, 3] }, dash: { from: 0, to: 8, vx: 11 },
         // 身体 f1 弓步斩 + 帧同步重染月牙(真笔迹, 与基础轻击同法); 冲刺+密集残影
         smear: { phases: [{ f: 1, t: 5 }], decay: 2, echo: { t: 3, dx: 10 }, edge: '#35e0d8', core: '#eafffd' },
-        dmg: 7, chip: 1, guardDmg: 14, box: { x1: 10, x2: 175, y1: -145, y2: -40 },
+        dmg: 8, chip: 1, guardDmg: 14, box: { x1: 10, x2: 175, y1: -145, y2: -40 }, // 微加强: 7->8
         // blockstun 12->10: 修 on-block +2(4帧起手+175reach 的招不该防后仍有利)
         knock: 7, hitstun: 22, blockstun: 10, hitstop: 7, shake: 3, kd: false,
         meterHit: 10, sfx: 'whooshH', hitSfx: 'hitH',

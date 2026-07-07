@@ -132,7 +132,7 @@ function miniResolve() {
   const boxA = A.activeBox(), mA = A.move;
   if (boxA && mA && !B.dead && !B.superSeq && rectsOverlap(boxA, B.bodyBox())) {
     if (!(B.invuln > 0 || B.state === 'down' || B.state === 'getup')) {
-      mA.hasHit = true; mA.contact = true; mA.contactT = mA.t;
+      mA.hasHit = true; mA.contact = true; mA.contactT = mA.t; mA.hitLanded = true;
       const d = mA.def;
       const kd = d.kd || (mA.chained && d.kind === 'heavy' && A.rekkaH);
       const predicted = B.comboable > 0 ? A.combo.count + 1 : 1;

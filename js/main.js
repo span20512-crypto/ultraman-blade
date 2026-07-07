@@ -194,9 +194,12 @@ function tryHit(a, b, boxA, moveA) {
     blockstun: d.blockstun, kd, launch: d.launch, meterHit: d.meterHit, hitSfx: d.hitSfx,
   }, a);
 
+  moveA.hitLanded = res !== 'block';
   if (res === 'block') {
-    Effects.spark(px, py, a.facing, ['#35b9e0', '#8ad8ff', '#ffffff'], 8, 4);
-    G.hitstop(4);
+    // ② 格挡对抗感: 摩擦火花 + 分级卡帧 + 微震(不再像打空)
+    Effects.blockSpark(px, py, a.facing, d.kind);
+    G.hitstop(d.kind === 'light' ? 5 : 8);
+    G.shake(d.kind === 'light' ? 1 : 2, 4);
   } else if (res === 'crush') {
     Effects.impact(px, py, a.facing, { tier: 3, color: a.c.theme2 || '#ffc531' });
     G.hitstop(12);

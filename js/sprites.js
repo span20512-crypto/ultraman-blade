@@ -502,6 +502,29 @@ const Effects = {
     });
   },
 
+  /* 格挡摩擦火花: 刀刃磨在防线上的对抗感 —— 沿竖直防线迸出的青白磨擦屑
+     + 接触点白芯闪。轻/重分级数量与力度(格挡不再像打空)。 */
+  blockSpark(x, y, dir, kind = 'light') {
+    const heavy = kind !== 'light';
+    const n = heavy ? 10 : 6;
+    for (let i = 0; i < n; i++) {
+      const up = Math.random() < 0.5 ? -1 : 1;
+      this.parts.push({
+        x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 18,
+        vx: -dir * (1.5 + Math.random() * 2.5),            // 屑向攻方反弹(磨出来的)
+        vy: up * (1.2 + Math.random() * 2.4) - 0.6,
+        life: 8 + Math.random() * 7, maxLife: 15,
+        w: Math.round(5 + Math.random() * 5), h: 2,        // 短磨擦条
+        color: Math.random() < 0.5 ? '#bff0fa' : '#7fd8e8',
+        grav: 0.12,
+      });
+    }
+    this.parts.push({
+      x, y, vx: 0, vy: 0, life: 3, maxLife: 3,
+      size: heavy ? 7 : 5, color: '#ffffff', grav: 0,
+    });
+  },
+
   /* 突刺: 直线快刺的刀线(亮芯长条 + 两侧薄流线), 轨迹最清晰的轻攻击视觉 */
   thrust(x, y, dir, o = {}) {
     const core = o.color2 || '#ffd24a', lite = o.color || '#fff6d8';

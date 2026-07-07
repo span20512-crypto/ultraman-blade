@@ -151,8 +151,8 @@ class Fighter {
       if (this.altL) key = 'light2';
       this.altL = !this.altL;
     } else if (key === 'heavy' && this.c.moves.heavy2) {
-      if (this.altH) key = 'heavy2';
-      this.altH = !this.altH;
+      // 回升斩只在"真连招"时出现: 连锁 + 前一下 K 真命中(被防/单发/隔久 = 永远下劈)
+      if (chained && this.rekkaH && this._chainHit) key = 'heavy2';
     }
     const def = this.c.moves[key];
     if (!def) return;
@@ -464,6 +464,7 @@ class Fighter {
       const nextKind = this.c.moves[m.want].kind;
       if (d.kind === 'light' && nextKind === 'light') this.rekka = true;
       if (d.kind === 'heavy' && nextKind === 'heavy') this.rekkaH = true;
+      this._chainHit = m.hitLanded === true;  // 连锁来源是否真命中(变招路由用)
       const key = m.want;
       this.move = null;
       return this.startMove(key, true);
