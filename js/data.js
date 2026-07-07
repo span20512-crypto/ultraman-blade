@@ -286,7 +286,8 @@ const DATA = {
         // 身体 f1 弓步斩 + 帧同步重染月牙(真笔迹, 与基础轻击同法); 冲刺+密集残影
         smear: { phases: [{ f: 1, t: 5 }], decay: 2, echo: { t: 3, dx: 10 }, edge: '#35e0d8', core: '#eafffd' },
         dmg: 7, chip: 1, guardDmg: 14, box: { x1: 10, x2: 175, y1: -145, y2: -40 },
-        knock: 7, hitstun: 22, blockstun: 12, hitstop: 7, shake: 3, kd: false,
+        // blockstun 12->10: 修 on-block +2(4帧起手+175reach 的招不该防后仍有利)
+        knock: 7, hitstun: 22, blockstun: 10, hitstop: 7, shake: 3, kd: false,
         meterHit: 10, sfx: 'whooshH', hitSfx: 'hitH',
       },
       super: { // 三幕: 紫气聚身 -> 瞬身内爆/外爆 -> 紫青交替连斩 · 終B 月輪爆
