@@ -13,6 +13,12 @@
   src: url('../assets/fonts/FusionPixel-ja.woff2') format('woff2');
   font-display: block;
 }
+/* 青柳衡山フォントT (free incl. commercial/logo use) — title-logo kanji only */
+@font-face {
+  font-family: 'KouzanBrush';
+  src: url('../assets/fonts/AoyagiKouzanT.ttf') format('truetype');
+  font-display: block;
+}
 
 html, body {
   margin: 0;

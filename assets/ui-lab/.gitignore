@@ -1,0 +1,2 @@
+# generation candidates stay local (canonical picks are committed without suffix)
+*-c[0-9].png

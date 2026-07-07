@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>刀魂 · 布局编辑器</title>
+<style>
+  body { margin:0; background:#14100d; color:#efe6d5; font:13px/1.6 "PingFang SC", monospace; user-select:none; }
+  #bar { padding:10px 16px; border-bottom:2px solid #3a2d1c; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  #bar b { color:#d9a441; font-size:15px; }
+  button, .tab { background:#241c16; color:#efe6d5; border:1px solid #8a6a2f; padding:4px 14px; cursor:pointer; font:inherit; }
+  .tab.on { background:#8a6a2f; color:#14100d; font-weight:bold; }
+  #hint { color:#9a8f78; font-size:12px; }
+  #wrap { display:flex; justify-content:center; padding:14px; }
+  #stage { position:relative; width:1024px; height:576px; outline:2px solid #3a2d1c; transform-origin:top center; background:#000; overflow:hidden; }
+  #bgimg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .ent { position:absolute; cursor:grab; box-sizing:border-box; }
+  .ent:hover { outline:1px dashed rgba(255,197,49,0.7); }
+  .ent.sel { outline:2px solid #ffc531; }
+  .ent img { width:100%; height:100%; display:block; pointer-events:none; image-rendering:pixelated; }
+  .ent.text { white-space:nowrap; font-family:"Courier New", monospace; font-weight:bold; letter-spacing:1px; text-shadow:2px 2px 0 #0d0f16, -2px -2px 0 #0d0f16, 2px -2px 0 #0d0f16, -2px 2px 0 #0d0f16; }
+  .ent.box { border:2px solid #8a6a2f; background:rgba(20,14,10,0.25); }
+  .hudframe { position:absolute; border:3px solid #d9a441; overflow:hidden; background:#0c0a09; }
+  .hudframe .inner { position:absolute; cursor:grab; }
+  .hudframe img { display:block; width:100%; pointer-events:none; image-rendering:pixelated; }
+  #out { width:96%; height:130px; background:#0d0a08; color:#ffc531; border:1px solid #3a2d1c; font:12px monospace; margin:0 16px 20px; }
+  #info { position:fixed; right:14px; top:56px; background:rgba(20,16,12,0.92); border:1px solid #8a6a2f; padding:8px 12px; font-size:12px; color:#ffc531; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <b>刀魂 · 布局编辑器</b>
+  <span class="tab on" data-t="select">选人屏</span>
+  <span class="tab" data-t="result">结算屏</span>
+  <span class="tab" data-t="hud">HUD 头像框</span>
+  <button id="reset">重置本屏</button>
+  <label><input type="checkbox" id="bgtoggle" checked> 参考底图</label>
+  <input type="range" id="bgop" min="10" max="100" value="45" style="width:90px">
+  <button id="export">导出坐标 JSON</button>
+  <button id="copy">复制</button>
+  <span id="hint">拖动 = 移动 · 滚轮 = 缩放（文字为字号）· 方向键 = 微调 1px · 改完点「导出」把 JSON 发我</span>
+</div>
+<div id="wrap"><div id="stage"><img id="bgimg"></div></div>
+<textarea id="out" placeholder="点「导出坐标 JSON」后把这里的内容整段发给 Claude"></textarea>
+<div id="info"></div>
+
+<script>
+const SCREENS = {
+  select: {
+    bg: 'mockups/r10/s1-select.png',
+    ents: [
+      { id: 'panelL',  label: '左面板框', type: 'box',  x: 152, y: 116, w: 320, h: 330 },
+      { id: 'panelR',  label: '右面板框', type: 'box',  x: 552, y: 116, w: 320, h: 330 },
+      { id: 'bustHayato', label: '隼人立绘', type: 'img', src: 'portrait-hayato-sel.png', x: 188, y: 89, w: 300, ar: 344/320 },
+      { id: 'bustKenji',  label: '剣二立绘', type: 'img', src: 'portrait-kenji-sel.png',  x: 609, y: 111, w: 262, ar: 344/320 },
+      { id: 'plateL', label: '左名牌', type: 'img', src: 'nameplate.png', x: 202, y: 376, w: 220, ar: 0.30 },
+      { id: 'plateR', label: '右名牌', type: 'img', src: 'nameplate.png', x: 602, y: 376, w: 220, ar: 0.30 },
+      { id: 'nameL', label: '左名字', type: 'text', text: 'HAYATO · 隼人', x: 250, y: 392, fs: 15, color: '#e8543f' },
+      { id: 'nameR', label: '右名字', type: 'text', text: 'KENJI · 剣二',  x: 658, y: 392, fs: 15, color: '#8f7ff0' },
+      { id: 'typeL', label: '左TYPE', type: 'text', text: 'POWER TYPE', x: 272, y: 414, fs: 10, color: '#9a8f78' },
+      { id: 'typeR', label: '右TYPE', type: 'text', text: 'SPEED TYPE', x: 672, y: 414, fs: 10, color: '#9a8f78' },
+      { id: 'statL', label: '左数值', type: 'text', text: 'POW ▮▮▮▮▮▯  SPD ▮▮▮▯▯▯', x: 156, y: 450, fs: 12, color: '#e8543f' },
+      { id: 'statR', label: '右数值', type: 'text', text: 'POW ▮▮▮▯▯▯  SPD ▮▮▮▮▮▯', x: 556, y: 450, fs: 12, color: '#8f7ff0' },
+    ],
+  },
+  result: {
+    bg: 'mockups/r10/s4-result.png',
+    ents: [
+      { id: 'bustWinner', label: '胜者立绘', type: 'img', src: 'portrait-hayato-sel.png', x: 392, y: 199, w: 266, ar: 344/320 },
+      { id: 'katsu', label: '勝利', type: 'text', text: '勝利', x: 486, y: 158, fs: 22, color: '#f4f1e8' },
+      { id: 'maxcombo', label: 'MAX COMBO', type: 'text', text: 'MAX COMBO: 5 HITS', x: 400, y: 192, fs: 13, color: '#9aa3bd' },
+      { id: 'quoteBox', label: '台词框', type: 'box', x: 232, y: 428, w: 560, h: 62 },
+    ],
+  },
+  hud: { hud: true },
+};
+
+const stage = document.getElementById('stage'), bgimg = document.getElementById('bgimg');
+let cur = 'select', selEl = null;
+const state = JSON.parse(localStorage.getItem('sb-layout') || '{}');
+
+function save() { localStorage.setItem('sb-layout', JSON.stringify(state)); }
+function st(id) { return (state[cur] = state[cur] || {})[id] = state[cur][id] || {}; }
+
+function build() {
+  stage.querySelectorAll('.ent, .hudframe, .hudlabel').forEach(e => e.remove());
+  const S = SCREENS[cur];
+  if (S.hud) return buildHud();
+  bgimg.src = S.bg;
+  for (const d of S.ents) {
+    const s = Object.assign({}, d, st(d.id));
+    const el = document.createElement('div');
+    el.className = 'ent ' + d.type;
+    el.dataset.id = d.id; el.dataset.label = d.label;
+    if (d.type === 'img') {
+      const im = new Image(); im.src = d.src; el.appendChild(im);
+      el.style.width = s.w + 'px'; el.style.height = (s.w * d.ar) + 'px';
+    } else if (d.type === 'box') {
+      el.style.width = s.w + 'px'; el.style.height = s.h + 'px';
+    } else {
+      el.style.fontSize = s.fs + 'px'; el.style.color = d.color;
+      el.textContent = ''; d.text.split('\n').forEach(t => { const r = document.createElement('div'); r.textContent = t; el.appendChild(r); });
+    }
+    el.style.left = s.x + 'px'; el.style.top = s.y + 'px';
+    stage.appendChild(el);
+  }
+}
+
+function buildHud() {
+  bgimg.src = 'mockups/r10/s3-hud.png';
+  // two 88x88 frames shown at 3x so the crop is draggable precisely
+  const cfg = [['hudHayato', 'portrait-hayato-sel.png', 60, 130], ['hudKenji', 'portrait-kenji-sel.png', 620, 130]];
+  for (const [id, src, fx, fy] of cfg) {
+    const s = Object.assign(id === 'hudHayato' ? { w: 331, x: -8, y: -37 } : { w: 298, x: 21, y: -17 }, st(id)); // img width & offset in 3x display space (frame=264)
+    const fr = document.createElement('div');
+    fr.className = 'hudframe'; fr.style.cssText = `left:${fx}px; top:${fy}px; width:264px; height:264px;`;
+    const inner = document.createElement('div');
+    inner.className = 'inner ent'; inner.dataset.id = id; inner.dataset.label = id + ' 切片';
+    inner.style.cssText = `left:${s.x}px; top:${s.y}px; width:${s.w}px;`;
+    const im = new Image(); im.src = src; inner.appendChild(im);
+    fr.appendChild(inner); stage.appendChild(fr);
+    const lb = document.createElement('div');
+    lb.className = 'hudlabel'; lb.textContent = id + '（88×88 框，放大 3 倍显示）';
+    lb.style.cssText = `position:absolute; left:${fx}px; top:${fy - 22}px; color:#d9a441; font-size:12px;`;
+    stage.appendChild(lb);
+  }
+}
+
+// drag / wheel / arrows
+let drag = null;
+stage.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.ent'); if (!el) return;
+  document.querySelectorAll('.ent.sel').forEach(x => x.classList.remove('sel'));
+  el.classList.add('sel'); selEl = el;
+  drag = { el, sx: e.clientX, sy: e.clientY, ox: parseFloat(el.style.left), oy: parseFloat(el.style.top) };
+  el.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const nx = Math.round(drag.ox + e.clientX - drag.sx), ny = Math.round(drag.oy + e.clientY - drag.sy);
+  drag.el.style.left = nx + 'px'; drag.el.style.top = ny + 'px';
+  Object.assign(st(drag.el.dataset.id), { x: nx, y: ny }); info(drag.el); save();
+});
+stage.addEventListener('pointerup', () => drag = null);
+stage.addEventListener('wheel', e => {
+  const el = e.target.closest('.ent'); if (!el) return;
+  e.preventDefault();
+  const k = e.deltaY < 0 ? 1.03 : 0.97, s = st(el.dataset.id);
+  if (el.classList.contains('text')) {
+    const fs = Math.max(6, Math.round((parseFloat(el.style.fontSize)) * k));
+    el.style.fontSize = fs + 'px'; s.fs = fs;
+  } else {
+    const w = Math.max(20, Math.round(parseFloat(el.style.width) * k));
+    const ar = el.style.height ? parseFloat(el.style.height) / parseFloat(el.style.width) : 0;
+    el.style.width = w + 'px'; if (ar) el.style.height = Math.round(w * ar) + 'px';
+    s.w = w;
+  }
+  info(el); save();
+}, { passive: false });
+window.addEventListener('keydown', e => {
+  if (!selEl || !e.key.startsWith('Arrow')) return;
+  e.preventDefault();
+  const dx = { ArrowLeft: -1, ArrowRight: 1 }[e.key] || 0, dy = { ArrowUp: -1, ArrowDown: 1 }[e.key] || 0;
+  const nx = parseFloat(selEl.style.left) + dx, ny = parseFloat(selEl.style.top) + dy;
+  selEl.style.left = nx + 'px'; selEl.style.top = ny + 'px';
+  Object.assign(st(selEl.dataset.id), { x: nx, y: ny }); info(selEl); save();
+});
+function info(el) {
+  document.getElementById('info').textContent =
+    `${el.dataset.label}  x:${parseFloat(el.style.left)} y:${parseFloat(el.style.top)}` +
+    (el.style.width ? ` w:${parseFloat(el.style.width)}` : '') +
+    (el.classList.contains('text') ? ` 字号:${parseFloat(el.style.fontSize)}` : '');
+}
+
+// tabs / export / reset / bg
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  t.classList.add('on'); cur = t.dataset.t; build();
+});
+document.getElementById('export').onclick = () => {
+  const dump = {};
+  for (const scr of Object.keys(SCREENS)) if (state[scr] && Object.keys(state[scr]).length) dump[scr] = state[scr];
+  document.getElementById('out').value = '刀魂布局导出 v1\n' + JSON.stringify(dump, null, 1);
+};
+document.getElementById('copy').onclick = () => { document.getElementById('out').select(); document.execCommand('copy'); };
+document.getElementById('reset').onclick = () => { delete state[cur]; save(); build(); };
+document.getElementById('bgtoggle').onchange = e => bgimg.style.display = e.target.checked ? '' : 'none';
+document.getElementById('bgop').oninput = e => bgimg.style.opacity = e.target.value / 100;
+bgimg.style.opacity = 0.45;
+build();
+</script>
+</body>
+</html>

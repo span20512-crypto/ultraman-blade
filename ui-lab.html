@@ -22,9 +22,14 @@
 </head>
 <body>
 <header>
-  <h1>拳魂 · 和风 UI 资产库</h1>
-  <div class="sub">Gemini 图像模型直连生成(gemini-2.5-flash-image) · 已全部接入游戏(运行时抠底/裁切/内窗检测,见 assets/ui-lab/proc.html 管线自检页) · 想重生成/改风格请指着卡片名字说</div>
+  <h1>拳魂 · 和风 UI 资产库 <span style="color:#9a8f78;font-size:13px">v2 · ui-polish 分支</span></h1>
+  <div class="sub">Gemini 图像模型直连生成(gemini-2.5-flash-image, 文生图 + 图生图编辑 + sprite 参考生成) · 运行时抠底/裁切/内窗检测见 assets/ui-lab/proc.html · 想重生成/改风格请指着卡片名字说 · 标「待接入」的资产等 Eric 过目后才进游戏</div>
 </header>
+<header>
+  <h1 style="font-size:17px">标题页整装效果图 <span style="color:#9a8f78;font-size:12px">真实运行截图, 非拼贴 —— 点卡片可打开可交互的实况版</span></h1>
+  <div class="sub">「刀魂」现为衡山毛笔字体渲染(免费商用含 logo, 半分辨率烘焙+2x 最近邻放大保像素感, 渐变金/墨字两套处理) —— AI 生成书法字已试过 3 张, 「魂」字笔画全崩, 弃; 游戏名与构图相互独立, 拍板后可任意替换</div>
+</header>
+<div class="grid" id="mockups" style="grid-template-columns:repeat(auto-fill, minmax(480px, 1fr))"></div>
 <div class="grid" id="grid"></div>
 <footer>
   接入说明:拍板后每张资产会被裁切/缩样到实际 UI 尺寸(如头像框 96px、血条框 400×36),必要时抠透明底,再替换 ui.js 里对应的程序化绘制。<br>
@@ -39,11 +44,41 @@ const ASSETS = [
   ['keycap', '按键帽', '键位教学屏的按键图示', '现为程序化灰蓝键帽(风格最不搭,优先换)'],
   ['timer-seal', '计时印章', '顶部中央回合倒计时的朱印底座', '现为程序化朱红方块'],
   ['title-emblem', '标题徽章', '标题画面「拳魂」字后的旭日/円相底纹', '现为程序化旭日+光芒'],
-  ['vs-emblem', 'VS 徽章', '选人确认后的 VS 过场中心图案', '现为纯文字 VS'],
+  ['vs-emblem-v2', 'VS 徽章 v2 (刀刃修正)', '选人确认后的 VS 过场中心图案 —— 图生图编辑: 保留徽章整体, 柄上刃下, 下端改为出鞘刀尖', '已接入 (v1 弃用: 下半段全是刀柄)'],
   ['stage-alt', '战斗场景(AI生成版)', '对战背景 —— 已设为默认(?stage=proc 可切回程序化版)', '已接入'],
-  ['banner-ribbon', '公告缎带(补生成)', 'ROUND/胜负公告与结算屏标题的丝绸缎带底', '已接入'],
+  ['announce-brush', '公告墨痕 (替换缎带)', 'ROUND/胜负公告与结算屏标题的枯笔墨痕底 —— 纯黑硬边+朱红飞沫+金点', '已接入 (banner-ribbon 缎带退役)'],
   ['cursor-fan', '菜单光标·折扇(补生成)', '标题菜单选中项两侧的折扇指示', '已接入'],
+  ['nameplate', '名牌底 (菱角漆牌)', 'HUD 角色名 / 选人屏名字条的底牌, 左端朱红结饰', '✅ 已接入 (选人屏名牌)'],
+  ['pip-mon', '胜场标记·家纹章', 'HUD 回合胜利 pips, 替换程序化小菱形; 未胜场用暗化版', '✅ 已接入 (HUD 胜场标)'],
+  ['combo-splash', '连击计数底饰·泼墨', '连击数字后的朱红泼墨爆点, 强化打击感', '✅ 已接入 (HUD 连击)'],
+  ['portrait-kenji-sel', '剣二 · 选人立绘 (归一后)', '选人屏 / 结算屏; 与隼人脸高对齐、同取景成组', '✅ 已接入'],
+  ['portrait-hayato-sel', '隼人 · 选人立绘 (v4b→bust→归一)', 'v4b 定案 → 图生图重取景为头肩特写 → 与剣二脸高对齐; 白面红眼绯披斜盘帽', '✅ 已接入'],
+  ['title-zangetsu', '标题徽章 · 斩日 (定案)', '一笔黑墨斜斩红日, 金沫飞溅, 毛笔「刀魂」骑斩痕', '✅ 已接入 (默认标题)'],
+  ['titlebg-gate', '标题背景 · 血暮城门 (定案)', '仰视城门+纸灯+战旗+鸦群, 上半天空留白放 logo', '✅ 已接入 (默认标题)'],
+  ['title-kanban', '标题概念 · 双挂牌 (备选)', '绳梁悬双漆牌, 一牌一字墨书 —— ?te=kanban 可切', '备选 (URL 可切)'],
+  ['title-gunsen', '标题概念 · 军扇 (备选)', '黑漆骨金面军扇+日之丸+朱缨 —— ?te=gunsen 可切', '备选 (URL 可切)'],
+  ['title-torii', '标题概念 · 鸟居旭日 (备选)', '朱鸟居+旭日+金芒+鸦影 —— ?te=torii 可切', '备选 (URL 可切)'],
+  ['titlebg-moon', '标题背景 · 月夜神社 (备选)', '冷色月夜+五重塔+石灯 —— ?tbg=moon 可切', '备选 (URL 可切)'],
+  ['portrait-hayato-v4b', '隼人 v4b (bust 前的定案稿)', '归一前的半身定案, 保留备查', '底稿 (已被 sel 取代)'],
 ];
+const MOCKUPS = [
+  ['m6-zangetsu-gate', 'F · 斩日 × 血暮城门 (Eric 指定组合)', 'te=zangetsu&tbg=gate', '毛笔「刀魂」+斩痕+血空 —— 本轮主推'],
+  ['m1-kanban-moon', 'A · 双挂牌 × 月夜神社', 'te=kanban&tbg=moon', '墨书牌匾撞冷色月夜, 反差最强'],
+  ['m2-kanban-gate', 'B · 双挂牌 × 血暮城门', 'te=kanban&tbg=gate', '战意最浓, 牌匾+战旗+鸦群'],
+  ['m3-gunsen-gate', 'C · 军扇 × 血暮城门', 'te=gunsen&tbg=gate', '扇面墨字, 最典雅'],
+  ['m4-zangetsu-stage', 'D · 斩日 × 现役黄昏', 'te=zangetsu', '同 F 徽章, 背景沿用战斗黄昏'],
+  ['m5-torii-moon', 'E · 鸟居旭日 × 月夜神社', 'te=torii&tbg=moon', '神域感, 日月同框(可换背景解)'],
+];
+const mg = document.getElementById('mockups');
+for (const [file, name, qs, note] of MOCKUPS) {
+  const d = document.createElement('div');
+  d.className = 'card';
+  d.innerHTML = `
+    <a href="/?screen=title&${qs}" target="_blank" style="text-decoration:none;color:inherit">
+    <div class="imgwrap" style="min-height:120px;padding:0"><img src="assets/ui-lab/mockups/${file}.png" loading="lazy" style="max-height:none"></div>
+    <div class="meta"><b>${name}</b><br><span class="use">${note} · 实况: ?screen=title&${qs}</span></div></a>`;
+  mg.appendChild(d);
+}
 const g = document.getElementById('grid');
 for (const [file, name, use, cur] of ASSETS) {
   const d = document.createElement('div');

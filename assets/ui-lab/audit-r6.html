@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>刀魂 · UI 审阅页 — R11</title>
+<style>
+  body { margin:0; background:#14100d; color:#efe6d5; font:14px/1.75 "PingFang SC", monospace; }
+  header { padding:22px 30px 10px; border-bottom:2px solid #3a2d1c; }
+  h1 { margin:0; font-size:21px; color:#d9a441; }
+  h2 { font-size:17px; color:#d9a441; border-left:4px solid #b32b20; padding-left:10px; margin:34px 0 6px; }
+  .sub { color:#9a8f78; font-size:12px; }
+  section { padding:6px 30px 10px; }
+  .card { background:#1b1512; border:2px solid #3a2d1c; margin:14px 0; }
+  .card .hd { padding:8px 16px; border-bottom:1px solid #3a2d1c; }
+  .card .hd b { color:#ffe27a; font-size:15px; }
+  .card .bd { padding:10px 16px 14px; color:#c9bfa8; font-size:13px; }
+  .card img, .card canvas { max-width:100%; display:block; background:#000; }
+  .done { color:#7ec97e; font-weight:bold; }
+  .pick { color:#ff9c3d; font-weight:bold; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td, th { border:1px solid #3a2d1c; padding:6px 10px; text-align:left; vertical-align:top; }
+  th { color:#d9a441; background:#1b1512; }
+  code { background:#241c16; padding:1px 6px; color:#ffc531; font-size:12px; }
+  a { color:#ffc531; }
+</style>
+</head>
+<body>
+<header>
+  <h1>刀魂 · UI 审阅页（R12）</h1>
+  <div class="sub">防御特效已定稿实装（朱印結界·无字版）；拖拽布局已全部接入。当前无待拍板项。</div>
+</header>
+
+<section>
+<h2>一、防御特效 · 已定稿实装：朱印結界（无字版）</h2>
+<div class="sub" style="padding-bottom:6px">你选了結界并去掉「防」字。最终版已写进 fighter.js：持防 = 旋转朱印环（虚线外环 + 金色反向内环 + 菱形芯，呼吸明暗）；格挡瞬间 = 金光爆亮 + 脉冲环 + 径向碎光 + 花瓣飘散。下面的 GIF 是<b>从真实游戏里逐帧抓取</b>的完整循环（左 = 持防预备态呼吸旋转，右 = 格挡瞬间金光爆发→脉冲→花瓣→回到预备）。下方三个低保真示意稿仅留档对照。</div>
+<div class="card"><div class="hd"><b>朱印結界 · 实机动画（游戏内逐帧抓取）</b></div><img src="guard-seal.gif"><div class="bd">游玩体验请用 Chrome 打开 <code>http://localhost:8788/</code>（cmux 内嵌浏览器跑不动 canvas 游戏，会卡；之前那个演示标签页还是锁输入的调试模式，别在那里玩）。开一局按住后方向 = 持防，被打中瞬间 = 爆发。</div></div>
+<div class="grid3">
+<div class="card"><div class="hd"><b>案一 · 墨環砕</b>（瞬发型）</div><canvas id="g1" width="480" height="270"></canvas><div class="bd">平时无预备特效，格挡瞬间：白闪楔 + 双层墨环（金边）爆开 + 墨点飞溅 + 击退回弹。最克制、最贴近剑戟片的「一瞬」。</div></div>
+<div class="card"><div class="hd"><b>案二 · 朱印結界</b>（结界型·推荐）</div><canvas id="g2" width="480" height="270"></canvas><div class="bd">持防时身前浮现旋转朱印圆环（中央「防」字，呼吸明暗）；格挡瞬间印环金光爆亮 + 径向碎光 + 花瓣飘散 + 震动。</div></div>
+<div class="card"><div class="hd"><b>案三 · 鋼月鱗</b>（像素弧型）</div><canvas id="g3" width="480" height="270"></canvas><div class="bd">现方案的像素化重做：弧线由 4px 色块鳞片构成（贴合像素画风），持防时青光呼吸；格挡瞬间鳞片白→金爆闪、沿切线迸出火花像素、弧面碎裂再聚合。</div></div>
+</div>
+</section>
+
+<section>
+<h2>二、你的布局 · 已接入实机</h2>
+<table>
+<tr><th>屏</th><th>接入内容</th></tr>
+<tr><td>选人屏</td><td class="done">✅ 立绘按你的坐标（隼人 188,89,w300 / 剣二 609,111,w262），艺术图越框「破格」式构图；文字重排：POW/SPD 收进框内漆条、名字+TYPE 居中于名牌净区，互不碰撞</td></tr>
+<tr><td>HUD 头像框</td><td class="done">✅ 按你调的切片框（帽檐/鬼角完整、留白一致）</td></tr>
+<tr><td>结算屏</td><td class="done">✅ 隼人按你的坐标（392,199,w266）；剣二按同眼线同脸心推得（409,212,w232）；勝利/MAX COMBO 上移避开帽顶</td></tr>
+</table>
+<div class="grid2">
+<div class="card"><div class="hd"><b>选人屏（你的布局 + 文字重排）</b></div><img src="mockups/r12/s1-select.png"></div>
+<div class="card"><div class="hd"><b>HUD（你的头像切片）</b></div><img src="mockups/r12/s3-hud.png"></div>
+</div>
+<div class="card"><div class="hd"><b>结算屏（你的胜者位）</b></div><img src="mockups/r12/s2-result.png"></div>
+<div class="sub">还想再调：打开 <a href="layout-editor.html" target="_blank">layout-editor.html</a>（已同步为当前实机值）拖完告诉我即可。</div>
+</section>
+
+<section style="display:none">
+<h2>（存档）布局编辑器说明</h2>
+<div class="card"><div class="bd">
+打开 <a href="layout-editor.html" target="_blank"><b>layout-editor.html</b></a> —— 三个标签页：<b>选人屏 / 结算屏 / HUD 头像框</b>。<br>
+· 拖动 = 移动 · 滚轮 = 缩放（文字改字号） · 方向键 = 1px 微调 · 右上角实时显示坐标<br>
+· 底图是当前游戏截图（可调透明度/隐藏），立绘、名牌、文字、面板框都是独立实体<br>
+· HUD 页是两个 88×88 头像框（放大 3 倍显示），在框里拖动/缩放立绘就是在定切片范围<br>
+· 调好后点「<b>导出坐标 JSON</b>」→「复制」→ 把整段 JSON 发我，我直接按坐标接进游戏（选人位置会同步用于 VS/结算的对应实体）。自动存在浏览器里，随时接着调。
+</div></div>
+</section>
+
+<section>
+<h2>三、本轮 7 项修复 — 已实装</h2>
+<table>
+<tr><th>#</th><th>问题</th><th>处理</th></tr>
+<tr><td>1</td><td>选人屏文字互相重叠</td><td class="done">✅ 名字移出名牌结绳装饰区居中、TYPE 移到名牌下方、数值条下移——互不重叠（等你编辑器坐标后以你的为准）</td></tr>
+<tr><td>2</td><td>难度选择折扇装饰</td><td class="done">✅ 已删除</td></tr>
+<tr><td>3</td><td>VS 徽章后的斜黄线</td><td class="done">✅ 已删除（速度线保留）</td></tr>
+<tr><td>4</td><td>计时器居中 / 血条对称</td><td class="done">✅ 逐像素实测核验：印章朱漆中心 511.5（中线 512）、血条外缘 122↔123、内缘 499↔500 —— 数值与实测均对称，无需改动。如你看到的不对称请截图圈出，我再查</td></tr>
+<tr><td>5</td><td>胜负圆圈开局即满</td><td class="done">✅ Bug 修复：未胜场 = 空心环，胜场才盖家纹章</td></tr>
+<tr><td>6</td><td>连击数字位置</td><td class="done">✅ 移到画面中上部（y=185，攻方一侧 x=240/784），更贴近角色视线</td></tr>
+<tr><td>7</td><td>「回避」是日语吗</td><td class="done">✅ 是。回避（かいひ）= 闪避，日语正字，保留</td></tr>
+</table>
+<div class="grid2">
+<div class="card"><div class="hd"><b>选人屏（文字整理后）</b></div><img src="mockups/r11/s1-select.png"></div>
+<div class="card"><div class="hd"><b>难度选择（折扇已删）</b></div><img src="mockups/r11/s2-diff.png"></div>
+<div class="card"><div class="hd"><b>VS（斜线已删）</b></div><img src="mockups/r11/s3-vs.png"></div>
+<div class="card"><div class="hd"><b>HUD（空心胜负环）</b></div><img src="mockups/r11/s4-hud.png"></div>
+</div>
+</section>
+
+<script>
+// ---- shared mini-scene: attacker slash sweeps in, defender blocks ----------
+function scene(cv, fx) {
+  const ctx = cv.getContext('2d');
+  const DX = 330, DY = 195; // defender feet
+  let t = 0;
+  function defender(shake) {
+    const x = DX + shake, y = DY;
+    ctx.fillStyle = '#241d2e';
+    ctx.fillRect(x - 12, y - 64, 24, 34);           // torso
+    ctx.fillStyle = '#3a2d4e';
+    ctx.fillRect(x - 10, y - 30, 8, 30); ctx.fillRect(x + 2, y - 30, 8, 30); // legs
+    ctx.fillStyle = '#cfc6b8';
+    ctx.fillRect(x - 8, y - 78, 16, 14);            // head
+    ctx.fillStyle = '#5a1210';
+    ctx.fillRect(x - 14, y - 84, 28, 8);            // hat
+    ctx.fillStyle = '#8fa8b8';                       // blade held vertical (guard pose)
+    ctx.fillRect(x - 22, y - 70, 4, 44);
+  }
+  function slash(p) { // p 0..1 approach
+    const sx = 40 + p * 200, sy = DY - 46;
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(-0.5 + p * 0.55);
+    const g = ctx.createLinearGradient(-60, 0, 30, 0);
+    g.addColorStop(0, 'rgba(226,60,42,0)'); g.addColorStop(0.75, 'rgba(255,140,90,0.85)'); g.addColorStop(1, '#fff2d9');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-64, -4); ctx.quadraticCurveTo(6, -26, 34, 0); ctx.quadraticCurveTo(6, 10, -64, 4);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function frame() {
+    const T = 150, tt = t % T;              // loop
+    const impact = 62;                       // impact frame
+    const ip = tt - impact;                  // frames since impact
+    const stop = ip >= 0 && ip < 5;          // hit-stop
+    const shake = ip >= 0 && ip < 16 ? Math.sin(ip * 2.2) * Math.max(0, 6 - ip * 0.4) : 0;
+    ctx.fillStyle = '#100c14'; ctx.fillRect(0, 0, 480, 270);
+    ctx.fillStyle = '#1c1524'; ctx.fillRect(0, DY, 480, 75);      // floor
+    ctx.fillStyle = 'rgba(179,43,32,0.12)';
+    ctx.beginPath(); ctx.arc(240, 90, 70, 0, 7); ctx.fill();      // dim sun
+    fx.pre && fx.pre(ctx, DX, DY, tt, ip);
+    defender(shake);
+    if (tt < impact) slash(tt / impact);
+    fx.post(ctx, DX, DY, tt, ip);
+    if (!stop) t++; else t += (ip === 4 ? 1 : 0.34);              // hit-stop crawl
+    requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+// 案一 墨環砕 — twin ink rings + gold rim + flecks, no primed state
+scene(document.getElementById('g1'), {
+  post(ctx, x, y, tt, ip) {
+    if (ip < 0 || ip > 34) return;
+    const cx = x - 26, cy = y - 52, p = ip / 34;
+    if (ip < 4) { // contact flash wedge
+      ctx.globalAlpha = 1 - ip / 4; ctx.fillStyle = '#fff7e0';
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - 46, cy - 26); ctx.lineTo(cx - 46, cy + 26); ctx.closePath(); ctx.fill();
+    }
+    for (const [k, w, col] of [[1, 5, 'rgba(16,10,8,0.9)'], [0.8, 2, '#d9a441']]) {
+      ctx.globalAlpha = (1 - p) * 0.95;
+      ctx.strokeStyle = col; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.arc(cx, cy, 8 + p * 52 * k, 0, 7); ctx.stroke();
+    }
+    for (let i = 0; i < 9; i++) { // ink flecks
+      const a = 2.4 + i * 0.5, r = 10 + p * (30 + (i * 13) % 26);
+      ctx.globalAlpha = (1 - p);
+      ctx.fillStyle = i % 3 ? '#100a08' : '#d9a441';
+      ctx.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r - p * p * 18, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+  },
+});
+
+// 案二 朱印結界 — rotating vermillion seal, flares on impact
+scene(document.getElementById('g2'), {
+  pre(ctx, x, y, tt, ip) {
+    const cx = x - 26, cy = y - 52;
+    const flare = ip >= 0 && ip < 18 ? 1 - ip / 18 : 0;
+    const baseA = 0.34 + 0.1 * Math.sin(tt * 0.12) + flare * 0.66;
+    const R = 30 + flare * 8;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(tt * 0.02);
+    ctx.globalAlpha = baseA;
+    ctx.strokeStyle = flare ? '#ffd76a' : '#c23527'; ctx.lineWidth = flare ? 3 : 2;
+    for (let i = 0; i < 8; i++) { // dashed seal ring
+      ctx.beginPath(); ctx.arc(0, 0, R, i * 0.785 + 0.1, i * 0.785 + 0.6); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(0, 0, R - 7, 0, 7); ctx.globalAlpha = baseA * 0.5; ctx.stroke();
+    ctx.globalAlpha = baseA + 0.15;
+    ctx.fillStyle = flare ? '#ffe9b0' : '#e05a48';
+    ctx.font = 'bold 20px "Hiragino Mincho ProN", serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('防', 0, 1);
+    ctx.restore(); ctx.globalAlpha = 1;
+  },
+  post(ctx, x, y, tt, ip) {
+    if (ip < 0 || ip > 26) return;
+    const cx = x - 26, cy = y - 52, p = ip / 26;
+    ctx.globalAlpha = 1 - p;
+    ctx.strokeStyle = '#ffd76a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 30 + p * 40, 0, 7); ctx.stroke();
+    for (let i = 0; i < 8; i++) { // radial shards
+      const a = i * 0.785 + 0.4, r1 = 32 + p * 46;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (r1 - 8), cy + Math.sin(a) * (r1 - 8));
+      ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); ctx.stroke();
+    }
+    for (let i = 0; i < 6; i++) { // petals
+      const a = 2 + i * 0.7, r = 20 + p * 55;
+      ctx.fillStyle = '#e8a0b4'; ctx.globalAlpha = (1 - p) * 0.8;
+      ctx.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r + p * 26 - 10, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+  },
+});
+
+// 案三 鋼月鱗 — quantized pixel-block crescent, shatters & reforms
+scene(document.getElementById('g3'), {
+  pre(ctx, x, y, tt, ip) {
+    const cx = x - 8, cy = y - 52;
+    const flare = ip >= 0 && ip < 16 ? 1 - ip / 16 : 0;
+    const burst = ip >= 0 && ip < 22 ? ip / 22 : 0;
+    const baseA = 0.3 + 0.12 * Math.sin(tt * 0.14) + flare * 0.7;
+    for (let i = -6; i <= 6; i++) {           // crescent of 4px scales
+      const a = Math.PI + i * 0.13;           // opening toward attacker
+      const r = 34 + burst * ((i * 29) % 13); // scales scatter on impact
+      const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r * 1.15;
+      ctx.globalAlpha = Math.max(0, baseA - burst * 0.5);
+      ctx.fillStyle = flare > 0.4 ? '#fff7e0' : (flare ? '#ffd76a' : '#7fd8e8');
+      ctx.fillRect(Math.round(px / 4) * 4, Math.round(py / 4) * 4, 4, 4);
+      if (!burst && i % 2) { ctx.globalAlpha = baseA * 0.4; ctx.fillRect(Math.round(px / 4) * 4 - 4, Math.round(py / 4) * 4, 4, 4); }
+    }
+    if (ip >= 0 && ip < 14) {                 // tangent sparks
+      for (let i = 0; i < 7; i++) {
+        const p = ip / 14, a = -1.9 - i * 0.16;
+        ctx.globalAlpha = 1 - p;
+        ctx.fillStyle = i % 2 ? '#fff2d9' : '#7fd8e8';
+        ctx.fillRect(cx - 34 + Math.cos(a) * p * 60, cy + Math.sin(a) * p * 60, 3, 3);
+      }
+    }
+    ctx.globalAlpha = 1;
+  },
+  post() {},
+});
+</script>
+</body>
+</html>

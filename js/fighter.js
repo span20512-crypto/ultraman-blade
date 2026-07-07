@@ -1095,29 +1095,67 @@ class Fighter {
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    // guard barrier: clean vertical energy pane, subtle when primed,
-    // bright during blockstun
+    // 朱印結界 guard seal (Eric's pick, no kanji): rotating vermillion seal
+    // ring floating before the fighter — dashed outer ring + counter-rotating
+    // inner ring + diamond core. On block impact the seal flares gold and
+    // throws a pulse ring, radial shards and drifting petals.
     if (this.state === 'guard' || this.state === 'block') {
       const strong = this.state === 'block';
-      const bx = Math.round(this.x + this.facing * 44);
-      const h = 116, top = this.y - 136;
-      const base = strong ? 0.42 : 0.16 + 0.05 * Math.sin(this.world.tick * 0.25);
-      ctx.globalAlpha = base;
-      ctx.fillStyle = '#7fd8e8';
-      ctx.fillRect(bx - 4, top, 8, h);
-      // bright leading edge toward the opponent
-      ctx.globalAlpha = Math.min(1, base + 0.3);
-      ctx.fillStyle = '#e8fbff';
-      ctx.fillRect(bx + (this.facing > 0 ? 3 : -5), top, 2, h);
-      // caps
-      ctx.fillRect(bx - 7, top - 3, 14, 3);
-      ctx.fillRect(bx - 7, top + h, 14, 3);
-      // travelling shimmer band
-      const sy = top + ((this.world.tick * 4) % h);
-      ctx.globalAlpha = Math.min(1, base + 0.2);
-      ctx.fillStyle = '#bff0fa';
-      ctx.fillRect(bx - 4, sy, 8, Math.min(12, top + h - sy));
-      ctx.globalAlpha = 1;
+      const t = this.world.tick;
+      const it = strong ? Math.max(0, 14 - this.blockstun) : -1;   // impact age
+      const flare = strong ? Math.max(0, 1 - it / 12) : 0;
+      // primed alpha kept high — vermillion camouflages into the red dusk sky
+      const A = strong ? 0.6 + flare * 0.4 : 0.46 + 0.12 * Math.sin(t * 0.11);
+      const R = 38 + flare * 6;
+      const col = flare > 0.6 ? '#fff3d0' : flare > 0 ? '#ffd76a' : '#e05a3a';
+      ctx.save();
+      ctx.translate(this.x + this.facing * 26, this.y - 78);
+      const g = ctx.createRadialGradient(0, 0, 4, 0, 0, R);        // inner glow
+      g.addColorStop(0, `rgba(194,53,39,${(0.10 * A + flare * 0.12).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(194,53,39,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+      ctx.rotate(t * (0.02 + flare * 0.06) * this.facing);         // outer ring
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5 + flare * 1.5; ctx.globalAlpha = A;
+      for (let i = 0; i < 8; i++) {
+        ctx.beginPath(); ctx.arc(0, 0, R, i * 0.7854 + 0.08, i * 0.7854 + 0.58); ctx.stroke();
+      }
+      ctx.rotate(-t * 0.065 * this.facing);                        // inner ring
+      ctx.strokeStyle = flare > 0 ? col : '#d9a441';               // gold vs red sky
+      ctx.globalAlpha = A * 0.8; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(0, 0, R - 7, 0, 7); ctx.stroke();
+      for (let i = 0; i < 4; i++) {                                // tick marks
+        const a = i * 1.5708;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * (R - 11), Math.sin(a) * (R - 11));
+        ctx.lineTo(Math.cos(a) * (R - 4), Math.sin(a) * (R - 4));
+        ctx.stroke();
+      }
+      ctx.rotate(t * 0.055 * this.facing + 0.7854);                // diamond core
+      ctx.globalAlpha = Math.min(1, A + 0.15); ctx.lineWidth = 1.5;
+      ctx.strokeRect(-5.5, -5.5, 11, 11);
+      ctx.fillStyle = col; ctx.fillRect(-1.5, -1.5, 3, 3);
+      ctx.restore();
+      if (strong && it >= 0 && it < 20) {                          // impact burst
+        const p = it / 20;
+        const cx = this.x + this.facing * 26, cy = this.y - 78;
+        ctx.globalAlpha = 1 - p; ctx.strokeStyle = '#ffd76a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, R + p * 34, 0, 7); ctx.stroke();
+        for (let i = 0; i < 8; i++) {                              // shards
+          const a = i * 0.7854 + 0.3, r1 = R + 2 + p * 40;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(a) * (r1 - 7), cy + Math.sin(a) * (r1 - 7));
+          ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+          ctx.stroke();
+        }
+        for (let i = 0; i < 6; i++) {                              // petals
+          const a = 1.8 + i * 0.75, r = 14 + p * 46;
+          ctx.globalAlpha = (1 - p) * 0.85;
+          ctx.fillStyle = i % 2 ? '#e8a0b4' : '#ffd7c9';
+          ctx.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r + p * p * 22, 3, 3);
+        }
+        ctx.globalAlpha = 1;
+      }
     }
   }
 }
