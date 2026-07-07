@@ -576,7 +576,7 @@ const Effects = {
         x: x + (Math.random() - 0.5) * 150,
         y: y - 90 - Math.random() * 120,
         vx: (Math.random() - 0.5) * 0.3,
-        vy: 0.28 + Math.random() * 0.25,      // 比普通 petals 更慢
+        vy: 0.22 + Math.random() * 0.2,       // 比普通 petals 更慢(Eric: 落樱再慢一点)
         life: 90 + Math.random() * 60, maxLife: 150,
         size: 3, petal: true, big: true,      // 大瓣, 更显眼
         color: Math.random() < 0.55 ? '#ffb7c9' : '#ffd9df',

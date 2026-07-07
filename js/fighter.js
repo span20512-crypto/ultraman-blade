@@ -585,10 +585,11 @@ class Fighter {
       Effects.flashFrame({ alpha: 0.5, t: 3 });
       const variant = this.finisherOverride || this.c.moves.super.finisher || 'A';
       Effects.superFinale(variant, opp.x, opp.y, this);
-      if (variant === 'B') { // 月輪爆: 三环连爆配半速余韵
-        this.world.slowmoT = 16; this.world.slowmo = 0.4; this.world.slowAcc = 0;
-      }
-      this.world.hitstop(16);
+      // 前快后慢(Eric): 终结爆发一律配重 slowmo 余韵(桜吹雪落樱在慢镜中飘)
+      this.world.slowmoT = variant === 'B' ? 16 : 20;
+      this.world.slowmo = variant === 'B' ? 0.4 : 0.38;
+      this.world.slowAcc = 0;
+      this.world.hitstop(18);
       this.world.shake(variant === 'B' ? 13 : 11, 16);
       AudioSys.sfx('hitH');
       this.superSeq = null; this.cineSmear = null;
@@ -779,10 +780,10 @@ class Fighter {
       // 消散加强: 静立残影缓慢淡出 + 双层升华残光 + 柔环 + 瞬身音
       Effects.cloneRun(this, 'idle', gx, gx + 1, opp.y, 4, null,
         { fadeIn: 0, face: Math.sign(opp.x - gx) || 1 });
-      Effects.rise(gx, opp.y - 30, '#c9baff', 10);
-      Effects.rise(gx, opp.y - 70, '#7d5bff', 8);
-      Effects.rise(gx, opp.y - 110, '#eafffd', 6);
-      Effects.ring(gx, opp.y - 90, '#c9baff', 14);
+      Effects.rise(gx, opp.y - 10, '#c9baff', 10);
+      Effects.rise(gx, opp.y - 45, '#7d5bff', 8);
+      Effects.rise(gx, opp.y - 85, '#eafffd', 6);
+      Effects.ring(gx, opp.y - 65, '#c9baff', 14);
       AudioSys.sfx('tele');
       this.setAnim('idle', true); this.cineSmear = null;
       this.facing = Math.sign(opp.x - this.x) || 1;  // 面向对手(爆炸方向基准)
