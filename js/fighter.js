@@ -677,7 +677,7 @@ class Fighter {
     const V = this.cineVarOverride || (this.c.moves.super.cine && this.c.moves.super.cine.variant) || 'A';
     const W = 16;                                    // 单回合冲刺时长(放慢)
     const w = [30, 56, 82];                          // 三回合起点
-    const ghostAt = 20, linesAt = w[2] + W + 10, burstAt = linesAt + 16;
+    const ghostAt = 20, linesAt = w[2] + W + 12, burstAt = linesAt + 36; // 线24t+静场12t
 
     // ── ① 瞬身敌后 + 完整重击: 举刀(f2→f3) → 抡下(f1 斩+月牙) ──
     if (s.t === 1) {
@@ -772,29 +772,38 @@ class Fighter {
       this.anim.frame = s.hold.frame;
     }
 
-    // ── ④ ghost 优雅消散 → 居合斩线 → 爆发(炸离剑二) ──
+    // ── ④ ghost 显眼消散 → 居合斩线(放慢) → 长静场 → 爆发(炸离剑二) ──
+    // 节奏设计(Eric): 前段快, 收尾慢 —— 斩线一条条来, 静场拉长, 爆发带重slowmo
     if (s.t === w[2] + W + 4) {
       const gx = opp.x - s.run.dir * 150;
-      Effects.rise(gx, opp.y - 40, '#c9baff', 7);
-      Effects.rise(gx, opp.y - 80, '#7d5bff', 5);
+      // 消散加强: 静立残影缓慢淡出 + 双层升华残光 + 柔环 + 瞬身音
+      Effects.cloneRun(this, 'idle', gx, gx + 1, opp.y, 4, null,
+        { fadeIn: 0, face: Math.sign(opp.x - gx) || 1 });
+      Effects.rise(gx, opp.y - 30, '#c9baff', 10);
+      Effects.rise(gx, opp.y - 70, '#7d5bff', 8);
+      Effects.rise(gx, opp.y - 110, '#eafffd', 6);
+      Effects.ring(gx, opp.y - 90, '#c9baff', 14);
+      AudioSys.sfx('tele');
       this.setAnim('idle', true); this.cineSmear = null;
       this.facing = Math.sign(opp.x - this.x) || 1;  // 面向对手(爆炸方向基准)
     }
-    if (s.t >= linesAt && s.t < linesAt + 12 && (s.t - linesAt) % 2 === 0) {
-      const i = (s.t - linesAt) / 2;
+    // 斩线: 每 4 tick 一条(慢, 每条都读得清)
+    if (s.t >= linesAt && s.t < linesAt + 24 && (s.t - linesAt) % 4 === 0) {
+      const i = (s.t - linesAt) / 4;
       const angs = [-0.6, 0.7, -1.2, 1.4, 0.1, -1.8];
       Effects.cutLine(opp.x + (i % 3 - 1) * 8, opp.y - 92 + ((i * 41) % 54) - 27,
         angs[i % 6], 92 + (i % 3) * 20, '#c9baff');
       AudioSys.sfx('whooshL');
     }
+    // 静场一拍半, 然后爆发(重 slowmo 收尾)
     if (s.t >= burstAt) {
       Effects.burstCutLines();
       Effects.impact(opp.x, opp.y - 100, this.facing, { tier: 4, color: this.c.theme2 });
       Effects.shockRing(opp.x, opp.y - 60, this.c.theme2);
       Effects.flashFrame({ alpha: 0.55, t: 3 });
-      this.world.hitstop(16);
-      this.world.shake(13, 15);
-      this.world.slowmoT = 14; this.world.slowmo = 0.4; this.world.slowAcc = 0;
+      this.world.hitstop(18);
+      this.world.shake(13, 16);
+      this.world.slowmoT = 22; this.world.slowmo = 0.35; this.world.slowAcc = 0;
       AudioSys.sfx('hitH');
       // 爆炸方向 = 炸离剑二(facing 已在消散拍指向对手)
       this.cineFinish(opp, -13, 16);

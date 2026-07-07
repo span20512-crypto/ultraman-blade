@@ -188,9 +188,9 @@ const DATA = {
         knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
-      light2: { // 逆袈裟回斩(J·J 第二段): F模式 —— 同月牙微变(缩0.94+转角), Eric定版
+      light2: { // 逆袈裟回斩(J·J 第二段): 起手举刀(f2 竖刀, Eric 定) → 回斩
         kind: 'light', anim: 'attack1', total: 18, startup: 4, active: 5, impact: 1,
-        seq: { w: [0], i: 3, r: [3] },
+        seq: { w: [2], i: 3, r: [3] },
         smear: { standalone: true, sheet: 'fx:ka1', cullPrev: true, phases: [{ f: 0, t: 4 }], decay: 2, dy: -4, scale: 0.94, rot: -0.1, edge: '#35e0d8', core: '#ddfffa' },
         dmg: 6, chip: 0, guardDmg: 10, box: { x1: 12, x2: 140, y1: -165, y2: -40 },
         knock: 4.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
@@ -216,8 +216,8 @@ const DATA = {
       },
       clight: { // 蹲刺·穿膝: 全程蹲姿(评审①), 低位刺击交给贴地 fx 表达
         kind: 'light', anim: 'attack1', total: 18, startup: 5, active: 4, impact: 1,
-        seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 3 }, r: [{ a: 'crouch', f: 0 }] },
-        // 削足=贴地横扫: 画师 f1 月牙压扁成低平弧(真笔迹, 非手画), 蹲身+低位清晰可见
+        // 起手举刀(f2 竖刀, Eric 定) → 落蹲横扫
+        seq: { w: [2], i: { a: 'crouch', f: 3 }, r: [{ a: 'crouch', f: 0 }] },
         smear: { standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 2, dy: 30, squashY: 0.42, scale: 0.86, edge: '#5ce8da', core: '#eafffd' },
         dmg: 4, chip: 0, guardDmg: 9, box: { x1: 10, x2: 128, y1: -62, y2: -5 },
         knock: 3.5, hitstun: 16, blockstun: 9, hitstop: 4, shake: 2,
@@ -292,6 +292,7 @@ const DATA = {
       super: { // 三幕: 紫气聚身 -> 瞬身内爆/外爆 -> 紫青交替连斩 · 終B 月輪爆
         kind: 'super', name: '残影·滅殺陣', anim: 'attack2', total: 54, cost: 100,
         startup: 16, active: 12, impact: 1, invuln: 0, finisher: 'B',
+        seq: { w: [2, 3], i: 1, r: [0] }, // 瞬移后前摇=举刀过顶(Eric: 抡在头上)
         smear: { phases: [{ f: 1, t: 4 }], decay: 2, gale: 1.06, attach: true, edge: '#7d5bff', core: '#efe8ff' },
         fx: { x: 118, y: -118, r: 124, ry: 0.75, a0: 2.5, a1: -2.5, w: 19, life: 13, color: '#efe8ff', color2: '#7d5bff' },
         dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 155, y1: -180, y2: -25 },
