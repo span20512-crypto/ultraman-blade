@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 · 判定实验室 HITBOX LAB</title>
+<style>
+  body { margin:0; background:#14100d; color:#efe6d5; font:14px/1.55 "PingFang SC", monospace; }
+  header { padding:14px 22px 4px; }
+  h1 { margin:0; font-size:18px; color:#d9a441; }
+  .sub { color:#9a8f78; font-size:12px; max-width:940px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; padding:6px 22px; align-items:center; }
+  button, select { background:#241d18; color:#efe6d5; border:2px solid #8a6a2f; padding:5px 11px; font:13px monospace; cursor:pointer; }
+  button.on { background:#b32b20; border-color:#d9a441; color:#fff; }
+  button:hover { border-color:#d9a441; }
+  #wrap { display:flex; gap:18px; padding:8px 22px; align-items:flex-start; flex-wrap:wrap; }
+  canvas { background:#0c0a09; border:2px solid #8a6a2f; image-rendering:pixelated; }
+  #panel { min-width:360px; background:#1b1512; border:2px solid #3a2d1c; padding:14px 16px; font-size:13px; }
+  #panel b { color:#d9a441; }
+  #readout { line-height:1.75; border-bottom:1px solid #3a2d1c; padding-bottom:9px; margin-bottom:10px; }
+  #readout .hit { color:#4be08a; } #readout .miss { color:#ff5a4a; } #readout .gap { color:#d9a441; } #readout .grace { color:#ffd24a; }
+  .sl { display:flex; align-items:center; gap:8px; margin:8px 0; }
+  .sl label { width:38px; color:#d9a441; font-size:13px; }
+  .sl.tip label { color:#ffd24a; }
+  .sl .hint { width:158px; color:#6f6552; font-size:11px; }
+  .sl input[type=range] { flex:1; accent-color:#d9a441; height:20px; }
+  .sl.tip input[type=range] { accent-color:#ffd24a; }
+  .sl input[type=number] { width:62px; background:#0c0a09; color:#efe6d5; border:1px solid #3a2d1c; font:13px monospace; padding:3px 5px; }
+  #exp { margin-top:10px; width:100%; background:#0c0a09; color:#8fd0a8; border:1px solid #3a2d1c; font:12px monospace; padding:8px; box-sizing:border-box; }
+  .legend { display:flex; gap:16px; font-size:11px; color:#9a8f78; padding:0 22px 4px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:11px; height:11px; vertical-align:-1px; margin-right:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>拳魂 · 判定实验室 HITBOX LAB</h1>
+  <div class="sub">冻结在命中帧(active)。<b>x2</b>=判定命中门槛(敌人到这才算被打到);<b>刀尖</b>=刀刃视觉最远点, 可设得比 x2 稍远, 留出"重合但不算中"的宽限。分别调, 导出粘回 data.js。</div>
+</header>
+<div class="row" id="charRow"></div>
+<div class="row" id="moveRow"></div>
+<div class="legend">
+  <span><i style="background:rgba(255,74,61,.9)"></i>判定框 hitbox(x2=命中前缘)</span>
+  <span><i style="background:rgba(60,255,120,.5)"></i>受击框 bodybox(木桩)</span>
+  <span><i style="background:#35d0e0"></i>现刀尖 art(素材月牙实际最远点)</span>
+  <span><i style="background:#ffd24a"></i>目标刀尖(你设, 刀光将对齐到此)</span>
+</div>
+<div id="wrap">
+  <canvas id="cv" width="760" height="470"></canvas>
+  <div id="panel">载入中…</div>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/data.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/fighter.js"></script>
+<script>
+'use strict';
+/* 判定实验室: 真引擎冻结在 active 帧, 不做命中解算(hitbox 持续可见)。
+   box = 命中判定(改 DATA 活引用即时生效); tip = 目标刀尖(独立于 x2, 记在 tipMap, 供之后引擎让刀光对齐)。
+   控件只建一次(拖拽顺滑), 重绘只更画布+读数。特效粒子不渲染(避免噪点)。 */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const off = document.createElement('canvas'); off.width = 760; off.height = 470;
+const octx = off.getContext('2d'); octx.imageSmoothingEnabled = false;
+const GY = 470, AX = 330, GND = GY - 120;
+const CHARS = ['mack', 'kenji'];
+const _q = new URLSearchParams(location.search);
+let charId = _q.get('char') || 'kenji';
+let moveKey = _q.get('move') || 'light';
+let dummyX = 505, bladeTipX = null, tip = null;
+let A = null, B = null;
+const ORIG = {}, tipMap = {}; // ORIG=box 原值(回归用); tipMap=每招目标刀尖(相对角色前伸 px)
+
+function movesWithBox(cid) {
+  const mv = DATA[cid].moves;
+  return Object.keys(mv).filter(k => mv[k] && (mv[k].box || mv[k].dash || mv[k].dive)); // 含空中/dive/冲刺招
+}
+function snapshotOrig() {
+  for (const cid of CHARS) {
+    ORIG[cid] = {};
+    for (const k of movesWithBox(cid)) {
+      const m = DATA[cid].moves[k];
+      ORIG[cid][k] = { box: m.box ? Object.assign({}, m.box) : null, dashVx: m.dash ? m.dash.vx : null, slamRange: (m.slamRange != null ? m.slamRange : null) };
+    }
+  }
+}
+const W = {
+  tick: 0, hitstopT: 0, projectiles: [], stats: { maxCombo: 0 }, slowmoT: 0, slowmo: 1, slowAcc: 0,
+  training: { dummy: 'stand' }, mode: 'lab',
+  hitstop() {}, shake() {}, spawnProjectile() {}, hasProjectile() { return false; }, superFlash() {},
+};
+function epad() { return (typeof emptyPad === 'function') ? emptyPad() : {}; }
+
+function arm() {
+  const other = charId === 'kenji' ? 'mack' : 'kenji';
+  A = new Fighter(charId, AX, 1, W);
+  B = new Fighter(other, dummyX, -1, W);
+  A.meter = 100; W.tick = 0; W.projectiles = []; Effects.reset();
+  const def = DATA[charId].moves[moveKey];
+  // 直接强制摆到命中帧(绕过连招/超杀/蹲姿触发, 让每一招都能显示刀光)
+  A.state = 'attack'; A.facing = 1; A.grounded = true;
+  const midT = def.dive ? 1 : def.startup + Math.max(0, Math.floor((def.active || 2) / 2)); // dive 摆到落地砸(slam)判定
+  A.move = { def, t: midT, chained: false, hasHit: false, contact: false, contactT: 0, want: null, spawned: false, sfxDone: false, landed: !!def.dive, landedT: 0 };
+  A.setAnim(def.anim, true);
+  A.updateAnim(); // 据 move.t 摆到命中帧(月牙帧)
+  if (def.dive && def.smear && def.smear.phases && def.smear.phases[0]) A.anim.frame = def.smear.phases[0].f; // dive 摆到有月牙的帧
+  Effects.reset();
+  if (def.smear && def.smear.standalone) Effects.smearFx(A, def.smear, def.anim); // 独立刀光(蹲攻等): spawn 到 Effects 层才画得出
+  else if (def.dive && def.smear) Effects.smearFx(A, def.smear, def.anim); // dive 月牙真机在落地 slam 时才 spawn(arm 里 landed=true 跳过了那条路径), 这里补 spawn 让 lab 能看到刀光并标注
+  bladeTipX = scanBladeTip();
+  const tkey = charId + '.' + moveKey;
+  const artTipRel = bladeTipX != null ? Math.round(bladeTipX - A.x) : (def.box ? def.box.x2 : 120);
+  tip = (tipMap[tkey] != null) ? tipMap[tkey] : artTipRel;   // 默认 = 当前美术刀尖
+  tipMap[tkey] = tip;
+  buildControls();
+  redrawCanvas();
+}
+
+function scanBladeTip() {
+  if (!A || !A.move || !A.move.def.box) return null;
+  const def = A.move.def, oy = GND - A.y;
+  octx.clearRect(0, 0, off.width, off.height);
+  octx.save(); octx.translate(0, oy); A.draw(octx); Effects.drawSmears(octx); octx.restore();
+  const y1 = Math.max(0, Math.round(A.y + oy + def.box.y1)), y2 = Math.min(off.height, Math.round(A.y + oy + def.box.y2));
+  if (y2 <= y1) return null;
+  const img = octx.getImageData(0, y1, off.width, y2 - y1), d = img.data, w = off.width;
+  for (let x = w - 1; x >= Math.round(A.x); x--)
+    for (let yy = 0; yy < (y2 - y1); yy++)
+      if (d[(yy * w + x) * 4 + 3] > 45) return x;
+  return null;
+}
+
+function redrawCanvas() {
+  if (!A) return;
+  ctx.clearRect(0, 0, 760, 470);
+  ctx.fillStyle = '#171126'; ctx.fillRect(0, 0, 760, GND);
+  ctx.fillStyle = '#241812'; ctx.fillRect(0, GND, 760, GY - GND);
+  ctx.fillStyle = '#3d2b3a'; ctx.fillRect(0, GND - 1, 760, 2);
+  const oy = GND - A.y;
+  ctx.save(); ctx.translate(0, oy);
+  B.x = dummyX; B.draw(ctx);
+  A.draw(ctx);
+  Effects.drawSmears(ctx); // 独立刀光(蹲攻等)在此显示
+  const ab = A.activeBox();
+  if (ab) { ctx.strokeStyle = 'rgba(255,74,61,.95)'; ctx.lineWidth = 2; ctx.strokeRect(ab.x1, ab.y1, ab.x2 - ab.x1, ab.y2 - ab.y1); }
+  const bb = B.bodyBox();
+  ctx.strokeStyle = 'rgba(60,255,120,.5)'; ctx.lineWidth = 1.5; ctx.strokeRect(bb.x1, bb.y1, bb.x2 - bb.x1, bb.y2 - bb.y1);
+  ctx.restore();
+  // 现刀尖 art (青)
+  if (bladeTipX != null) {
+    ctx.strokeStyle = '#35d0e0'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(bladeTipX, 0); ctx.lineTo(bladeTipX, GND); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#35d0e0'; ctx.font = '11px monospace'; ctx.textAlign = 'left'; ctx.fillText('现刀尖', bladeTipX + 3, 14);
+  }
+  // 目标刀尖 (金) — 你设定的刀光最远点
+  const tgtX = A.x + tip;
+  ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(tgtX, 0); ctx.lineTo(tgtX, GND); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = '#ffd24a'; ctx.font = '11px monospace'; ctx.textAlign = 'left'; ctx.fillText('目标刀尖', tgtX + 3, 28);
+  // 冲刺范围(必杀/大招): 起点→终点条 + 终点标记
+  const mdef = A.move.def;
+  if (mdef.dash) {
+    const dEnd = A.x + mdef.dash.vx * (mdef.dash.to - mdef.dash.from);
+    ctx.fillStyle = 'rgba(226,58,82,.15)'; ctx.fillRect(A.x, GND - 32, dEnd - A.x, 12);
+    ctx.strokeStyle = '#e23a52'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(dEnd, 0); ctx.lineTo(dEnd, GND); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#e23a52'; ctx.font = '11px monospace'; ctx.textAlign = 'left'; ctx.fillText('冲到此', dEnd + 3, 44);
+  }
+  updateReadout(ab, bb);
+}
+
+function updateReadout(ab, bb) {
+  const hitFront = ab ? ab.x2 : null, dumNear = bb.x1;
+  const connect = ab ? (ab.x1 < bb.x2 && ab.x2 > bb.x1 && ab.y1 < bb.y2 && ab.y2 > bb.y1) : false;
+  const tgtWorld = A.x + tip, artWorld = bladeTipX;
+  const grace = hitFront != null ? Math.round(tgtWorld - hitFront) : null; // 目标刀尖 - 命中前缘 = 重合宽限
+  const r = document.getElementById('readout'); if (!r) return;
+  const def = A.move && A.move.def;
+  r.innerHTML =
+    `<b>${DATA[charId].name} ${DATA[charId].cn}</b> · <b>${moveKey}</b> (${def ? def.name || def.kind : '-'})<br>` +
+    `判定前缘 x2(世界): <b>${hitFront != null ? Math.round(hitFront) : '-'}</b> · 现刀尖 art: <b>${artWorld != null ? Math.round(artWorld) : '未扫到'}</b> · 目标刀尖: <b style="color:#ffd24a">${Math.round(tgtWorld)}</b><br>` +
+    `目标刀尖 − 判定前缘 = <span class="grace"><b>${grace != null ? (grace > 0 ? '+' + grace : grace) : '-'}</b></span> ${grace != null ? (grace > 0 ? '(刀尖伸出判定外的宽限: 重合但不算中)' : grace < 0 ? '(刀尖在判定内→看着没够到却已中)' : '(刀尖=命中门槛)') : ''}<br>` +
+    `木桩近边 x: <b>${Math.round(dumNear)}</b> · 当前: <span class="${connect ? 'hit' : 'miss'}"><b>${connect ? '命中 ✓' : '落空 ✗'}</b></span>`;
+}
+
+const COORDS = [
+  { k: 'x1', min: -60, max: 160, hint: '近边: 从身体往前多远开始' },
+  { k: 'x2', min: 40, max: 320, hint: '命中前缘: 敌人到这才算被打到' },
+  { k: 'y1', min: -240, max: 0, hint: '上边: 负=从脚往上的高度' },
+  { k: 'y2', min: -120, max: 40, hint: '下边: 0≈脚底, 负=离地' },
+];
+function buildControls() {
+  const def = A.move.def, b = def.box;
+  const dashW = def.dash ? (def.dash.to - def.dash.from) : 0;
+  let h = `<div id="readout"></div>`;
+  if (b) for (const c of COORDS)
+    h += `<div class="sl"><label>${c.k}</label><input type="range" id="r_${c.k}" min="${c.min}" max="${c.max}" step="1" value="${b[c.k]}"><input type="number" id="n_${c.k}" step="1" value="${b[c.k]}"><span class="hint">${c.hint}</span></div>`;
+  if (b) h += `<div class="sl tip"><label>刀尖</label><input type="range" id="r_tip" min="40" max="340" step="1" value="${tip}"><input type="number" id="n_tip" step="1" value="${tip}"><span class="hint">刀刃视觉最远点(可 &gt; x2 留宽限)</span></div>`;
+  if (def.dash) { const dist = Math.round(def.dash.vx * dashW); h += `<div class="sl"><label>冲刺</label><input type="range" id="r_dash" min="40" max="360" step="2" value="${dist}"><input type="number" id="n_dash" step="2" value="${dist}"><span class="hint">冲刺总距离 px(前冲多远)</span></div>`; }
+  h += `<div class="sl"><label>木桩</label><input type="range" id="r_dum" min="380" max="680" step="1" value="${dummyX}"><input type="number" id="n_dum" step="1" value="${dummyX}"><span class="hint">木桩距离(找临界)</span></div>`;
+  h += `<div class="row" style="padding:8px 0">${b ? '<button id="tipToX2">刀尖=x2</button>' : ''}<button id="resetBtn">↺ 回归原值</button><button id="expBtn">导出</button></div>`;
+  h += `<textarea id="exp" readonly rows="3"></textarea>`;
+  document.getElementById('panel').innerHTML = h;
+
+  const set = (k, v) => {
+    if (k === 'dum') dummyX = v;
+    else if (k === 'tip') { tip = v; tipMap[charId + '.' + moveKey] = v; }
+    else if (k === 'dash') def.dash.vx = dashW ? +(v / dashW).toFixed(2) : def.dash.vx;
+    else def.box[k] = v;
+    const r = document.getElementById('r_' + k), n = document.getElementById('n_' + k);
+    if (r) r.value = v; if (n) n.value = v;
+    redrawCanvas();
+  };
+  const ids = [{ k: 'dum' }];
+  if (b) ids.push(...COORDS, { k: 'tip' });
+  if (def.dash) ids.push({ k: 'dash' });
+  for (const c of ids) {
+    const r = document.getElementById('r_' + c.k), n = document.getElementById('n_' + c.k);
+    if (r) r.oninput = () => set(c.k, parseInt(r.value, 10));
+    if (n) n.oninput = () => set(c.k, parseInt(n.value, 10) || 0);
+  }
+  if (b) document.getElementById('tipToX2').onclick = () => set('tip', def.box.x2);
+  document.getElementById('resetBtn').onclick = () => {
+    const o = ORIG[charId][moveKey];
+    if (b && o.box) { Object.assign(def.box, o.box); for (const c of COORDS) set(c.k, def.box[c.k]); set('tip', bladeTipX != null ? Math.round(bladeTipX - A.x) : def.box.x2); }
+    if (def.dash && o.dashVx != null) { def.dash.vx = o.dashVx; set('dash', Math.round(o.dashVx * dashW)); }
+  };
+  document.getElementById('expBtn').onclick = () => {
+    let out = `${charId}.${moveKey}`;
+    if (b) out += `  box: { x1: ${def.box.x1}, x2: ${def.box.x2}, y1: ${def.box.y1}, y2: ${def.box.y2} } · 刀尖 ${tip}`;
+    if (def.dash) out += `  dash.vx: ${def.dash.vx} (总距离 ${Math.round(def.dash.vx * dashW)}px)`;
+    document.getElementById('exp').value = out;
+  };
+}
+
+function mkBtn(row, label, on, cb) {
+  const bt = document.createElement('button'); bt.textContent = label; if (on) bt.classList.add('on');
+  bt.onclick = () => { document.querySelectorAll('#' + row + ' button').forEach(x => x.classList.remove('on')); bt.classList.add('on'); cb(); };
+  document.getElementById(row).appendChild(bt);
+}
+function buildMoveRow() {
+  document.getElementById('moveRow').innerHTML = '';
+  movesWithBox(charId).forEach(k => mkBtn('moveRow', k, k === moveKey, () => { moveKey = k; arm(); }));
+}
+for (const cid of CHARS) mkBtn('charRow', `${DATA[cid].name} ${DATA[cid].cn}`, cid === charId, () => { charId = cid; moveKey = movesWithBox(charId)[0]; buildMoveRow(); arm(); });
+
+Assets.load().then(() => { snapshotOrig(); buildMoveRow(); arm(); });
+</script>
+</body>
+</html>

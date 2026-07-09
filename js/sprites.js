@@ -506,22 +506,22 @@ const Effects = {
      + 接触点白芯闪。轻/重分级数量与力度(格挡不再像打空)。 */
   blockSpark(x, y, dir, kind = 'light') {
     const heavy = kind !== 'light';
-    const n = heavy ? 10 : 6;
+    const n = heavy ? 14 : 9;
     for (let i = 0; i < n; i++) {
       const up = Math.random() < 0.5 ? -1 : 1;
       this.parts.push({
-        x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 18,
-        vx: -dir * (1.5 + Math.random() * 2.5),            // 屑向攻方反弹(磨出来的)
-        vy: up * (1.2 + Math.random() * 2.4) - 0.6,
-        life: 8 + Math.random() * 7, maxLife: 15,
-        w: Math.round(5 + Math.random() * 5), h: 2,        // 短磨擦条
-        color: Math.random() < 0.5 ? '#bff0fa' : '#7fd8e8',
+        x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 20,
+        vx: -dir * (2 + Math.random() * 3.2),              // 屑向攻方反弹(磨出来的)
+        vy: up * (1.4 + Math.random() * 2.6) - 0.6,
+        life: 9 + Math.random() * 7, maxLife: 16,
+        w: Math.round(5 + Math.random() * 6), h: 2,        // 短磨擦条
+        color: Math.random() < 0.4 ? '#ffe08a' : '#bff0fa', // 金屑(呼应朱印結界闪光) + 钢蓝
         grav: 0.12,
       });
     }
     this.parts.push({
-      x, y, vx: 0, vy: 0, life: 3, maxLife: 3,
-      size: heavy ? 7 : 5, color: '#ffffff', grav: 0,
+      x, y, vx: 0, vy: 0, life: 4, maxLife: 4,
+      size: heavy ? 9 : 6, color: '#ffffff', grav: 0,       // 接触闪光加大
     });
   },
 

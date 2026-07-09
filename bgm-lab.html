@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 SOUL FIST · BGM 曲庫</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@font-face { font-family:'PressStart'; src:url('assets/fonts/PressStart2P.ttf') format('truetype'); font-display:block; }
+@font-face { font-family:'FusionPixelJA'; src:url('assets/fonts/FusionPixel-ja.woff2') format('woff2'); font-display:block; }
+@font-face { font-family:'FusionPixel'; src:url('assets/fonts/FusionPixel-zh.woff2') format('woff2'); font-display:block; }
+
+:root{
+  --bg:#07080c; --bg2:#0b0d12; --panel:#10131b; --panel2:#151925;
+  --ink:#e8e3d8; --dim:#8a8778; --faint:#5a5850;
+  --crimson:#b00020; --crimson-lite:#e23a52; --gold:#d9b26a;
+  --line:#242836;
+  /* lens accents */
+  --l1:#8fb2c9; --l2:#d98fa6; --l3:#6f8fa0; --l4:#a89268;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font-family:'FusionPixel','FusionPixelJA',system-ui,sans-serif;
+  -webkit-font-smoothing:none; image-rendering:pixelated;}
+body{
+  background:
+    radial-gradient(1200px 500px at 50% -10%, rgba(176,0,32,.13), transparent 60%),
+    radial-gradient(900px 700px at 100% 100%, rgba(30,40,70,.16), transparent 55%),
+    var(--bg);
+  min-height:100vh; padding:0 0 90px;
+}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:99;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.10) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:.5;}
+.wrap{max-width:1200px;margin:0 auto;padding:0 22px;}
+
+header{padding:44px 0 20px;text-align:center;position:relative;}
+.kanji-bg{position:absolute;top:-14px;left:50%;transform:translateX(-50%);
+  font-family:'FusionPixelJA';font-size:190px;line-height:1;color:rgba(176,0,32,.06);
+  z-index:0;pointer-events:none;user-select:none;letter-spacing:.1em;}
+header .h-inner{position:relative;z-index:1;}
+h1{font-family:'PressStart';font-size:24px;letter-spacing:2px;margin:0;color:var(--ink);
+  text-shadow:0 2px 0 #000, 0 0 22px rgba(176,0,32,.4);}
+h1 .ja{font-family:'FusionPixelJA';color:var(--crimson-lite);margin-right:12px;font-size:28px;
+  text-shadow:0 0 16px rgba(226,58,82,.55);}
+.sub{margin:13px auto 0;max-width:720px;color:var(--dim);font-size:13.5px;line-height:1.75;}
+.sub b{color:var(--gold);}
+
+/* lens legend */
+.lenses{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:18px auto 0;max-width:900px;}
+.lens{display:flex;flex-direction:column;gap:2px;padding:8px 14px;border:1px solid var(--line);border-radius:9px;
+  background:var(--bg2);min-width:150px;}
+.lens .lh{font-family:'FusionPixelJA';font-size:15px;}
+.lens .le{font-family:'PressStart';font-size:8px;color:var(--faint);letter-spacing:.5px;}
+.lens .ld{font-size:11px;color:var(--dim);line-height:1.4;margin-top:2px;}
+.lens.a1{border-left:3px solid var(--l1);} .lens.a1 .lh{color:var(--l1);}
+.lens.a2{border-left:3px solid var(--l2);} .lens.a2 .lh{color:var(--l2);}
+.lens.a3{border-left:3px solid var(--l3);} .lens.a3 .lh{color:var(--l3);}
+.lens.a4{border-left:3px solid var(--l4);} .lens.a4 .lh{color:var(--l4);}
+
+/* sticky control bar */
+.bar{position:sticky;top:0;z-index:50;margin:22px auto 30px;display:flex;align-items:center;
+  gap:20px;flex-wrap:wrap;justify-content:center;
+  background:linear-gradient(180deg,rgba(11,13,18,.97),rgba(11,13,18,.88));
+  border:1px solid var(--line);border-radius:10px;padding:11px 18px;
+  backdrop-filter:blur(6px);box-shadow:0 8px 30px rgba(0,0,0,.5);}
+.bar .lbl{font-family:'PressStart';font-size:9px;color:var(--faint);letter-spacing:1px;}
+.toggle{display:inline-flex;align-items:center;gap:9px;cursor:pointer;user-select:none;font-size:13px;color:var(--dim);}
+.toggle .sw{width:40px;height:20px;border-radius:11px;background:#2a2030;border:1px solid var(--line);position:relative;transition:.16s;}
+.toggle .sw::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--faint);transition:.16s;}
+.toggle.on .sw{background:rgba(176,0,32,.4);border-color:var(--crimson);}
+.toggle.on .sw::after{left:22px;background:var(--crimson-lite);box-shadow:0 0 8px var(--crimson-lite);}
+.toggle.on{color:var(--ink);}
+.now{font-size:12px;color:var(--faint);min-width:150px;}
+.now b{color:var(--gold);}
+.picks{font-size:12px;color:var(--dim);margin-left:auto;text-align:right;line-height:1.5;}
+.picks b{color:#7fd0a0;} .picks .none{color:var(--faint);}
+
+/* scene */
+.scene{margin:0 0 34px;}
+.scene-head{display:flex;align-items:baseline;gap:14px;margin:0 0 14px;padding-bottom:9px;border-bottom:1px solid var(--line);}
+.scene-head .num{font-family:'PressStart';font-size:11px;color:var(--crimson);}
+.scene-head .glyph{font-family:'FusionPixelJA';font-size:32px;line-height:1;color:var(--ink);text-shadow:0 0 14px rgba(176,0,32,.3);}
+.scene-head .en{font-family:'PressStart';font-size:13px;letter-spacing:1px;color:var(--ink);}
+.scene-head .maps{margin-left:auto;font-size:11.5px;color:var(--dim);text-align:right;line-height:1.5;}
+.scene-head .maps code{color:var(--gold);background:rgba(217,178,106,.08);padding:1px 6px;border-radius:4px;font-family:'PressStart';font-size:8px;}
+
+.opts{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;}
+@media(max-width:1000px){.opts{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:560px){.opts{grid-template-columns:1fr;}}
+
+.card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);
+  border-radius:11px;padding:15px 15px 13px;position:relative;transition:border-color .16s, transform .16s, box-shadow .16s;}
+.card.playing{border-color:var(--crimson);box-shadow:0 0 0 1px rgba(226,58,82,.3),0 12px 30px rgba(176,0,32,.24);transform:translateY(-2px);}
+.card.picked{box-shadow:0 0 0 1px rgba(127,208,160,.4),0 8px 24px rgba(0,0,0,.4);}
+.card .lenstag{display:inline-flex;align-items:baseline;gap:6px;margin-bottom:8px;}
+.card .lenstag .g{font-family:'FusionPixelJA';font-size:16px;}
+.card .lenstag .e{font-family:'PressStart';font-size:7.5px;color:var(--faint);letter-spacing:.5px;}
+.card.l1{border-top:2px solid var(--l1);} .card.l1 .lenstag .g{color:var(--l1);}
+.card.l2{border-top:2px solid var(--l2);} .card.l2 .lenstag .g{color:var(--l2);}
+.card.l3{border-top:2px solid var(--l3);} .card.l3 .lenstag .g{color:var(--l3);}
+.card.l4{border-top:2px solid var(--l4);} .card.l4 .lenstag .g{color:var(--l4);}
+.card .desc{font-size:11.5px;color:var(--dim);line-height:1.6;min-height:56px;margin-bottom:9px;}
+.card .inst{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;min-height:22px;}
+.card .inst span{font-size:10px;color:#9fc7ab;background:rgba(111,174,143,.09);border:1px solid rgba(111,174,143,.16);border-radius:16px;padding:1px 8px;}
+
+.player{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.pbtn{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);
+  background:radial-gradient(circle at 40% 35%, #1c2130, #0c0e15);color:var(--ink);cursor:pointer;
+  display:grid;place-items:center;transition:.14s;}
+.pbtn:hover{border-color:var(--crimson);color:var(--crimson-lite);}
+.pbtn svg{width:16px;height:16px;fill:currentColor;}
+.pbtn.on{background:radial-gradient(circle at 40% 35%, #3a0e18, #14060a);border-color:var(--crimson);color:var(--crimson-lite);}
+.ptrack{flex:1;min-width:0;}
+.pseek{height:7px;border-radius:5px;background:#0a0c12;border:1px solid var(--line);position:relative;cursor:pointer;overflow:hidden;}
+.pseek .fill{position:absolute;top:0;left:0;bottom:0;width:0;background:linear-gradient(90deg,var(--crimson),var(--crimson-lite));}
+.ptime{display:flex;justify-content:space-between;margin-top:5px;font-size:9px;color:var(--faint);font-family:'PressStart';}
+
+.pick{width:100%;border:1px solid var(--line);background:var(--panel2);color:var(--dim);cursor:pointer;
+  border-radius:7px;padding:7px 0;font-family:'FusionPixelJA';font-size:13px;transition:.14s;}
+.pick:hover{border-color:#7fd0a0;color:#9fc7ab;}
+.card.picked .pick{background:rgba(127,208,160,.16);border-color:#7fd0a0;color:#bfeccf;}
+.card.picked .pick::before{content:'✓ ';}
+
+footer{max-width:1200px;margin:16px auto 0;padding:20px;color:var(--faint);font-size:11.5px;line-height:1.8;border-top:1px solid var(--line);}
+footer code{color:var(--gold);}
+</style>
+</head>
+<body>
+<header>
+  <div class="kanji-bg">幽玄</div>
+  <div class="h-inner">
+    <h1><span class="ja">音魂</span>SOUL FIST · BGM</h1>
+    <p class="sub">古代日和風・純樂器候選曲庫 v2 — <b>幽玄・物哀</b>,劍士武士之境,絕不歡快,無人聲。<br>
+    每場景 <b>4 個美學鏡頭</b>各一條,點 ▶ 試聽,聽到喜歡的按 <b>♥ 選它</b>(頂欄實時匯總)。</p>
+    <div class="lenses">
+      <div class="lens a1"><span class="lh">甲 幽玄</span><span class="le">YUGEN</span><span class="ld">空寂留白·氣聲·懸而未決的孤寂</span></div>
+      <div class="lens a2"><span class="lh">乙 物哀</span><span class="le">MONO NO AWARE</span><span class="ld">唯美惆悵·哀而不傷·落櫻無常</span></div>
+      <div class="lens a3"><span class="lh">丙 幽冷</span><span class="le">COLD STEEL</span><span class="ld">暗湧肅殺·危機壓抑·不熱血的張力</span></div>
+      <div class="lens a4"><span class="lh">丁 侘寂</span><span class="le">WABI-SABI</span><span class="ld">古拙斑駁·粗糲蒼涼·歲月感</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="bar">
+    <span class="lbl">PLAY</span>
+    <div class="toggle on" id="loopTog"><span class="sw"></span><span>循環 LOOP</span></div>
+    <div class="now" id="nowPlaying">— 未播放 —</div>
+    <div class="picks" id="picksSummary"></div>
+  </div>
+  <div id="scenes"></div>
+  <footer>
+    <div><b style="color:var(--ink)">場景映射</b> — 選定後接進 <code>js/audio.js</code>,替換現有芯片合成:</div>
+    <div style="margin-top:6px"><code>title</code> 標題/選單 · <code>select</code> 選人 · <code>fight</code> 對戰 · <code>result</code> 結算。你也可以跨場景複用同一條。</div>
+  </footer>
+</div>
+
+<script>
+const LENS = {
+  1:{g:'甲 幽玄', e:'YUGEN',   c:'l1'},
+  2:{g:'乙 物哀', e:'MONO',    c:'l2'},
+  3:{g:'丙 幽冷', e:'COLD',    c:'l3'},
+  4:{g:'丁 侘寂', e:'WABI',    c:'l4'},
+};
+const SCENES = [
+  { key:'title', num:'01', glyph:'題', en:'TITLE / MENU', maps:'標題畫面 · 主選單<br><code>screen:title</code>',
+    opts:[
+      {n:1, desc:'獨尺八飄在空寂之上,一記遠寺鐘、一縷風。幽深、神秘、懸。', inst:['尺八 solo','寺鐘','風']},
+      {n:2, desc:'溫柔筝旋律 + 哀傷尺八 + 淡弦樂,落櫻無常,唯美惆悵。', inst:['筝 melody','尺八','弦樂']},
+      {n:3, desc:'低沉持續音 + 遙遠太鼓心跳 + 孤尺八,戰國暮色的壓抑不安。', inst:['低音 drone','遠太鼓','尺八']},
+      {n:4, desc:'斑駁琵琶疏撥 + 孤笛 + 風與蟲鳴,粗糲、褪色、歲月感。', inst:['琵琶','笛','環境音']},
+    ]},
+  { key:'select', num:'02', glyph:'選', en:'CHARACTER SELECT', maps:'選人畫面 · VS 前<br><code>screen:select</code>',
+    opts:[
+      {n:1, desc:'疏朗筝固定音型 + 氣聲尺八 + 長留白,冥想、專注。', inst:['筝 ostinato','尺八']},
+      {n:2, desc:'輕柔筝 + 惆悵尺八 + 淡弦,對決前的莊重與不捨。', inst:['筝','尺八','弦樂']},
+      {n:3, desc:'低音 + 克制太鼓脈衝 + 警覺三味線,對峙的冷張力。', inst:['drone','太鼓','三味線']},
+      {n:4, desc:'琵琶三味線疏撥 + 寺院氛圍,古拙、孤寂的沉著。', inst:['琵琶','三味線']},
+    ]},
+  { key:'battle', num:'03', glyph:'戦', en:'BATTLE', maps:'對戰核心 · 循環最久<br><code>screen:fight</code>',
+    opts:[
+      {n:1, desc:'低沉太鼓驅動但陰鬱,尖銳氣聲尺八,致命對決的幽暗緊張。有旋律鉤子,疾而不燃。', inst:['低太鼓','尺八']},
+      {n:2, desc:'疾速哀弦 + 高揚悲愴尺八 + 重太鼓,悲劇式的美,無凱旋。', inst:['弦樂','尺八','太鼓']},
+      {n:3, desc:'不停的暗太鼓 + 三味線刺擊 + 威脅 drone,克制的殺意,戰國血色。', inst:['太鼓','三味線','drone']},
+      {n:4, desc:'粗糲琵琶重擊 + 大地感太鼓 + 狂野笛,古老、嚴酷、原始的驅動力。', inst:['琵琶','太鼓','笛']},
+    ]},
+  { key:'result', num:'04', glyph:'勝敗', en:'RESULT', maps:'勝負結算畫面<br><code>screen:result</code>',
+    opts:[
+      {n:1, desc:'一支氣聲尺八浮在深邃寂靜 + 遠鐘,暴力之後的澄澈。', inst:['尺八','寺鐘']},
+      {n:2, desc:'哀傷筝與尺八 + 柔弦,終局的悲與優雅,落櫻。勝負通用。', inst:['筝','尺八','弦樂']},
+      {n:3, desc:'低音漸隱 + 遠太鼓一擊 + 孤尺八,肅殺的靜默,一命之重。', inst:['drone','太鼓','尺八']},
+      {n:4, desc:'斑駁琵琶與風,疏落、粗糲,無常之美的尾聲。', inst:['琵琶','風']},
+    ]},
+];
+
+const scenesEl=document.getElementById('scenes'), nowEl=document.getElementById('nowPlaying'),
+      loopTog=document.getElementById('loopTog'), picksEl=document.getElementById('picksSummary');
+let doLoop=true; const audios=[]; const picks={};
+function fmt(t){ if(!isFinite(t))return'0:00'; const m=Math.floor(t/60),s=Math.floor(t%60); return m+':'+String(s).padStart(2,'0'); }
+const PLAY='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>', PAUSE='<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+
+function renderPicks(){
+  const parts=SCENES.map(sc=>{ const p=picks[sc.key];
+    return sc.glyph+':'+(p?`<b>${LENS[p].g.split(' ')[1]}</b>`:'<span class="none">—</span>'); });
+  picksEl.innerHTML='選擇 &nbsp;'+parts.join(' &nbsp;·&nbsp; ');
+}
+
+SCENES.forEach(sc=>{
+  const sec=document.createElement('div'); sec.className='scene';
+  sec.innerHTML=`<div class="scene-head"><span class="num">${sc.num}</span><span class="glyph">${sc.glyph}</span>
+    <span class="en">${sc.en}</span><span class="maps">${sc.maps}</span></div><div class="opts"></div>`;
+  const opts=sec.querySelector('.opts');
+  sc.opts.forEach(o=>{
+    const L=LENS[o.n];
+    const card=document.createElement('div'); card.className='card '+L.c;
+    card.innerHTML=`
+      <div class="lenstag"><span class="g">${L.g}</span><span class="e">${L.e}</span></div>
+      <div class="desc">${o.desc}</div>
+      <div class="inst">${o.inst.map(i=>`<span>${i}</span>`).join('')}</div>
+      <div class="player"><button class="pbtn">${PLAY}</button>
+        <div class="ptrack"><div class="pseek"><div class="fill"></div></div>
+        <div class="ptime"><span class="cur">0:00</span><span class="dur">--:--</span></div></div></div>
+      <button class="pick">選它 (${L.g.split(' ')[1]})</button>`;
+    const audio=new Audio('assets/audio/bgm/'+sc.key+'-'+o.n+'.mp3'); audio.preload='metadata'; audio.loop=doLoop;
+    const btn=card.querySelector('.pbtn'), fill=card.querySelector('.fill'), seek=card.querySelector('.pseek'),
+          cur=card.querySelector('.cur'), dur=card.querySelector('.dur'), pickBtn=card.querySelector('.pick');
+    audio.addEventListener('loadedmetadata',()=>dur.textContent=fmt(audio.duration));
+    audio.addEventListener('timeupdate',()=>{fill.style.width=(audio.currentTime/audio.duration*100||0)+'%';cur.textContent=fmt(audio.currentTime);});
+    audio.addEventListener('ended',()=>{if(!audio.loop){btn.innerHTML=PLAY;btn.classList.remove('on');card.classList.remove('playing');}});
+    btn.addEventListener('click',()=>{
+      if(audio.paused){ audios.forEach(a=>{if(a.audio!==audio){a.audio.pause();a.reset();}});
+        audio.play();btn.innerHTML=PAUSE;btn.classList.add('on');card.classList.add('playing');
+        nowEl.innerHTML='▶ <b>'+sc.glyph+' · '+L.g+'</b>';
+      } else { audio.pause();btn.innerHTML=PLAY;btn.classList.remove('on');card.classList.remove('playing');nowEl.textContent='— 已暫停 —'; }
+    });
+    seek.addEventListener('click',e=>{const r=seek.getBoundingClientRect();audio.currentTime=(e.clientX-r.left)/r.width*audio.duration;});
+    pickBtn.addEventListener('click',()=>{
+      opts.querySelectorAll('.card').forEach(c=>c.classList.remove('picked'));
+      if(picks[sc.key]===o.n){ delete picks[sc.key]; }
+      else { picks[sc.key]=o.n; card.classList.add('picked'); }
+      renderPicks();
+    });
+    audios.push({audio,reset:()=>{btn.innerHTML=PLAY;btn.classList.remove('on');card.classList.remove('playing');}});
+    opts.appendChild(card);
+  });
+  scenesEl.appendChild(sec);
+});
+loopTog.addEventListener('click',()=>{doLoop=!doLoop;loopTog.classList.toggle('on',doLoop);audios.forEach(a=>a.audio.loop=doLoop);});
+renderPicks();
+</script>
+</body>
+</html>

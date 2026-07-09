@@ -226,11 +226,14 @@ const UI = {
         ctx.fillRect(px + shakeX, 10, 88, 88);
         if (selArt) {
           ctx.save();
+          ctx.filter = 'brightness(1.2) saturate(1.08)'; // HUD 头像提亮, 比选人页更醒目
           ctx.beginPath(); ctx.rect(px + 2 + shakeX, 12, 84, 84); ctx.clip();
           ctx.drawImage(selArt, px + shakeX + HC.x, 10 + HC.y, HC.w, HC.w * 344 / 320);
           ctx.restore();
         } else {
+          ctx.save(); ctx.filter = 'brightness(1.2) saturate(1.08)';
           ctx.drawImage(face, px + 2 + shakeX, 12, 84, 84);
+          ctx.restore();
         }
         ctx.save();
         if (mir) {
@@ -712,24 +715,29 @@ const UI = {
     // drifting embers instead of floating idle sprites (they had no ground to
     // stand on over the gate backdrop and read as pasted-in)
     if (!this._embers) {
-      this._embers = Array.from({ length: 16 }, () => ({
+      this._embers = Array.from({ length: 22 }, () => ({
         x: Math.random() * 1024, y: Math.random() * 576,
-        s: 1 + Math.random() * 2, v: 0.25 + Math.random() * 0.5, ph: Math.random() * 6.28,
+        s: 1 + Math.random() * 2.3, v: 0.25 + Math.random() * 0.5, ph: Math.random() * 6.28,
       }));
     }
     for (const e of this._embers) {
       const ex = e.x + Math.sin(G.tick * 0.008 + e.ph) * 34;
       let ey = (e.y - G.tick * e.v) % 576;
       if (ey < 0) ey += 576;
-      ctx.globalAlpha = 0.28 + 0.24 * Math.sin(G.tick * 0.05 + e.ph);
+      ctx.globalAlpha = 0.42 + 0.26 * Math.sin(G.tick * 0.05 + e.ph);
       ctx.fillStyle = e.s > 2 ? '#ffc531' : '#d9a441';
       ctx.fillRect(ex, ey, e.s, e.s);
     }
     ctx.globalAlpha = 1;
 
+    // press-any-key 起始页: 未开始时 Logo 居中偏下, 首键后随 intro 上升到标题位; 菜单同步淡入
+    const _ip = G.titleStarted ? Math.min(1, (G.titleIntro || 0) / 30) : 0;
+    const _ease = 1 - Math.pow(1 - _ip, 3); // easeOutCubic
+    const logoDY = (1 - _ease) * 105;
+    const menuA = G.titleStarted ? Math.max(0, Math.min(1, (_ip - 0.4) / 0.6)) : 0;
     ctx.save();
     const bob = Math.sin(G.tick * 0.04) * 4;
-    ctx.translate(0, bob);
+    ctx.translate(0, bob + logoDY);
     if (V.te && this.ua.temblem) {
       // title-design preview (?te=...): alt emblem + placeholder name 刀魂;
       // pos = per-kanji [x-frac of W, y-frac of H (char center)]
@@ -786,6 +794,17 @@ const UI = {
     }
     ctx.restore();
 
+    // 起始页: 未开始时用脉动的 PRESS ANY KEY 占位(菜单尚未出现)
+    if (!G.titleStarted) {
+      const pulse = 0.5 + 0.5 * Math.abs(Math.sin(G.tick * 0.055));
+      ctx.save(); ctx.globalAlpha = pulse;
+      this.pixText(ctx, 'PRESS ANY KEY', 512, 515, { size: 20, align: 'center', color: '#ffe27a', outline: true, spacing: 4 });
+      this.pixText(ctx, '何かキーを押して', 512, 543, { size: 13, align: 'center', color: '#d9a441' });
+      ctx.restore();
+      return;
+    }
+    ctx.save(); ctx.globalAlpha = menuA; // 菜单随 intro 淡入
+
     // menu: lacquered wood boards with a folding-fan cursor
     // bilingual menu per language policy: EN primary + JP kanji accent
     const items = [['BATTLE', '決闘'], ['TRAINING', '修行'], ['HOW TO PLAY', '心得']];
@@ -832,6 +851,7 @@ const UI = {
     });
 
     this.pixText(ctx, 'W/S SELECT · J OK · M MUTE', 512, 520, { size: 12, align: 'center', color: '#5d6784' });
+    ctx.restore(); // 结束菜单淡入 alpha
   },
 
   // ---- controls / tutorial ------------------------------------------------------
@@ -878,21 +898,14 @@ const UI = {
       rx += 74;
     });
 
-    // combo branch callout
+    // combo + guard essentials (Eric: 原来 4 行太多太乱 → 精简成 2 行, 只留核心)
     ctx.fillStyle = 'rgba(217,164,65,0.1)';
-    ctx.fillRect(100, 356, 824, 30);
-    this.pixText(ctx, 'ENDERS AFTER J-J-K → K KNOCKDOWN · U HAYATO ONLY · I SUPER (MAX 気)', 512, 376, {
+    ctx.fillRect(100, 362, 824, 32);
+    this.pixText(ctx, 'J-J-K-K CHAIN · 2ND K = KNOCKDOWN · 3+ HITS = x1.3 · U KENJI ONLY', 512, 383, {
       size: 13, align: 'center', color: '#d9a441', maxW: 800,
     });
-    this.pixText(ctx, 'CHAIN 3+ HITS = BONUS x1.3 · KENJI\'S U IS A ZONING SHURIKEN, NOT A COMBO PIECE', 512, 408, {
-      size: 11, align: 'center', color: '#9a8f78', maxW: 800,
-    });
-
-    this.pixText(ctx, 'GUARD = HOLD AWAY AT IMPACT · NOT WHILE ATTACKING / JUMPING / DASHING', 512, 442, {
-      size: 11, align: 'center', color: '#ff9c3d', maxW: 820,
-    });
-    this.pixText(ctx, 'FULL GAUGE = GUARD CRUSH · HITS & GUARDS BUILD 気 · CHIP NEVER KILLS', 512, 464, {
-      size: 11, align: 'center', color: '#8892ad', maxW: 820,
+    this.pixText(ctx, 'GUARD = HOLD AWAY AT IMPACT · FILL GAUGE → GUARD CRUSH', 512, 428, {
+      size: 12, align: 'center', color: '#ff9c3d', maxW: 820,
     });
 
     this.pixText(ctx, asOverlay ? 'J / K  BACK' : 'J  BACK TO TITLE · M MUTE · H HIDE HINTS', 512, 522, {
@@ -931,9 +944,9 @@ const UI = {
       ctx.restore();
       // matched busts instead of tiny floor-less idle sprites
       this.drawBust(ctx, s.p1, 118 - off, 158, 264, 232, false, 1);
-      this.drawBust(ctx, s.p2, 642 + off, 158, 264, 232, false, 1);
+      this.drawBust(ctx, s.p2, 686 + off, 158, 264, 232, false, 1); // 右立绘再外移, 加大与徽章间距
       this.pixText(ctx, `${DATA[s.p1].name} · ${DATA[s.p1].cn}`, 250 - off, 480, { size: 20, align: 'center', color: DATA[s.p1].theme, outline: true });
-      this.pixText(ctx, `${DATA[s.p2].name} · ${DATA[s.p2].cn}`, 774 + off, 480, { size: 20, align: 'center', color: DATA[s.p2].theme, outline: true });
+      this.pixText(ctx, `${DATA[s.p2].name} · ${DATA[s.p2].cn}`, 818 + off, 480, { size: 20, align: 'center', color: DATA[s.p2].theme, outline: true });
       const vsScale = 1 + Math.max(0, 12 - t) * 0.3;
       const VE = this.ua.vs;
       ctx.save(); ctx.translate(512, 290); ctx.scale(vsScale, vsScale);
@@ -1006,7 +1019,13 @@ const UI = {
       const plateY = 376, plateCy = plateY + plateH / 2;
       if (NP) ctx.drawImage(NP.cv, x + 50, plateY, plateW, plateH);
       // name + TYPE centered in the plate's clear span (knot left, tip right)
-      this.pixText(ctx, `${c.name} · ${c.cn}`, x + 170, plateCy - 2, { size: 15, align: 'center', color: hovered || chosen ? c.theme : '#c9bfa8', outline: true, maxW: 148 });
+      // 名: EN + · + 汉字 分段绘制, 都 baseline:middle 居中不贴边; 汉字比拉丁下沉→上抬 2px 对齐
+      const nmCol = hovered || chosen ? c.theme : '#c9bfa8';
+      const w1 = this.textW(ctx, c.name, 14), wd = this.textW(ctx, '·', 14), w2 = this.textW(ctx, c.cn, 14);
+      const gp = 7, totW = w1 + gp + wd + gp + w2, sx = x + 170 - totW / 2, ny = plateCy - 6;
+      this.pixText(ctx, c.name, sx, ny, { size: 14, baseline: 'middle', color: nmCol, outline: true });
+      this.pixText(ctx, '·', sx + w1 + gp, ny - 1, { size: 14, baseline: 'middle', color: nmCol });
+      this.pixText(ctx, c.cn, sx + w1 + gp + wd + gp, ny - 2, { size: 14, baseline: 'middle', color: nmCol, outline: true });
       this.pixText(ctx, `${c.type} TYPE`, x + 170, plateCy + 16, { size: 9, align: 'center', color: '#9a8f78', spacing: 2, maxW: 140 });
       if (hovered && G.tick % 30 < 20) {
         this.pixText(ctx, '▼', x + 160, 80, { size: 16, align: 'center', color: '#ffc531' });
@@ -1073,7 +1092,7 @@ const UI = {
     this.pixText(ctx, playerWon ? 'VICTORY' : 'DEFEAT', 512, 133, { // 114 + 0.42em
       size: 46, align: 'center', color: playerWon ? '#ffc531' : '#f4ead6', outline: true, shadow: 6, spacing: 6,
     });
-    this.pixText(ctx, playerWon ? '勝利' : '敗北', 512, RB ? 176 : 172, { size: 22, align: 'center', color: '#f4f1e8', outline: true });
+    this.pixText(ctx, playerWon ? '勝利' : '敗北', 512, RB ? 194 : 172, { size: 22, align: 'center', color: '#f4f1e8', outline: true }); // 下移 176->194: 不压顶部彩带下边框(Eric)
 
     // victory quotes in Japanese-flavored English (UI-layer table; data.js untouched)
     const QUOTES_EN = {
@@ -1089,7 +1108,7 @@ const UI = {
       size: 13, align: 'center', color: '#dfe4f2', maxW: qw - 44,
     });
 
-    this.pixText(ctx, `MAX COMBO: ${G.stats.maxCombo} ${G.stats.maxCombo === 1 ? 'HIT' : 'HITS'}`, 512, RB ? 204 : 218, { size: 13, align: 'center', color: '#9aa3bd' });
+    this.pixText(ctx, `MAX COMBO: ${G.stats.maxCombo} ${G.stats.maxCombo === 1 ? 'HIT' : 'HITS'}`, 512, RB ? 220 : 218, { size: 13, align: 'center', color: '#9aa3bd' });
 
     this.pixText(ctx, 'J REMATCH · K CHARACTER · ESC TITLE', 512, 530, {
       size: 14, align: 'center', color: G.tick % 40 < 25 ? '#ffe27a' : '#8892ad',

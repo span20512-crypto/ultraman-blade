@@ -109,7 +109,9 @@ class Fighter {
     });
     if (d.dive) {
       if (!m.landed) return m.t >= d.startup ? rel(-25, 75, -115, 15) : null;
-      return m.t <= m.landedT + d.slamActive ? rel(-d.slamRange, d.slamRange, -80, 5) : null;
+      if (m.t > m.landedT + d.slamActive) return null;
+      return d.box ? rel(d.box.x1, d.box.x2, d.box.y1, d.box.y2)                 // 方向性 box
+                   : rel(-(d.slamRange || 110), d.slamRange || 110, -80, 5);      // 兜底: 无 box 退回对称 slamRange, 永不崩
     }
     if (!d.box) return null;
     if (m.t < d.startup || m.t >= d.startup + d.active) return null;
@@ -334,7 +336,7 @@ class Fighter {
 
   dashLogic() {
     this.dashT++;
-    this.vx = this.dashDir * 9;
+    this.vx = this.dashDir * (this.c.dashVx || 9);
     if (this.dashT % 3 === 0) Effects.ghost(this.spriteParams());
     const p = this.pad;
     // dash-jump: leap carrying dash momentum
@@ -352,7 +354,7 @@ class Fighter {
 
   backdashLogic() {
     this.dashT++;
-    this.vx = this.dashDir * 7.5;
+    this.vx = this.dashDir * (this.c.backdashVx || 7.5);
     if (this.dashT % 3 === 0) Effects.ghost(this.spriteParams());
     if (this.pad.jump) return this.doJump(this.dashDir * 6); // hop-back
     if (this.dashT >= 17) { this.state = 'idle'; this.vx = 0; }
@@ -747,7 +749,7 @@ class Fighter {
             this.world.hitstop(5); this.world.shake(4, 5);
             AudioSys.sfx('hitH');
           } else {
-            AudioSys.sfx('whooshH');                 // 第三回合: 纯声势对穿
+            AudioSys.sfx('hitH');                    // 第三回合: 补命中音(Eric: 三次冲撞应有三次音效); 仍不结算伤害=纯声势对穿
           }
         }
       }
@@ -866,13 +868,13 @@ class Fighter {
       this.facing = attacker.x >= this.x ? 1 : -1;
       this.state = 'block';
       this.lastBlockT = this.world.tick;
-      this.guard += info.guardDmg || 8;
+      this.guard += (info.guardDmg || 8) * 1.45; // 破防积累: 1.0(太难)->1.6(偏易)->1.45(Eric 微调到中间)
       if (this.guard >= 100) return this.guardCrush(dir);
       const chip = info.chip || 0;
       if (chip > 0) { this.hp = Math.max(1, this.hp - chip); this.lastHurt = this.world.tick; } // chip never KOs
       this.blockstun = info.blockstun || 10;
       this.vx = dir * Math.max(3, (info.knock || 4) * 0.6);
-      attacker.vx = -dir * 2;
+      attacker.vx = -dir * Math.min(5, 3 + (info.knock || 4) * 0.35); // 攻方被结界弹回的阻尼
       this.gainMeter(3);
       attacker.gainMeter(4);
       AudioSys.sfx('block');

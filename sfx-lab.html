@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 SOUL FIST · SFX 纯听音</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@font-face { font-family:'PressStart'; src:url('assets/fonts/PressStart2P.ttf') format('truetype'); font-display:block; }
+@font-face { font-family:'FusionPixelJA'; src:url('assets/fonts/FusionPixel-ja.woff2') format('woff2'); font-display:block; }
+@font-face { font-family:'FusionPixel'; src:url('assets/fonts/FusionPixel-zh.woff2') format('woff2'); font-display:block; }
+:root{--bg:#07080c;--bg2:#0b0d12;--panel:#10131b;--panel2:#151925;--ink:#e8e3d8;--dim:#8a8778;--faint:#5a5850;
+  --crimson:#b00020;--crimson-lite:#e23a52;--gold:#d9b26a;--jade:#6fae8f;--line:#242836;}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'FusionPixel','FusionPixelJA',system-ui,sans-serif;-webkit-font-smoothing:none;image-rendering:pixelated;}
+body{background:radial-gradient(1100px 460px at 50% -10%,rgba(176,0,32,.12),transparent 60%),radial-gradient(800px 640px at 100% 100%,rgba(30,40,70,.15),transparent 55%),var(--bg);min-height:100vh;padding:0 0 80px;}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:99;background:repeating-linear-gradient(0deg,rgba(0,0,0,.1) 0 1px,transparent 1px 3px);mix-blend-mode:multiply;opacity:.5;}
+.wrap{max-width:920px;margin:0 auto;padding:0 22px;}
+header{padding:44px 0 14px;text-align:center;position:relative;}
+.kanji-bg{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:'FusionPixelJA';font-size:180px;line-height:1;color:rgba(176,0,32,.06);z-index:0;pointer-events:none;user-select:none;}
+.h-inner{position:relative;z-index:1;}
+h1{font-family:'PressStart';font-size:21px;letter-spacing:2px;margin:0;color:var(--ink);text-shadow:0 2px 0 #000,0 0 22px rgba(176,0,32,.4);}
+h1 .ja{font-family:'FusionPixelJA';color:var(--crimson-lite);margin-right:12px;font-size:25px;}
+.sub{margin:13px auto 0;max-width:660px;color:var(--dim);font-size:13px;line-height:1.75;}
+.sub b{color:var(--gold);}
+.gate{margin:18px auto 0;display:inline-block;font-size:12px;color:var(--faint);}
+.gate.on{color:var(--jade);}
+.sec{margin:30px 0 0;}
+.sec-h{display:flex;align-items:baseline;gap:12px;margin:0 0 6px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+.sec-h .g{font-family:'FusionPixelJA';font-size:20px;color:var(--crimson-lite);}
+.sec-h .e{font-family:'PressStart';font-size:10px;color:var(--ink);letter-spacing:1px;}
+.sec-note{font-size:12px;color:var(--gold);background:rgba(217,178,106,.06);border-left:2px solid var(--gold);padding:7px 11px;border-radius:0 6px 6px 0;margin:8px 0;line-height:1.6;}
+.combos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;margin-top:14px;}
+@media(max-width:720px){.combos{grid-template-columns:1fr;}}
+.card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:12px;padding:16px 15px 14px;display:flex;flex-direction:column;gap:10px;transition:.16s;}
+.card.picked{box-shadow:0 0 0 1px rgba(127,208,160,.45),0 8px 22px rgba(0,0,0,.4);border-color:#7fd0a0;}
+.card .cn{font-family:'FusionPixelJA';font-size:19px;color:var(--ink);}
+.card .cn .en{font-family:'PressStart';font-size:8px;color:var(--faint);margin-left:7px;letter-spacing:1px;}
+.card .cd{font-size:11.5px;color:var(--dim);line-height:1.6;min-height:58px;}
+.row{display:flex;gap:9px;}
+.hb{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:linear-gradient(180deg,#1b202c,#0c0e15);cursor:pointer;border-radius:8px;padding:11px 0;font-family:'FusionPixelJA';font-size:14px;color:var(--ink);transition:.13s;}
+.hb:hover{border-color:var(--crimson);color:var(--crimson-lite);}
+.hb:active{transform:scale(.97);background:linear-gradient(180deg,#3a0e18,#14060a);}
+.hb .k{font-family:'PressStart';font-size:8px;color:var(--faint);}
+.hb.light:hover{border-color:#9fbfe0;color:#bcd8f0;}
+.hb.heavy:hover{border-color:#e0a99f;color:#f0c4bc;}
+.pick{width:100%;border:1px solid var(--line);background:var(--panel2);color:var(--dim);cursor:pointer;border-radius:7px;padding:7px 0;font-family:'FusionPixelJA';font-size:13px;transition:.14s;}
+.pick:hover{border-color:#7fd0a0;color:#9fc7ab;}
+.card.picked .pick{background:rgba(127,208,160,.16);border-color:#7fd0a0;color:#bfeccf;}
+.card.picked .pick::before{content:'✓ 已选 ';}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;}
+.sb{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid var(--line);background:linear-gradient(180deg,#151925,#0c0e15);cursor:pointer;border-radius:10px;padding:13px 18px;min-width:96px;transition:.13s;}
+.sb:hover{border-color:var(--crimson);}
+.sb:active{transform:scale(.97);}
+.sb .bn{font-family:'FusionPixelJA';font-size:15px;color:var(--ink);}
+.sb .be{font-family:'PressStart';font-size:7px;color:var(--faint);letter-spacing:.5px;}
+.sb.big{background:linear-gradient(180deg,#241019,#12060a);border-color:rgba(226,58,82,.4);}
+.sb.big .bn{color:var(--crimson-lite);}
+.now{margin-top:16px;text-align:center;font-size:12px;color:var(--faint);}.now b{color:var(--gold);}
+footer{max-width:920px;margin:22px auto 0;padding:18px;color:var(--faint);font-size:11.5px;line-height:1.7;border-top:1px solid var(--line);text-align:center;}
+</style>
+</head>
+<body>
+<header>
+  <div class="kanji-bg">響</div>
+  <div class="h-inner">
+    <h1><span class="ja">響</span>SOUL FIST · SFX</h1>
+    <p class="sub">纯听音审阅 — 每个按钮 = 一个合成音效,点即听(不带动作)。重点:<b>轻/重击 3 个组合</b>方案 A/B/C,<br>还有<b>大幅加强的格挡</b>(兵刃碰撞)。选好轻重组合按 ♥。</p>
+    <div class="gate" id="gate">① 先点一下页面任意处解锁声音</div>
+  </div>
+</header>
+<div class="wrap">
+
+  <div class="sec">
+    <div class="sec-h"><span class="g">打撃</span><span class="e">LIGHT / HEAVY 组合 (关键)</span></div>
+    <div class="sec-note">轻击是按最多的键、决定整体打击感 —— 这三个组合都<b>大幅强化了轻击</b>(加实体低频+脆瞬态),区别在轻击的猛度与轻/重差距。每个组合点「轻击」「重击」连着听,判断平衡。</div>
+    <div class="combos" id="combos"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="g">受け</span><span class="e">BLOCK 格挡 (3 备选)</span></div>
+    <div class="sec-note">三个都明确表达"格挡/兵刃相接",质感差异化:<b>刃鸣</b>=明亮金属对击 · <b>盾震</b>=低沉厚实闷响 · <b>結界</b>=金属+结晶余鸣(呼应朱印結界)。点听,告诉我编号。</div>
+    <div class="btns" id="blocks"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="g">其他</span><span class="e">OTHER UPGRADED 参考</span></div>
+    <div class="sec-note">顺带升级的其它音(层叠+去糊),可听可不管。</div>
+    <div class="btns" id="others"></div>
+  </div>
+
+  <div class="now" id="now">— 未播放 —</div>
+  <footer id="pickline">轻/重击组合:尚未选择。选一个 ♥,告诉我 A/B/C 即可;格挡也听下够不够响。</footer>
+</div>
+<script src="js/audio.js"></script>
+<script>
+const gate=document.getElementById('gate'), now=document.getElementById('now'), pickLine=document.getElementById('pickline');
+let unlocked=false;
+function unlock(){ if(unlocked)return; try{AudioSys.ensure();unlocked=true;gate.textContent='✓ 声音已解锁';gate.classList.add('on');}catch(e){} }
+window.addEventListener('pointerdown',unlock); window.addEventListener('keydown',unlock);
+function fire(variant,name,label){ unlock(); try{ if(variant)AudioSys.setVariant(variant); AudioSys.sfx(name);}catch(e){} now.innerHTML='▶ <b>'+label+'</b>'; }
+
+const COMBOS=[
+  {v:'A', name:'厚重', en:'HEAVY-BODY', desc:'轻击加了实体低频 + 脆瞬态(比原来强很多),重击很闷有肉。轻/重差距明显、层次分明。'},
+  {v:'B', name:'猛',   en:'FIERCE',     desc:'轻击更冲更响,重击更巨(多一层 sub 低频)。整体更大声更狠,差距保持。想要最强打击感选这个。'},
+  {v:'C', name:'均衡', en:'BALANCED',   desc:'轻、重接近,都扎实,差距小 —— 轻击几乎和重击一样有肉。连打时听感最统一。'},
+];
+const combosEl=document.getElementById('combos'); let picked=null;
+COMBOS.forEach(c=>{
+  const card=document.createElement('div'); card.className='card';
+  card.innerHTML=`<div class="cn">${c.name}<span class="en">${c.en} · ${c.v}</span></div>
+    <div class="cd">${c.desc}</div>
+    <div class="row">
+      <div class="hb light" data-v="${c.v}" data-n="hitL"><span>轻击</span><span class="k">J</span></div>
+      <div class="hb heavy" data-v="${c.v}" data-n="hitH"><span>重击</span><span class="k">K</span></div>
+    </div>
+    <button class="pick">选它 (组合 ${c.v} ${c.name})</button>`;
+  card.querySelector('.hb.light').addEventListener('click',()=>fire(c.v,'hitL','组合'+c.v+' · 轻击'));
+  card.querySelector('.hb.heavy').addEventListener('click',()=>fire(c.v,'hitH','组合'+c.v+' · 重击'));
+  card.querySelector('.pick').addEventListener('click',()=>{
+    combosEl.querySelectorAll('.card').forEach(x=>x.classList.remove('picked'));
+    if(picked===c.v){picked=null;pickLine.textContent='轻/重击组合:尚未选择。选一个 ♥,告诉我 A/B/C 即可。';}
+    else{picked=c.v;card.classList.add('picked');pickLine.innerHTML='已选轻/重击组合 <b style="color:#7fd0a0">'+c.v+' · '+c.name+'</b> — 告诉我这个字母我就设为默认。';}
+  });
+  combosEl.appendChild(card);
+});
+
+const BLOCKS=[[1,'刃鸣','CLASH'],[2,'盾震','GUARD'],[3,'結界','WARD']];
+const blocksEl=document.getElementById('blocks');
+BLOCKS.forEach(([n,zh,en])=>{
+  const b=document.createElement('div'); b.className='sb big';
+  b.innerHTML='<span class="bn">▶ '+zh+'</span><span class="be">'+en+' · '+n+'</span>';
+  b.addEventListener('click',()=>{ unlock(); try{AudioSys.setBlockVariant(n);AudioSys.sfx('block');}catch(e){} now.innerHTML='▶ <b>格挡 · '+zh+'</b>'; });
+  blocksEl.appendChild(b);
+});
+
+const OTHERS=[['whooshL','轻挥','SWING L'],['whooshH','重挥','SWING H'],['jump','跳跃','JUMP'],['land','落地','LAND'],['dash','冲刺','DASH'],['crush','破防','CRUSH'],['slam','击倒','SLAM'],['ko','KO','KO']];
+const othersEl=document.getElementById('others');
+OTHERS.forEach(([n,zh,en])=>{
+  const b=document.createElement('div'); b.className='sb';
+  b.innerHTML='<span class="bn">▶ '+zh+'</span><span class="be">'+en+'</span>';
+  b.addEventListener('click',()=>fire(null,n,zh)); othersEl.appendChild(b);
+});
+</script>
+</body>
+</html>

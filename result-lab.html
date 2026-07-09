@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>拳魂 SOUL FIST · 結算曲 RESULT</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@font-face { font-family:'PressStart'; src:url('assets/fonts/PressStart2P.ttf') format('truetype'); font-display:block; }
+@font-face { font-family:'FusionPixelJA'; src:url('assets/fonts/FusionPixel-ja.woff2') format('woff2'); font-display:block; }
+@font-face { font-family:'FusionPixel'; src:url('assets/fonts/FusionPixel-zh.woff2') format('woff2'); font-display:block; }
+:root{--bg:#07080c;--bg2:#0b0d12;--panel:#10131b;--panel2:#151925;--ink:#e8e3d8;--dim:#8a8778;--faint:#5a5850;
+  --crimson:#b00020;--crimson-lite:#e23a52;--gold:#d9b26a;--jade:#6fae8f;--line:#242836;}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'FusionPixel','FusionPixelJA',system-ui,sans-serif;-webkit-font-smoothing:none;image-rendering:pixelated;}
+body{background:radial-gradient(1100px 460px at 50% -10%,rgba(176,0,32,.12),transparent 60%),
+  radial-gradient(800px 640px at 100% 100%,rgba(30,40,70,.15),transparent 55%),var(--bg);min-height:100vh;padding:0 0 80px;}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:99;background:repeating-linear-gradient(0deg,rgba(0,0,0,.1) 0 1px,transparent 1px 3px);mix-blend-mode:multiply;opacity:.5;}
+.wrap{max-width:900px;margin:0 auto;padding:0 22px;}
+header{padding:46px 0 18px;text-align:center;position:relative;}
+.kanji-bg{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:'FusionPixelJA';font-size:190px;line-height:1;color:rgba(176,0,32,.06);z-index:0;pointer-events:none;user-select:none;}
+.h-inner{position:relative;z-index:1;}
+h1{font-family:'PressStart';font-size:22px;letter-spacing:2px;margin:0;color:var(--ink);text-shadow:0 2px 0 #000,0 0 22px rgba(176,0,32,.4);}
+h1 .ja{font-family:'FusionPixelJA';color:var(--crimson-lite);margin-right:12px;font-size:26px;}
+.sub{margin:14px auto 0;max-width:640px;color:var(--dim);font-size:13.5px;line-height:1.8;}
+.sub b{color:var(--gold);}
+.bar{position:sticky;top:0;z-index:50;margin:22px auto 30px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;
+  background:linear-gradient(180deg,rgba(11,13,18,.97),rgba(11,13,18,.88));border:1px solid var(--line);border-radius:10px;padding:11px 20px;backdrop-filter:blur(6px);box-shadow:0 8px 30px rgba(0,0,0,.5);}
+.bar .lbl{font-family:'PressStart';font-size:9px;color:var(--faint);letter-spacing:1px;}
+.toggle{display:inline-flex;align-items:center;gap:9px;cursor:pointer;user-select:none;font-size:13px;color:var(--dim);}
+.toggle .sw{width:40px;height:20px;border-radius:11px;background:#2a2030;border:1px solid var(--line);position:relative;transition:.16s;}
+.toggle .sw::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--faint);transition:.16s;}
+.toggle.on .sw{background:rgba(176,0,32,.4);border-color:var(--crimson);}
+.toggle.on .sw::after{left:22px;background:var(--crimson-lite);box-shadow:0 0 8px var(--crimson-lite);}
+.toggle.on{color:var(--ink);}
+.now{font-size:12px;color:var(--faint);min-width:150px;text-align:right;}.now b{color:var(--gold);}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:640px){.opts{grid-template-columns:1fr;}}
+.card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:12px;padding:18px;position:relative;transition:.16s;}
+.card.playing{border-color:var(--crimson);box-shadow:0 0 0 1px rgba(226,58,82,.3),0 12px 30px rgba(176,0,32,.22);transform:translateY(-2px);}
+.card.picked{box-shadow:0 0 0 1px rgba(127,208,160,.4),0 8px 24px rgba(0,0,0,.4);}
+.card .tag{font-family:'PressStart';font-size:9px;color:var(--faint);letter-spacing:1px;}
+.card .name{font-family:'FusionPixelJA';font-size:22px;color:var(--ink);margin:5px 0 2px;}
+.card .name .en{font-family:'PressStart';font-size:9px;color:var(--gold);margin-left:8px;letter-spacing:1px;}
+.card .desc{font-size:12.5px;color:var(--dim);line-height:1.7;min-height:66px;margin:8px 0 12px;}
+.card .inst{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px;}
+.card .inst span{font-size:11px;color:var(--jade);background:rgba(111,174,143,.09);border:1px solid rgba(111,174,143,.18);border-radius:20px;padding:2px 9px;}
+.player{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.pbtn{flex:none;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:radial-gradient(circle at 40% 35%,#1c2130,#0c0e15);color:var(--ink);cursor:pointer;display:grid;place-items:center;transition:.14s;}
+.pbtn:hover{border-color:var(--crimson);color:var(--crimson-lite);}
+.pbtn svg{width:18px;height:18px;fill:currentColor;}
+.pbtn.on{background:radial-gradient(circle at 40% 35%,#3a0e18,#14060a);border-color:var(--crimson);color:var(--crimson-lite);}
+.ptrack{flex:1;min-width:0;}
+.pseek{height:8px;border-radius:5px;background:#0a0c12;border:1px solid var(--line);position:relative;cursor:pointer;overflow:hidden;}
+.pseek .fill{position:absolute;top:0;left:0;bottom:0;width:0;background:linear-gradient(90deg,var(--crimson),var(--crimson-lite));}
+.ptime{display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--faint);font-family:'PressStart';}
+.pick{width:100%;border:1px solid var(--line);background:var(--panel2);color:var(--dim);cursor:pointer;border-radius:7px;padding:8px 0;font-family:'FusionPixelJA';font-size:14px;transition:.14s;}
+.pick:hover{border-color:#7fd0a0;color:#9fc7ab;}
+.card.picked .pick{background:rgba(127,208,160,.16);border-color:#7fd0a0;color:#bfeccf;}
+.card.picked .pick::before{content:'✓ ';}
+footer{max-width:900px;margin:22px auto 0;padding:20px;color:var(--faint);font-size:12px;line-height:1.7;border-top:1px solid var(--line);text-align:center;}
+</style>
+</head>
+<body>
+<header>
+  <div class="kanji-bg">静</div>
+  <div class="h-inner">
+    <h1><span class="ja">結</span>RESULT · 結算曲</h1>
+    <p class="sub">再做的 4 版结算曲 — 沿用你选中两首(<b>幽冷 / 幽玄</b>)的同一套冷暗乐器(低 drone·太鼓·气声尺八·三味线),只是<b>放慢、悠闲、平静</b>下来。整体一致性更高。点 ▶ 试听,选一个按 ♥。</p>
+  </div>
+</header>
+<div class="wrap">
+  <div class="bar">
+    <span class="lbl">RESULT</span>
+    <div class="toggle on" id="loopTog"><span class="sw"></span><span>循環 LOOP</span></div>
+    <div class="now" id="now">— 未播放 —</div>
+  </div>
+  <div class="opts" id="opts"></div>
+  <footer id="pickline">尚未选择 — 听完选一个,告诉我编号即可</footer>
+</div>
+<script>
+const PLAY='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>', PAUSE='<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+const OPTS=[
+  {n:1, name:'余韵', en:'LINGERING', desc:'低 drone + 气声尺八,最后一记远太鼓渐隐——决斗后的冷寂余韵。与选中两首同一冷暗世界,悠闲不催。', inst:['低 drone','气声尺八','远太鼓渐隐']},
+  {n:2, name:'静寂', en:'STILLNESS', desc:'低 drone 托着孤气声尺八,偶现一记警觉三味线,极简、冷、静。最悠闲平静的一版。', inst:['低 drone','孤尺八','三味线']},
+  {n:3, name:'幽暮', en:'DUSK', desc:'暮色降温:低 drone + 渐止的太鼓心跳 + 飘动尺八,幽暗沉静、含蓄哀愁,同战斗世界的收束。', inst:['低 drone','渐止太鼓','气声尺八']},
+  {n:4, name:'沉静', en:'COMPOSED', desc:'战斗世界的慢板:稀疏低太鼓 + 从容尺八 + 三味线,冷而不乱,武士处变不惊。与两首一致性最高。', inst:['稀疏低太鼓','尺八','三味线']},
+];
+const optsEl=document.getElementById('opts'), nowEl=document.getElementById('now'), pickLine=document.getElementById('pickline'), loopTog=document.getElementById('loopTog');
+let doLoop=true, picked=null; const audios=[];
+function fmt(t){if(!isFinite(t))return'0:00';const m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+String(s).padStart(2,'0');}
+OPTS.forEach(o=>{
+  const card=document.createElement('div'); card.className='card';
+  card.innerHTML=`<div class="tag">候选 ${o.n}</div>
+    <div class="name">${o.name}<span class="en">${o.en}</span></div>
+    <div class="desc">${o.desc}</div>
+    <div class="inst">${o.inst.map(i=>`<span>${i}</span>`).join('')}</div>
+    <div class="player"><button class="pbtn">${PLAY}</button>
+      <div class="ptrack"><div class="pseek"><div class="fill"></div></div>
+      <div class="ptime"><span class="cur">0:00</span><span class="dur">--:--</span></div></div></div>
+    <button class="pick">选它 (候${o.n} ${o.name})</button>`;
+  const audio=new Audio('assets/audio/bgm/result-'+o.n+'.mp3'); audio.preload='metadata'; audio.loop=doLoop;
+  const btn=card.querySelector('.pbtn'),fill=card.querySelector('.fill'),seek=card.querySelector('.pseek'),cur=card.querySelector('.cur'),dur=card.querySelector('.dur'),pickBtn=card.querySelector('.pick');
+  audio.addEventListener('loadedmetadata',()=>dur.textContent=fmt(audio.duration));
+  audio.addEventListener('timeupdate',()=>{fill.style.width=(audio.currentTime/audio.duration*100||0)+'%';cur.textContent=fmt(audio.currentTime);});
+  audio.addEventListener('ended',()=>{if(!audio.loop){btn.innerHTML=PLAY;btn.classList.remove('on');card.classList.remove('playing');}});
+  btn.addEventListener('click',()=>{
+    if(audio.paused){audios.forEach(a=>{if(a.audio!==audio){a.audio.pause();a.reset();}});
+      audio.play();btn.innerHTML=PAUSE;btn.classList.add('on');card.classList.add('playing');nowEl.innerHTML='▶ <b>'+o.name+'</b>';}
+    else{audio.pause();btn.innerHTML=PLAY;btn.classList.remove('on');card.classList.remove('playing');nowEl.textContent='— 已暂停 —';}
+  });
+  seek.addEventListener('click',e=>{const r=seek.getBoundingClientRect();audio.currentTime=(e.clientX-r.left)/r.width*audio.duration;});
+  pickBtn.addEventListener('click',()=>{
+    optsEl.querySelectorAll('.card').forEach(c=>c.classList.remove('picked'));
+    if(picked===o.n){picked=null;pickLine.textContent='尚未选择 — 听完选一个,告诉我编号即可';}
+    else{picked=o.n;card.classList.add('picked');pickLine.innerHTML='已选 <b style="color:#7fd0a0">候选 '+o.n+' · '+o.name+'</b> — 告诉我这个编号我就接进游戏';}
+  });
+  audios.push({audio,reset:()=>{btn.innerHTML=PLAY;btn.classList.remove('on');card.classList.remove('playing');}});
+  optsEl.appendChild(card);
+});
+loopTog.addEventListener('click',()=>{doLoop=!doLoop;loopTog.classList.toggle('on',doLoop);audios.forEach(a=>a.audio.loop=doLoop);});
+</script>
+</body>
+</html>

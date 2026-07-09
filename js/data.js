@@ -25,11 +25,11 @@ const CHAIN_RANK = { light: 1, heavy: 2, special: 3, super: 4 };
 const DATA = {
   mack: {
     id: 'mack',
-    name: 'HAYATO', cn: '隼人', title: '豪剣の侍', type: 'POWER',
+    name: 'KENJI', cn: '剣二', title: '豪剣の侍', type: 'POWER',
     theme: '#ff4a3d', theme2: '#ffc531',
     dir: 'assets/img/mack', native: 1, scale: 2.75,
     anchor: { x: 98, y: 122 },
-    walk: 3.3, jumpVy: -16,
+    walk: 3.0, jumpVy: -16, dashVx: 8, backdashVx: 6.5, // 平衡: 力量型 walk 3.3->3.0 + 冲刺9->8/后撤7.5->6.5 都放慢(Eric: 接近速度整体更慢); Hayato 走默认 9/7.5
     stats: { pow: 5, spd: 3, rng: 5 },
     quoteWin: '刀は、鞘に戻った。', quoteLose: '……見事だ。もう一度！',
     portrait: { x: 64, y: 40, w: 68, h: 68 },
@@ -52,7 +52,7 @@ const DATA = {
         seq: { w: [0, 1, 2, 3], i: 4, r: [5] },
         smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, edge: '#ffd24a', core: '#fff8e2' },
         fx: { x: 103, y: -101, r: 116, ry: 0.6, a0: 2.3, a1: -2.35, w: 13, life: 11, color: '#fff6d8', color2: '#ffd24a' },
-        dmg: 6, chip: 0, guardDmg: 11, box: { x1: 15, x2: 165, y1: -175, y2: -40 },
+        dmg: 6, chip: 0, guardDmg: 11, box: { x1: 15, x2: 208, y1: -175, y2: -40 },
         knock: 4.5, hitstun: 19, blockstun: 11, hitstop: 5, shake: 2,
         meterHit: 9, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -61,7 +61,7 @@ const DATA = {
         seq: { w: [3], i: 4, r: [5] },
         smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, edge: '#e8a83c', core: '#fff2c8' },
         fx: { x: 113, y: -142, r: 120, ry: 0.82, a0: 2.75, a1: 0.05, w: 12, life: 10, color: '#fff2c8', color2: '#e8a83c' },
-        dmg: 7, chip: 0, guardDmg: 11, box: { x1: 15, x2: 165, y1: -160, y2: -30 },
+        dmg: 7, chip: 0, guardDmg: 11, box: { x1: 15, x2: 208, y1: -160, y2: -30 },
         knock: 5, hitstun: 19, blockstun: 11, hitstop: 5, shake: 2,
         meterHit: 9, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -70,7 +70,7 @@ const DATA = {
         seq: { w: [0, 1, 2, 3], i: 4, r: [5, 0] },
         smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 3, dx: 6 }, edge: '#ffb32e', core: '#fff3cf' },
         fx: { x: 113, y: -142, r: 126, ry: 0.82, a0: 2.75, a1: 0.05, w: 20, life: 13, grow: 0.6, color: '#fff3cf', color2: '#ffc531' },
-        dmg: 11, chip: 2, guardDmg: 28, box: { x1: 15, x2: 180, y1: -185, y2: -35 },
+        dmg: 10, chip: 2, guardDmg: 28, box: { x1: 15, x2: 208, y1: -185, y2: -35 }, // 平衡: 11->10(Eric: 剑二伤害偏高)
         knock: 8, hitstun: 26, blockstun: 15, hitstop: 13, shake: 5,
         meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
       },
@@ -79,7 +79,7 @@ const DATA = {
         seq: { w: [2, 3], i: 4, r: [5, 0] }, dash: { from: 2, to: 10, vx: 6.5 },
         smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 4, dx: 8 }, edge: '#ff5a35', core: '#ffe27a' },
         fx: { x: 103, y: -101, r: 126, ry: 0.6, a0: 2.3, a1: -2.35, w: 22, life: 14, grow: 0.8, color: '#ffe27a', color2: '#ff4a3d' },
-        dmg: 12, chip: 2, guardDmg: 28, box: { x1: 15, x2: 180, y1: -190, y2: -35 },
+        dmg: 11, chip: 2, guardDmg: 28, box: { x1: 15, x2: 208, y1: -190, y2: -35 }, // 平衡: 12->11
         knock: 9, hitstun: 28, blockstun: 15, hitstop: 14, shake: 6,
         meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
       },
@@ -88,7 +88,7 @@ const DATA = {
         seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 2 }, r: [{ a: 'crouch', f: 0 }] },
         smear: { standalone: true, sheet: 'fx:ma2', phases: [{ f: 0, t: 4 }, { f: 1, t: 3 }], decay: 2, dy: 26, squashY: 0.8, edge: '#ffc531', core: '#fff2c8' },
         fx: { x: 100, y: -70, r: 110, ry: 0.42, a0: 2.75, a1: 0.05, w: 12, life: 10, color: '#fff2c8', color2: '#ffc531' },
-        dmg: 5, chip: 0, guardDmg: 10, box: { x1: 10, x2: 128, y1: -70, y2: -5 },
+        dmg: 5, chip: 0, guardDmg: 10, box: { x1: 10, x2: 208, y1: -70, y2: -5 },
         knock: 3.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -101,16 +101,16 @@ const DATA = {
         cullSmear: true,
         // 定版(Eric 拍板 A): 同刀微抬角(-7°), 第二刀收势略向上挑
         smear: { standalone: true, sheet: 'fx:ma2', phases: [{ f: 0, t: 4 }, { f: 1, t: 3 }], decay: 2, dy: 26, squashY: 0.8, rot: -0.12, edge: '#ffc531', core: '#fff2c8' },
-        dmg: 4, chip: 0, guardDmg: 10, box: { x1: 10, x2: 135, y1: -70, y2: -5 },
+        dmg: 4, chip: 0, guardDmg: 10, box: { x1: 10, x2: 208, y1: -70, y2: -5 },
         knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
       cheavy: { // 蹲升·月轮: 独立挑空技,不参与连锁 · smear 红金升弧(余波上飘)
         kind: 'heavy', noChain: true, anim: 'attack1', total: 34, startup: 10, active: 6, impact: 4,
         seq: { w: [{ a: 'crouch', f: 0 }], i: 4, r: [5] }, hop: -8,
-        smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 3, dy: -7 }, attach: true, edge: '#ff5a3d', core: '#ffe27a' },
+        smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 4, dx: 8 }, attach: true, edge: '#ff5a3d', core: '#ffe27a' },
         fx: { x: 103, y: -101, r: 120, ry: 0.6, a0: 2.3, a1: -2.35, w: 18, life: 14, rise: -1.2, color: '#ffe27a', color2: '#ff5a3d' },
-        dmg: 10, chip: 2, guardDmg: 22, box: { x1: 5, x2: 135, y1: -195, y2: -20 },
+        dmg: 9, chip: 2, guardDmg: 22, box: { x1: 5, x2: 208, y1: -195, y2: -20 }, // 平衡: 10->9
         // launch 此前未接线(receiveHit 只认默认 -7.5), 接线后 -10 ≈ 高度 35px→62px
         knock: 5, hitstun: 26, blockstun: 14, hitstop: 13, shake: 5, kd: true, launch: -10,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
@@ -119,37 +119,37 @@ const DATA = {
         kind: 'light', anim: 'attack1', total: 24, startup: 6, active: 8, impact: 4, air: true,
         smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, attach: true, edge: '#ffd24a', core: '#fff6d8' },
         fx: { x: 103, y: -101, r: 110, ry: 0.6, a0: 2.3, a1: -2.35, w: 13, life: 10, color: '#fff6d8', color2: '#ffd24a' },
-        dmg: 6, chip: 0, guardDmg: 12, box: { x1: 10, x2: 150, y1: -150, y2: 10 },
+        dmg: 6, chip: 0, guardDmg: 12, box: { x1: -1, x2: 155, y1: -182, y2: 10 },
         knock: 4, hitstun: 20, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 9, sfx: 'whooshL', hitSfx: 'hitL',
       },
       dive: {
         kind: 'heavy', name: '断地斬', anim: 'attack2', air: true, dive: true, impact: 4,
-        startup: 8, diveSpeed: 15, diveDrift: 4.5, recovery: 26, slamActive: 8, slamRange: 125,
+        startup: 8, diveSpeed: 15, diveDrift: 4.5, recovery: 26, slamActive: 8,
         smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 3, dx: 5 }, edge: '#ffb32e', core: '#fff3cf' },
-        dmg: 11, chip: 3, guardDmg: 32,
+        dmg: 10, chip: 3, guardDmg: 32, box: { x1: 17, x2: 220, y1: -126, y2: 10 }, // 落地砸判定(方向性, 朝前); 平衡: 11->10
         knock: 7, hitstun: 28, blockstun: 16, hitstop: 13, shake: 7, kd: true,
         meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
       },
       special: { // 突进残影 + 追身红月牙 · smear 红金刃风(attach 追身) + 命中冲击环/slowmo
         kind: 'special', name: '月牙·疾斬', anim: 'attack2', total: 44,
-        startup: 10, active: 10, impact: 4, cooldown: 110,
+        startup: 10, active: 10, impact: 4, cooldown: 195, // 平衡: 110->130->195(Eric: U 冷却 x1.5); 降低最强中距突进斩复用频率, 伤害不变
         smear: { phases: [{ f: 4, t: 6 }, { f: 5, t: 5 }], decay: 3, rim: 4, gale: 1.06, echo: { t: 4, dx: 10 }, attach: true, edge: '#ff4a3d', core: '#ffe27a' },
         fx: { x: 113, y: -142, r: 124, ry: 0.82, a0: 2.75, a1: 0.05, w: 20, life: 13, vx: 7, color: '#ffe27a', color2: '#d64533' },
-        dmg: 13, chip: 5, guardDmg: 46, box: { x1: 0, x2: 190, y1: -185, y2: -30 },
+        dmg: 11, chip: 5, guardDmg: 46, box: { x1: 0, x2: 208, y1: -152, y2: -9 }, // 平衡: 13->11(突进斩爆发偏高)
         // 突进斩命中要把人斩飞: knock 加重 + launch 抬高(接线后生效)
         knock: 16, hitstun: 30, blockstun: 18, hitstop: 16, shake: 7, kd: true, launch: -9,
-        dash: { from: 4, to: 20, vx: 8.5 },
+        dash: { from: 4, to: 20, vx: 6.25 },
         meterHit: 16, sfx: 'special', hitSfx: 'hitH',
       },
       super: { // 三幕: 聚气红光 -> 残影突进 -> 红金交替连斩·花瓣终结 (cine smear 在 runSuperSeq)
-        kind: 'super', name: '無月·連獄斬', anim: 'attack1', total: 58, cost: 100,
+        kind: 'super', name: '満開·連獄斬', anim: 'attack1', total: 58, cost: 100,
         startup: 8, active: 16, impact: 4, invuln: 16,
         smear: { phases: [{ f: 4, t: 6 }, { f: 5, t: 5 }], decay: 3, rim: 4, gale: 1.06, echo: { t: 4, dx: 12 }, attach: true, edge: '#ff4a3d', core: '#fff1c0' },
         fx: { x: 103, y: -101, r: 130, ry: 0.6, a0: 2.3, a1: -2.35, w: 22, life: 14, vx: 9, color: '#fff1c0', color2: '#ff4a3d' },
-        dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 175, y1: -190, y2: -25 },
+        dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 208, y1: -190, y2: -25 },
         knock: 4, hitstun: 24, blockstun: 24, hitstop: 8, shake: 6, kd: true,
-        dash: { from: 2, to: 22, vx: 12.5 },
+        dash: { from: 2, to: 22, vx: 8 },
         cine: { hits: 4, interval: 10, dmgPer: 5, final: 10 },
         meterHit: 0, sfx: 'special', hitSfx: 'hitH',
       },
@@ -158,7 +158,7 @@ const DATA = {
 
   kenji: {
     id: 'kenji',
-    name: 'KENJI', cn: '剣二', title: '疾影の忍', type: 'SPEED',
+    name: 'HAYATO', cn: '隼人', title: '疾影の忍', type: 'SPEED',
     theme: '#7d5bff', theme2: '#35e0d8',
     dir: 'assets/img/kenji', native: -1, scale: 2.75,
     anchor: { x: 100, y: 126 },
@@ -184,7 +184,7 @@ const DATA = {
         seq: { w: [0], i: 1, r: [2, 3] },
         smear: { phases: [{ f: 1, t: 3 }], decay: 1, edge: '#66e8dc', core: '#eafffd' },
         fx: { x: 110, y: -75, r: 110, ry: 0.61, a0: -2.3, a1: 2.3, w: 11, life: 9, color: '#eafffd', color2: '#66e8dc' },
-        dmg: 5, chip: 0, guardDmg: 10, box: { x1: 12, x2: 140, y1: -165, y2: -40 },
+        dmg: 5, chip: 0, guardDmg: 10, box: { x1: 12, x2: 192, y1: -165, y2: -40 },
         knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -192,7 +192,7 @@ const DATA = {
         kind: 'light', anim: 'attack1', total: 18, startup: 4, active: 5, impact: 1,
         seq: { w: [2], i: 3, r: [3] },
         smear: { standalone: true, sheet: 'fx:ka1', cullPrev: true, phases: [{ f: 0, t: 4 }], decay: 2, dy: -4, scale: 0.94, rot: -0.1, edge: '#35e0d8', core: '#ddfffa' },
-        dmg: 6, chip: 0, guardDmg: 10, box: { x1: 12, x2: 140, y1: -165, y2: -40 },
+        dmg: 6, chip: 0, guardDmg: 10, box: { x1: 12, x2: 192, y1: -165, y2: -40 },
         knock: 4.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -201,7 +201,7 @@ const DATA = {
         seq: { w: [2, 3], i: 1, r: [0, { a: 'crouchin', f: 0 }] }, // 评审③: 弓步->半起身桥接, 消除收招硬切
         smear: { phases: [{ f: 1, t: 4 }], decay: 2, echo: { t: 3, dy: 7 }, edge: '#7d5bff', core: '#efe8ff' },
         fx: { x: 118, y: -118, r: 118, ry: 0.75, a0: -2.5, a1: 2.5, w: 17, life: 12, color: '#efe8ff', color2: '#7d5bff' },
-        dmg: 9, chip: 2, guardDmg: 20, box: { x1: 12, x2: 155, y1: -175, y2: -35 },
+        dmg: 9, chip: 2, guardDmg: 20, box: { x1: 12, x2: 200, y1: -175, y2: -35 },
         knock: 7.5, hitstun: 24, blockstun: 14, hitstop: 10, shake: 4,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
@@ -210,7 +210,7 @@ const DATA = {
         seq: { w: [0], i: 3, r: [3] }, dash: { from: 2, to: 9, vx: 7 }, // 身体 f3 举刀, 随前突移动
         // F模式改(Eric: 重击第二下更有力): 同下劈月牙, 放大1.14+微转角, attach 随突进
         smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 5 }], decay: 2, dy: -14, scale: 1.14, rot: -0.12, edge: '#8f6fff', core: '#c8fff5' },
-        dmg: 10, chip: 2, guardDmg: 20, box: { x1: 12, x2: 155, y1: -180, y2: -35 },
+        dmg: 10, chip: 2, guardDmg: 20, box: { x1: 12, x2: 200, y1: -180, y2: -35 },
         knock: 8.5, hitstun: 26, blockstun: 14, hitstop: 11, shake: 5,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
@@ -219,7 +219,7 @@ const DATA = {
         // 起手举刀(f2 竖刀, Eric 定) → 落蹲横扫
         seq: { w: [2], i: { a: 'crouch', f: 3 }, r: [{ a: 'crouch', f: 0 }] },
         smear: { standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 2, dy: 30, squashY: 0.42, scale: 0.86, edge: '#5ce8da', core: '#eafffd' },
-        dmg: 4, chip: 0, guardDmg: 9, box: { x1: 10, x2: 128, y1: -62, y2: -5 },
+        dmg: 4, chip: 0, guardDmg: 9, box: { x1: 10, x2: 192, y1: -88, y2: -5 },
         knock: 3.5, hitstun: 16, blockstun: 9, hitstop: 4, shake: 2,
         meterHit: 7, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -228,16 +228,16 @@ const DATA = {
         seq: { w: [{ a: 'crouch', f: 0 }], i: { a: 'crouch', f: 3 }, r: [{ a: 'crouch', f: 0 }] },
         cullSmear: true,
         smear: { standalone: true, sheet: 'fx:ka1', phases: [{ f: 0, t: 4 }], decay: 2, dy: 24, squashY: 0.46, scale: 0.82, rot: -0.13, edge: '#35c8bc', core: '#d6fff8' },
-        dmg: 3, chip: 0, guardDmg: 9, box: { x1: 10, x2: 132, y1: -66, y2: -5 },
+        dmg: 3, chip: 0, guardDmg: 9, box: { x1: 10, x2: 192, y1: -88, y2: -5 },
         knock: 4, hitstun: 16, blockstun: 9, hitstop: 4, shake: 2,
         meterHit: 7, sfx: 'whooshL', hitSfx: 'hitL',
       },
       cheavy: { // 蹲撩·逆风: 独立挑空技,不参与连锁 · 青升弧
         kind: 'heavy', noChain: true, anim: 'attack2', total: 30, startup: 8, active: 5, impact: 1,
         seq: { w: [{ a: 'crouch', f: 0 }], i: 3, r: [3] }, hop: -7, // 身体 f3 举刀, 随小跳弹起
-        // 升斩=KK第二下同源月牙(Eric: 保持一致)但更夸张(1.28, 力道最大) + attach 随弹起
-        smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 6 }], decay: 2, dy: -18, scale: 1.28, rot: -0.18, edge: '#35e0d8', core: '#d6fff8' },
-        dmg: 9, chip: 2, guardDmg: 20, box: { x1: 5, x2: 125, y1: -190, y2: -20 },
+        // 升斩=KK第二下同源月牙(Eric: 保持一致), 只比 heavy2(1.14) 大一丢丢 + attach 随弹起
+        smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 6 }], decay: 2, dy: -18, scale: 1.16, rot: -0.18, edge: '#35e0d8', core: '#d6fff8' },
+        dmg: 9, chip: 2, guardDmg: 20, box: { x1: 5, x2: 205, y1: -190, y2: -20 },
         knock: 5, hitstun: 24, blockstun: 13, hitstop: 10, shake: 5, kd: true, launch: -12.5,
         meterHit: 11, sfx: 'whooshH', hitSfx: 'hitH',
       },
@@ -245,7 +245,7 @@ const DATA = {
         kind: 'light', anim: 'attack1', total: 20, startup: 5, active: 7, impact: 1, air: true,
         smear: { phases: [{ f: 1, t: 3 }], decay: 1, attach: true, edge: '#66e8dc', core: '#eafffd' },
         fx: { x: 110, y: -75, r: 104, ry: 0.61, a0: -2.3, a1: 2.3, w: 12, life: 9, color: '#eafffd', color2: '#66e8dc' },
-        dmg: 5, chip: 0, guardDmg: 11, box: { x1: 8, x2: 130, y1: -140, y2: 10 },
+        dmg: 5, chip: 0, guardDmg: 11, box: { x1: 8, x2: 145, y1: -140, y2: 10 },
         knock: 4, hitstun: 18, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -255,13 +255,13 @@ const DATA = {
         // Eric 定版: 倾身抡劈下砸 —— 俯冲期直接显示 f1 斩帧(impact:2 → 俯冲帧=f1),
         // 身体带 dive 前倾角, 月牙帧同步重染妖紫随身而落; 落地卡帧 12
         smear: { phases: [{ f: 1, t: 5 }], decay: 2, echo: { t: 3, dy: 8 }, edge: '#7d5bff', core: '#efe8ff' },
-        dmg: 9, chip: 2, guardDmg: 28,
+        dmg: 9, chip: 2, guardDmg: 28, box: { x1: -25, x2: 202, y1: -95, y2: 10 },
         knock: 6.5, hitstun: 26, blockstun: 15, hitstop: 12, shake: 7, kd: true,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
       special: { // 影·手裏剣: 单发旋转手里剑(Eric 定版: 最贴合日本忍者, 苦无导弹感被否)
         kind: 'special', name: '影·手裏剣', anim: 'attack1', total: 30,
-        startup: 11, active: 4, impact: 3, cooldown: 100, // 微加强: CD 120->100
+        startup: 11, active: 4, impact: 3, cooldown: 150, // 微加强 120->100, 后 Eric: U 冷却 x1.5 -> 150
         seq: { w: [0], i: 3, r: [3] }, // 投掷用 f3 收势帧, 避开 f1 刀光月牙
         fx: { lean: true, x: 40, y: -95, r: 26, ry: 0.9, a0: -0.6, a1: 0.4, w: 4, life: 5, sweep: 0.7, color: '#eafffd', color2: '#7d5bff' },
         dmg: 0, chip: 0, box: null,
@@ -271,7 +271,7 @@ const DATA = {
       },
       airspecial: { // 空中手裏剣(空中+U): 滞空斜下掷, 制空/压制起跳
         kind: 'special', name: '空中手裏剣', anim: 'attack1', air: true, total: 26,
-        startup: 6, active: 4, impact: 3, cooldown: 80, // 微加强
+        startup: 6, active: 4, impact: 3, cooldown: 120, // 微加强 80, 后 Eric: U 冷却 x1.5 -> 120(空中U)
         seq: { w: [0], i: 3, r: [3] },
         fx: { lean: true, x: 34, y: -60, r: 22, ry: 0.9, a0: -0.5, a1: 0.5, w: 4, life: 5, sweep: 0.7, color: '#eafffd', color2: '#7d5bff' },
         dmg: 0, chip: 0, box: null,
@@ -282,21 +282,21 @@ const DATA = {
       },
       dashslash: { // 疾駆斬(dash+J): 借冲刺前突的横斩, 重残影拖尾 —— 疾影突进
         kind: 'light', name: '疾駆斬', anim: 'attack1', total: 20, startup: 4, active: 6, impact: 1,
-        seq: { w: [0], i: 1, r: [2, 3] }, dash: { from: 0, to: 8, vx: 11 },
+        seq: { w: [0], i: 1, r: [2, 3] }, dash: { from: 0, to: 8, vx: 12.5 },
         // 身体 f1 弓步斩 + 帧同步重染月牙(真笔迹, 与基础轻击同法); 冲刺+密集残影
         smear: { phases: [{ f: 1, t: 5 }], decay: 2, echo: { t: 3, dx: 10 }, edge: '#35e0d8', core: '#eafffd' },
-        dmg: 8, chip: 1, guardDmg: 14, box: { x1: 10, x2: 175, y1: -145, y2: -40 }, // 微加强: 7->8
+        dmg: 8, chip: 1, guardDmg: 14, box: { x1: 10, x2: 192, y1: -145, y2: -40 }, // 微加强: 7->8; reach 175->192(Eric 实验室标注)
         // blockstun 12->10: 修 on-block +2(4帧起手+175reach 的招不该防后仍有利)
         knock: 7, hitstun: 22, blockstun: 10, hitstop: 7, shake: 3, kd: false,
         meterHit: 10, sfx: 'whooshH', hitSfx: 'hitH',
       },
       super: { // 三幕: 紫气聚身 -> 瞬身内爆/外爆 -> 紫青交替连斩 · 終B 月輪爆
-        kind: 'super', name: '残影·滅殺陣', anim: 'attack2', total: 54, cost: 100,
+        kind: 'super', name: '残影·居合斬', anim: 'attack2', total: 54, cost: 100,
         startup: 16, active: 12, impact: 1, invuln: 0, finisher: 'B',
         seq: { w: [2, 3], i: 1, r: [0] }, // 瞬移后前摇=举刀过顶(Eric: 抡在头上)
         smear: { phases: [{ f: 1, t: 4 }], decay: 2, gale: 1.06, attach: true, edge: '#7d5bff', core: '#efe8ff' },
         fx: { x: 118, y: -118, r: 124, ry: 0.75, a0: 2.5, a1: -2.5, w: 19, life: 13, color: '#efe8ff', color2: '#7d5bff' },
-        dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 155, y1: -180, y2: -25 },
+        dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 192, y1: -180, y2: -25 },
         knock: 4, hitstun: 24, blockstun: 24, hitstop: 8, shake: 6, kd: true,
         teleport: { at: 6, offset: 92, invuln: 26 },
         cine: { hits: 3, interval: 11, dmgPer: 7, final: 12, style: 'clones' }, // Eric 定版: 残影分身
@@ -388,12 +388,12 @@ const AI_DIFFS = {
   },
   normal: {
     label: '中', en: 'NORMAL', desc: 'Balanced offense and defense',
-    reactMin: 15, reactMax: 26, aggression: 0.68, blockChance: 0.42,
-    dodgeChance: 0.16, comboFollow: 0.6, superUse: 0.6, jumpiness: 0.14,
+    reactMin: 12, reactMax: 20, aggression: 0.76, blockChance: 0.56,
+    dodgeChance: 0.26, comboFollow: 0.75, superUse: 0.7, jumpiness: 0.16,
   },
   hard: {
     label: '難', en: 'HARD', desc: 'Sharp reactions, punishes mistakes',
-    reactMin: 8, reactMax: 15, aggression: 0.85, blockChance: 0.68,
-    dodgeChance: 0.32, comboFollow: 0.9, superUse: 0.85, jumpiness: 0.16,
+    reactMin: 1, reactMax: 2, aggression: 0.99, blockChance: 0.98,
+    dodgeChance: 0.62, comboFollow: 1.0, superUse: 1.0, jumpiness: 0.3,
   },
 };

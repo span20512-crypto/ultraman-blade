@@ -13,7 +13,8 @@ const G = {
   hitstopT: 0, slowmo: 1, slowmoT: 0, slowAcc: 0,
   shakeT: 0, shakeMag: 0, koFlashT: 0, koWinner: null,
   ann: null, superBanner: null,
-  titleSel: 0,
+  titleSel: 0, titleStarted: false, titleIntro: 0, // press-any-key 起始页
+
   select: { phase: 'char', cursor: 0, p1: null, p2: null, diff: 'normal', diffCursor: 1, vsT: 0 },
   result: null, paused: false, pauseView: 'menu',
   stats: { maxCombo: 0 },
@@ -146,7 +147,7 @@ function endMatch(winner) {
   G.screen = 'result';
   Effects.reset();
   G.projectiles = [];
-  AudioSys.playBgm('menu');
+  AudioSys.playBgm('result');
   AudioSys.sfx(winner === G.fighters[0] ? 'win' : 'lose');
 }
 
@@ -196,10 +197,11 @@ function tryHit(a, b, boxA, moveA) {
 
   moveA.hitLanded = res !== 'block';
   if (res === 'block') {
-    // ② 格挡对抗感: 摩擦火花 + 分级卡帧 + 微震(不再像打空)
+    // ② 格挡对抗感: 摩擦火花 + 分级卡帧(受阻感) + 震动(打在结界上的实感, 不再像打空)
     Effects.blockSpark(px, py, a.facing, d.kind);
-    G.hitstop(d.kind === 'light' ? 5 : 8);
-    G.shake(d.kind === 'light' ? 1 : 2, 4);
+    const bHeavy = d.kind !== 'light';
+    G.hitstop(bHeavy ? 11 : 7);   // 冻结时长 = 攻击被挡下的阻尼/顿挫
+    G.shake(bHeavy ? 5 : 3, 7);
   } else if (res === 'crush') {
     Effects.impact(px, py, a.facing, { tier: 3, color: a.c.theme2 || '#ffc531' });
     G.hitstop(12);
@@ -285,6 +287,13 @@ function pushApart() {
 
 // ---- per-screen updates -----------------------------------------------------------
 function updateTitle() {
+  // 起始页: 等首次任意键/点击 → Logo 上升 + 菜单淡入 + BGM 起(unlockAudio 已解锁音频)
+  if (!G.titleStarted) {
+    if (firstInput) { G.titleStarted = true; G.titleIntro = 0; AudioSys.sfx('menuSel'); }
+    return;
+  }
+  // intro 过场 (~0.5s): 定住导航, 让 Logo 升起+按钮淡入演完, 也顺带吃掉启动键不误触菜单
+  if (G.titleIntro < 30) { G.titleIntro++; return; }
   if (Input.consume('KeyW')) { G.titleSel = (G.titleSel + 2) % 3; AudioSys.sfx('menuMove'); }
   if (Input.consume('KeyS')) { G.titleSel = (G.titleSel + 1) % 3; AudioSys.sfx('menuMove'); }
   if (Input.consume('KeyJ') || Input.consume('Enter')) {
@@ -367,7 +376,7 @@ function updateFight() {
     else { // quit to title
       G.paused = false;
       G.screen = 'title';
-      AudioSys.playBgm('menu');
+      AudioSys.playBgm('select');
       AudioSys.sfx('menuBack');
       return;
     }
@@ -641,19 +650,29 @@ function applyUrlParams() {
   }
 }
 
-function desiredBgm() { return G.screen === 'fight' ? 'battle' : 'menu'; }
+function desiredBgm() {
+  switch (G.screen) {
+    case 'fight': return 'battle';
+    case 'result': return 'result';
+    default: return 'select'; // 菜单/标题/选人/说明 共用 select 主题
+  }
+}
 
+let firstInput = false; // 起始页「按任意键」: 首次用户手势(键/点/触)置真
 function unlockAudio() {
+  firstInput = true;
   if (AudioSys.ensure()) AudioSys.playBgm(desiredBgm());
 }
-window.addEventListener('keydown', unlockAudio, { once: false });
-window.addEventListener('pointerdown', unlockAudio);
+// 浏览器自动播放策略要求先有一次用户手势 — 监听所有可能的最早交互, 尽早解锁
+['pointerdown', 'mousedown', 'keydown', 'touchstart', 'click'].forEach(ev =>
+  window.addEventListener(ev, unlockAudio));
 
 let last = performance.now(), acc = 0;
 function loop(now) {
   acc += Math.min(100, now - last);
   last = now;
   while (acc >= 16.667) { update(); acc -= 16.667; }
+  if (AudioSys.ready) AudioSys.playBgm(desiredBgm()); // BGM 每帧跟随当前画面, 进入即自动 crossfade
   draw();
   (Input.expire || Input.clearFrame)(); // tolerate a stale-cached input.js
   requestAnimationFrame(loop);

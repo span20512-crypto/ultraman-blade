@@ -4,7 +4,13 @@
 const AudioSys = (() => {
   let ctx = null, master = null, sfxBus = null, bgmBus = null, noiseBuf = null;
   let muted = false;
-  const bgm = { playing: false, track: null, step: 0, nextTime: 0, timer: null };
+  // BGM = real instrumental mp3s (Lyria-generated), one per scene, routed through bgmBus.
+  const BGM_SRC = {
+    select: 'assets/audio/bgm/select-3.mp3',  // 丙 幽冷 — 菜单/标题/选人 共用此曲
+    battle: 'assets/audio/bgm/battle-1.mp3',  // 甲 幽玄 (丙 battle-3 = 候补)
+    result: 'assets/audio/bgm/result-1.mp3',  // 结算 = 余韵 LINGERING (Eric 选定)
+  };
+  const bgmTrk = {}, bgmBuf = {}; let curBgm = null, bgmInit = false;
 
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return true; }
@@ -12,10 +18,12 @@ const AudioSys = (() => {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       master = ctx.createGain(); master.gain.value = muted ? 0 : 0.6; master.connect(ctx.destination);
       sfxBus = ctx.createGain(); sfxBus.gain.value = 0.8; sfxBus.connect(master);
-      bgmBus = ctx.createGain(); bgmBus.gain.value = 0.16; bgmBus.connect(master);
+      bgmBus = ctx.createGain(); bgmBus.gain.value = 0.5; bgmBus.connect(master);
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      initBgm();
+      if (ctx.state === 'suspended') ctx.resume(); // WKWebView 新建 ctx 默认挂起, 手势内立即 resume
       return true;
     } catch (e) { ctx = null; return false; }
   }
@@ -27,45 +35,89 @@ const AudioSys = (() => {
   }
 
   // --- primitive voices -------------------------------------------------
-  function tone(freq, dur, { type = 'square', vol = 0.3, slide = 0, delay = 0, curve = 2.5 } = {}) {
+  function tone(freq, dur, { type = 'square', vol = 0.3, slide = 0, delay = 0, curve = 2.5, atk = 0 } = {}) {
     if (!ctx) return;
     const t0 = ctx.currentTime + delay;
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type;
     o.frequency.setValueAtTime(Math.max(20, freq), t0);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), t0 + dur);
-    g.gain.setValueAtTime(vol, t0);
+    if (atk > 0) { g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + atk); } // 起音渐入去爆音
+    else g.gain.setValueAtTime(vol, t0);
     g.gain.exponentialRampToValueAtTime(0.001, t0 + dur * curve / 2.5);
     o.connect(g); g.connect(sfxBus);
     o.start(t0); o.stop(t0 + dur + 0.05);
   }
 
-  function noise(dur, { freq = 1200, q = 1, vol = 0.3, type = 'bandpass', delay = 0, slide = 0 } = {}) {
+  function noise(dur, { freq = 1200, q = 1, vol = 0.3, type = 'bandpass', delay = 0, slide = 0, atk = 0 } = {}) {
     if (!ctx) return;
     const t0 = ctx.currentTime + delay;
     const src = ctx.createBufferSource(); src.buffer = noiseBuf;
     const f = ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
     if (slide) f.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t0 + dur);
     const g = ctx.createGain();
-    g.gain.setValueAtTime(vol, t0);
+    if (atk > 0) { g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + atk); } // 起音渐入去爆音
+    else g.gain.setValueAtTime(vol, t0);
     g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     src.connect(f); f.connect(g); g.connect(sfxBus);
     src.start(t0); src.stop(t0 + dur + 0.05);
   }
+
+  // 轻/重击 组合方案 (Eric A/B: URL ?sfx=A|B|C) — 强化轻击打击感 + 调整轻重平衡
+  let sfxVariant = 'A';
+  const HIT_VARIANTS = {
+    A: { // 厚重: 轻击加实体低频+脆瞬态(比原来强很多), 重击很闷; 轻重差距明显
+      hitL: () => { tone(260, 0.10, { type: 'triangle', vol: 0.42, slide: -140, atk: 0.002 }); tone(110, 0.12, { type: 'sine', vol: 0.32, slide: -45, atk: 0.002 }); noise(0.05, { freq: 3000, type: 'highpass', vol: 0.24, atk: 0.001 }); },
+      hitH: () => { tone(120, 0.22, { type: 'sine', vol: 0.58, slide: -75, atk: 0.002 }); tone(205, 0.13, { type: 'triangle', vol: 0.34, slide: -110, atk: 0.002 }); noise(0.12, { freq: 2000, q: 0.7, type: 'bandpass', vol: 0.34, slide: -1200, atk: 0.001 }); },
+    },
+    B: { // 猛: 轻击更冲更响, 重击更巨(加 sub 低频); 整体更大, 差距保持
+      hitL: () => { tone(300, 0.10, { type: 'triangle', vol: 0.46, slide: -160, atk: 0.002 }); tone(120, 0.13, { type: 'sine', vol: 0.36, slide: -55, atk: 0.002 }); noise(0.06, { freq: 3400, type: 'highpass', vol: 0.28, slide: -600, atk: 0.001 }); },
+      hitH: () => { tone(104, 0.24, { type: 'sine', vol: 0.64, slide: -60, atk: 0.002 }); tone(200, 0.13, { type: 'triangle', vol: 0.36, slide: -95, atk: 0.002 }); noise(0.13, { freq: 1800, q: 0.7, type: 'bandpass', vol: 0.40, slide: -1100, atk: 0.001 }); tone(60, 0.16, { type: 'sine', vol: 0.30, slide: -18, atk: 0.003 }); },
+    },
+    C: { // 均衡: 轻重接近、都扎实, 差距小(轻击几乎和重击一样有肉)
+      hitL: () => { tone(240, 0.11, { type: 'triangle', vol: 0.44, slide: -120, atk: 0.002 }); tone(125, 0.14, { type: 'sine', vol: 0.40, slide: -50, atk: 0.002 }); noise(0.06, { freq: 2800, type: 'highpass', vol: 0.24, atk: 0.001 }); },
+      hitH: () => { tone(120, 0.18, { type: 'sine', vol: 0.50, slide: -60, atk: 0.002 }); tone(210, 0.12, { type: 'triangle', vol: 0.32, slide: -100, atk: 0.002 }); noise(0.10, { freq: 2200, q: 0.7, type: 'bandpass', vol: 0.30, slide: -1200, atk: 0.001 }); },
+    },
+  };
+
+  // 格挡 3 备选 — Eric 选定 1 (刃鸣); 都明确表达"格挡/兵刃相接", 质感差异化
+  let blockVariant = 1;
+  const BLOCK_VARIANTS = {
+    1: () => { // 刃鸣 CLASH: 明亮金属对击 + 金属余鸣 + 低频撞击 + 火花
+      tone(1050, 0.13, { type: 'triangle', vol: 0.42, slide: -240, atk: 0.001 });
+      tone(1580, 0.10, { type: 'sine', vol: 0.26, slide: -360, atk: 0.001 });
+      tone(300, 0.09, { type: 'sine', vol: 0.34, slide: -90, atk: 0.001 });
+      noise(0.06, { freq: 5200, type: 'highpass', vol: 0.30, slide: -1800, atk: 0.001 });
+    },
+    2: () => { // 盾震 GUARD: 低沉厚实的"当"闷响, 像硬挡吃下冲击, 金属味收敛
+      tone(220, 0.14, { type: 'sine', vol: 0.50, slide: -90, atk: 0.001 });
+      tone(140, 0.12, { type: 'triangle', vol: 0.34, slide: -50, atk: 0.001 });
+      tone(760, 0.06, { type: 'triangle', vol: 0.16, slide: -160, atk: 0.001 });
+      noise(0.07, { freq: 1400, type: 'lowpass', vol: 0.26, slide: -600, atk: 0.001 });
+    },
+    3: () => { // 結界 WARD: 金属 clang + 高频结晶余鸣(呼应朱印結界), 清亮带一丝法术感
+      tone(1200, 0.14, { type: 'triangle', vol: 0.36, slide: -260, atk: 0.001 });
+      tone(1800, 0.14, { type: 'sine', vol: 0.20, slide: -120, atk: 0.002 });
+      tone(2400, 0.12, { type: 'sine', vol: 0.12, slide: -200, atk: 0.003 });
+      tone(360, 0.08, { type: 'sine', vol: 0.24, slide: -90, atk: 0.001 });
+      noise(0.05, { freq: 6000, type: 'highpass', vol: 0.20, slide: -2000, atk: 0.001 });
+    },
+  };
 
   // --- named SFX ---------------------------------------------------------
   const SFX = {
     menuMove:  () => tone(620, 0.06, { vol: 0.18 }),
     menuSel:   () => { tone(700, 0.07, { vol: 0.2 }); tone(1180, 0.1, { vol: 0.18, delay: 0.06 }); },
     menuBack:  () => tone(420, 0.08, { vol: 0.16, slide: -180 }),
-    jump:      () => tone(280, 0.14, { type: 'sine', vol: 0.22, slide: 320 }),
-    land:      () => noise(0.09, { freq: 500, type: 'lowpass', vol: 0.22 }),
+    // 升级版(2026-07-08): 保留原街机打击音色, 层叠+起音渐入去糊, 更脆更有冲击。改动限于战斗手感相关音
+    jump:      () => { tone(300, 0.13, { type: 'sine', vol: 0.2, slide: 360, atk: 0.004, curve: 2.2 }); noise(0.05, { freq: 2600, type: 'highpass', vol: 0.06, slide: 900, atk: 0.003 }); },
+    land:      () => { noise(0.1, { freq: 480, type: 'lowpass', vol: 0.2, slide: -180, atk: 0.003 }); tone(110, 0.09, { type: 'sine', vol: 0.15, slide: -30, atk: 0.003 }); },
     dash:      () => noise(0.13, { freq: 1600, vol: 0.2, slide: -900 }),
-    whooshL:   () => noise(0.09, { freq: 2200, vol: 0.22, slide: -800 }),
-    whooshH:   () => noise(0.16, { freq: 1100, vol: 0.3, slide: -600 }),
-    hitL:      () => { tone(170, 0.09, { vol: 0.34 }); noise(0.07, { freq: 2600, vol: 0.26 }); },
-    hitH:      () => { tone(100, 0.17, { vol: 0.42, slide: -45 }); noise(0.12, { freq: 1700, vol: 0.34 }); },
-    block:     () => { tone(740, 0.06, { type: 'triangle', vol: 0.26 }); noise(0.05, { freq: 3400, type: 'highpass', vol: 0.14 }); },
+    whooshL:   () => { noise(0.10, { freq: 3000, q: 1.2, type: 'bandpass', vol: 0.16, slide: -1900, atk: 0.004 }); noise(0.08, { freq: 1400, q: 0.8, type: 'bandpass', vol: 0.12, slide: -700, atk: 0.003 }); },
+    whooshH:   () => { noise(0.18, { freq: 1600, q: 0.9, type: 'bandpass', vol: 0.20, slide: -1100, atk: 0.005 }); noise(0.14, { freq: 600, q: 0.7, type: 'lowpass', vol: 0.16, slide: -300, atk: 0.005 }); tone(150, 0.12, { type: 'sine', vol: 0.10, slide: -70, atk: 0.004 }); },
+    hitL:      () => HIT_VARIANTS[sfxVariant].hitL(),
+    hitH:      () => HIT_VARIANTS[sfxVariant].hitH(),
+    block:     () => BLOCK_VARIANTS[blockVariant](),
     special:   () => { tone(210, 0.2, { type: 'sawtooth', vol: 0.26, slide: 700 }); noise(0.18, { freq: 900, vol: 0.16, slide: 1400 }); },
     projectile:() => tone(320, 0.14, { vol: 0.22, slide: -160 }),
     tele:      () => tone(1250, 0.18, { type: 'sine', vol: 0.24, slide: -1050 }),
@@ -84,97 +136,89 @@ const AudioSys = (() => {
 
   function sfx(name) { if (ctx && !muted && SFX[name]) SFX[name](); }
 
-  // --- chiptune BGM -------------------------------------------------------
-  // step sequencer: 16 steps per bar, patterns alternate over 2 bars.
-  // notes are semitone offsets from the track root; null = rest.
-  const TRACKS = {
-    battle: {
-      bpm: 150, root: 110, // A2
-      bass: [
-        [0, null, 0, null, 3, null, 3, null, 5, null, 5, null, 3, null, 2, null],
-        [0, null, 0, null, 3, null, 3, null, 7, null, 5, null, 3, null, 2, null],
-      ],
-      lead: [
-        [12, null, null, 15, null, 12, null, null, 17, null, 15, null, 12, null, 10, null],
-        [12, null, null, 15, null, 19, null, null, 17, null, 15, null, 17, null, 12, null],
-      ],
-      kick: [0, 4, 8, 12], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14],
-    },
-    menu: {
-      bpm: 96, root: 110,
-      bass: [
-        [0, null, null, null, 5, null, null, null, 3, null, null, null, 7, null, null, null],
-        [0, null, null, null, 5, null, null, null, 8, null, null, null, 7, null, null, null],
-      ],
-      lead: [
-        [null, null, 12, null, null, null, 15, null, null, null, 12, null, null, null, null, null],
-        [null, null, 17, null, null, null, 15, null, null, null, 12, null, null, null, 10, null],
-      ],
-      kick: [0, 8], snare: [], hat: [4, 12],
-    },
-  };
+  // --- BGM: real instrumental mp3s decoded to AudioBuffers and looped SAMPLE-ACCURATELY.
+  //     HTMLAudio's .loop has an audible seek-gap at the wrap (Eric heard the "断"), so each
+  //     track loops forever via an AudioBufferSourceNode(loop=true) on its own gain; scene
+  //     changes only crossfade the gains (position kept, no restart pop). loopStart/loopEnd
+  //     auto-trim the mp3 encoder's head/tail near-silence so the wrap has zero dead air. ---
+  const BGM_FADE = 0.9; // seconds — crossfade / 淡入淡出
 
-  function noteFreq(root, semi) { return root * Math.pow(2, semi / 12); }
+  // trim leading/trailing near-silence (mp3 padding) → clean loop wrap; fall back to full buffer
+  function computeLoop(buf) {
+    const thr = 0.004, ch = buf.getChannelData(0), n = ch.length, sr = buf.sampleRate;
+    let s = 0, e = n - 1;
+    while (s < n && Math.abs(ch[s]) < thr) s++;
+    while (e > s && Math.abs(ch[e]) < thr) e--;
+    const loopStart = Math.max(0, s / sr - 0.005);
+    const loopEnd = Math.min(buf.duration, (e + 1) / sr + 0.02);
+    return (loopEnd > loopStart + 0.5) ? { loopStart, loopEnd } : { loopStart: 0, loopEnd: buf.duration };
+  }
 
-  function scheduleStep(tr, step, when) {
-    const bar = Math.floor(step / 16) % 2, s = step % 16;
-    const stepDur = 60 / tr.bpm / 4;
-    const b = tr.bass[bar][s];
-    if (b !== null && b !== undefined) {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'square'; o.frequency.value = noteFreq(tr.root, b);
-      g.gain.setValueAtTime(0.5, when); g.gain.exponentialRampToValueAtTime(0.01, when + stepDur * 1.7);
-      o.connect(g); g.connect(bgmBus); o.start(when); o.stop(when + stepDur * 1.8);
-    }
-    const l = tr.lead[bar][s];
-    if (l !== null && l !== undefined) {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'triangle'; o.frequency.value = noteFreq(tr.root * 2, l);
-      g.gain.setValueAtTime(0.34, when); g.gain.exponentialRampToValueAtTime(0.01, when + stepDur * 2.6);
-      o.connect(g); g.connect(bgmBus); o.start(when); o.stop(when + stepDur * 2.7);
-    }
-    if (tr.kick.includes(s)) {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'sine'; o.frequency.setValueAtTime(130, when); o.frequency.exponentialRampToValueAtTime(42, when + 0.1);
-      g.gain.setValueAtTime(0.9, when); g.gain.exponentialRampToValueAtTime(0.01, when + 0.12);
-      o.connect(g); g.connect(bgmBus); o.start(when); o.stop(when + 0.14);
-    }
-    if (tr.snare.includes(s)) {
-      const src = ctx.createBufferSource(); src.buffer = noiseBuf;
-      const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.8;
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.5, when); g.gain.exponentialRampToValueAtTime(0.01, when + 0.09);
-      src.connect(f); f.connect(g); g.connect(bgmBus); src.start(when); src.stop(when + 0.1);
-    }
-    if (tr.hat.includes(s)) {
-      const src = ctx.createBufferSource(); src.buffer = noiseBuf;
-      const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6500;
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.16, when); g.gain.exponentialRampToValueAtTime(0.01, when + 0.04);
-      src.connect(f); f.connect(g); g.connect(bgmBus); src.start(when); src.stop(when + 0.05);
+  // smooth gain ramp, continuing from the current (possibly mid-ramp) value
+  function fadeTo(track, target, when) {
+    const g = track.gain.gain;
+    g.cancelScheduledValues(when);
+    g.setValueAtTime(g.value, when);
+    g.linearRampToValueAtTime(target, when + BGM_FADE);
+  }
+
+  // start a track's looping source (idempotent). Sources are one-shot, so we keep them
+  // running forever (muted when off-scene) — position kept, no restart pop, gapless wrap.
+  function startSource(name) {
+    const t = bgmTrk[name];
+    if (!t || t.src || !bgmBuf[name]) return;
+    const src = ctx.createBufferSource();
+    src.buffer = bgmBuf[name];
+    src.loop = true;
+    src.loopStart = t.loop.loopStart;
+    src.loopEnd = t.loop.loopEnd;
+    src.connect(t.gain);
+    src.start(0, t.loop.loopStart);
+    t.src = src;
+  }
+
+  function initBgm() {
+    if (bgmInit || !ctx) return;
+    bgmInit = true;
+    for (const name in BGM_SRC) {
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(bgmBus);
+      bgmTrk[name] = { gain, src: null, loop: { loopStart: 0, loopEnd: 0 } };
+      fetch(BGM_SRC[name])
+        .then(r => r.arrayBuffer())
+        .then(a => ctx.decodeAudioData(a))
+        .then(buf => {
+          bgmBuf[name] = buf;
+          bgmTrk[name].loop = computeLoop(buf);
+          startSource(name);                                    // loops forever, silent…
+          if (name === curBgm) fadeTo(bgmTrk[name], 1, ctx.currentTime); // …unless it's the live scene
+        })
+        .catch(e => console.warn('BGM decode failed:', name, e));
     }
   }
 
   function playBgm(name) {
-    if (!ctx) { bgm.track = name; return; } // will start on ensure+playBgm again
-    if (bgm.playing && bgm.track === name) return;
-    stopBgm();
-    bgm.track = name; bgm.playing = true; bgm.step = 0;
-    bgm.nextTime = ctx.currentTime + 0.06;
-    const tr = TRACKS[name];
-    bgm.timer = setInterval(() => {
-      if (!ctx || !bgm.playing) return;
-      const stepDur = 60 / tr.bpm / 4;
-      while (bgm.nextTime < ctx.currentTime + 0.14) {
-        scheduleStep(tr, bgm.step, bgm.nextTime);
-        bgm.nextTime += stepDur;
-        bgm.step = (bgm.step + 1) % 32;
-      }
-    }, 30);
+    if (!BGM_SRC[name]) return;
+    curBgm = name;
+    if (!ctx) return;                     // remembered; ensure() → initBgm() → decode applies it
+    initBgm();
+    const now = ctx.currentTime;
+    for (const k in bgmTrk) if (bgmTrk[k].src) fadeTo(bgmTrk[k], k === name ? 1 : 0, now); // gain-only crossfade
   }
 
   function stopBgm() {
-    bgm.playing = false;
-    if (bgm.timer) { clearInterval(bgm.timer); bgm.timer = null; }
+    curBgm = null;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    for (const k in bgmTrk) if (bgmTrk[k].src) fadeTo(bgmTrk[k], 0, now);
   }
 
-  return { ensure, sfx, playBgm, stopBgm, toggleMute, get muted() { return muted; }, get ready() { return !!ctx; } };
+  return {
+    ensure, sfx, playBgm, stopBgm, toggleMute,
+    setVariant(v) { if (HIT_VARIANTS[v]) sfxVariant = v; }, // 切换轻/重击组合 A/B/C
+    setBlockVariant(n) { if (BLOCK_VARIANTS[n]) blockVariant = n; }, // 切换格挡 1/2/3
+    get sfxVariant() { return sfxVariant; }, get blockVariant() { return blockVariant; },
+    get muted() { return muted; }, get ready() { return !!ctx; },
+  };
 })();
