@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dev server for SOUL FIST: http.server with caching disabled,
+"""Dev server for SOUL BLADE: http.server with caching disabled,
 so the browser always loads the latest code after edits."""
 import http.server
 import socketserver
@@ -23,5 +23,5 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
 if __name__ == '__main__':
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(('', PORT), NoCacheHandler) as httpd:
-        print(f'SOUL FIST dev server: http://localhost:{PORT}')
+        print(f'SOUL BLADE dev server: http://localhost:{PORT}')
         httpd.serve_forever()

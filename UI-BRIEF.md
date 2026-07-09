@@ -1,6 +1,6 @@
 # UI 打磨工作简报 (ericf-0705--ui-polish 分支专用)
 
-你在 SOUL FIST 的 **UI worktree**（`~/Desktop/soul-fist-ui`，分支 `ericf-0705--ui-polish`）。
+你在 SOUL BLADE 的 **UI worktree**（`~/Desktop/soul-fist-ui`，分支 `ericf-0705--ui-polish`）。
 主 worktree（`~/Desktop/soul-fist`，main 分支）正在并行打磨战斗表现，**由另一个 session 负责，与你无关**。
 
 先通读仓库根目录 `CLAUDE.md`（全局交接文档：架构、工具链、Eric 的验收标准），再回来读本文件。

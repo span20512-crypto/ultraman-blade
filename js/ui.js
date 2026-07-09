@@ -788,8 +788,8 @@ const UI = {
           }
         }
       }
-      this.pixText(ctx, '拳魂', 512, 226, { size: 108, align: 'center', color: '#f4ead6', outline: true, shadow: 8 });
-      this.pixText(ctx, 'SOUL FIST', 512, 288, { size: 22, align: 'center', color: '#d9a441', outline: true, spacing: 8 });
+      this.pixText(ctx, '刀魂', 512, 226, { size: 108, align: 'center', color: '#f4ead6', outline: true, shadow: 8 });
+      this.pixText(ctx, 'SOUL BLADE', 512, 288, { size: 22, align: 'center', color: '#d9a441', outline: true, spacing: 8 });
       this.pixText(ctx, '- 和風 PIXEL FIGHTING -', 512, 316, { size: 10, align: 'center', color: '#9a8f78', spacing: 4 });
     }
     ctx.restore();

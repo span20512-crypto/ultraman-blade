@@ -1,4 +1,4 @@
-# 拳魂 SOUL FIST
+# 刀魂 SOUL BLADE
 
 KOF 风格的像素格斗游戏(HTML5 Canvas,零依赖)。人机对战,2 个可选角色,完整格斗机制。
 

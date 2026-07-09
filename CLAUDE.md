@@ -1,4 +1,4 @@
-# 拳魂 SOUL FIST — 项目交接 (CLAUDE.md)
+# 刀魂 SOUL BLADE — 项目交接 (CLAUDE.md)
 
 KOF 式和风像素格斗游戏。纯 vanilla JS + Canvas,零依赖,零构建。人机对战,完整格斗机制 + 练习场。
 **2 角色(2026-07 改名:内部 id 不变,只改 DATA.name/cn)**:内部 id `mack` = 显示「**剣二 KENJI**」力量型武士(红/POWER);内部 id `kenji` = 显示「**隼人 HAYATO**」速度型忍者(蓝/SPEED)。注意代码注释里"剑二/隼人"仍按旧义(纯注释)。逻辑一律用 id,不 key 显示名。
