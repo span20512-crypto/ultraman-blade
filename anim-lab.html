@@ -98,8 +98,10 @@ const W = {
   training: { dummy: 'stand' }, mode: 'lab',
   hitstop(n) { this.hitstopT = Math.max(this.hitstopT, n); },
   shake() {},
-  spawnProjectile(f, def) {
-    this.projectiles.push(new Projectile(f, def, f.x + f.facing * 70, f.y + def.y, f.facing));
+  spawnProjectile(f, def) { // 与 main.js 同步: spread=[vy] 每枚一个纵速(直线=[0])
+    for (const vy of (def.spread || [0])) {
+      this.projectiles.push(new Projectile(f, def, f.x + f.facing * 70, f.y + def.y, f.facing, vy));
+    }
   },
   hasProjectile(f) { return this.projectiles.some(p => p.owner === f && !p.dead); },
   superFlash(f, def) { if (def.cine) { this.hitstopT = Math.max(this.hitstopT, 28); this.banner = { t: 28, def }; } },
@@ -131,7 +133,7 @@ function rectsOverlap(a, b) { return a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 &
 function miniResolve() {
   const boxA = A.activeBox(), mA = A.move;
   if (boxA && mA && !B.dead && !B.superSeq && rectsOverlap(boxA, B.bodyBox())) {
-    if (!(B.invuln > 0 || B.state === 'down' || B.state === 'getup')) {
+    if (!(B.invuln > 0 || B.state === 'down' || B.state === 'getup' || B.juggleImmune())) {
       mA.hasHit = true; mA.contact = true; mA.contactT = mA.t; mA.hitLanded = true;
       const d = mA.def;
       const kd = d.kd || (mA.chained && d.kind === 'heavy' && A.rekkaH);
@@ -172,9 +174,9 @@ function miniResolve() {
   }
   for (const pr of W.projectiles) {
     if (pr.dead || B.dead) continue;
-    if (rectsOverlap(pr.box(), B.bodyBox()) && !(B.invuln > 0 || ['down', 'getup'].includes(B.state))) {
+    if (rectsOverlap(pr.box(), B.bodyBox()) && !(B.invuln > 0 || ['down', 'getup'].includes(B.state) || B.juggleImmune())) {
       const pd = pr.def;
-      B.receiveHit({ dmg: pd.dmg, chip: pd.chip, guardDmg: pd.guardDmg, knock: pd.knock, hitstun: pd.hitstun, blockstun: pd.blockstun, meterHit: pd.meterHit, hitSfx: 'hitL' }, pr.owner);
+      B.receiveHit({ dmg: pd.dmg, chip: pd.chip, guardDmg: pd.guardDmg, knock: pd.knock, hitstun: pd.hitstun, blockstun: pd.blockstun, meterHit: pd.meterHit, hitSfx: 'hitL', proj: true, launch: pd.launch }, pr.owner);
       pr.dead = true;
       Effects.spark(pr.x, pr.y, Math.sign(pr.vx), ['#c9baff', '#7d5bff', '#ffffff'], 10, 5);
       W.hitstop(pd.hitstop || 6);

@@ -29,7 +29,7 @@ const DATA = {
     theme: '#ff4a3d', theme2: '#ffc531',
     dir: 'assets/img/mack', native: 1, scale: 2.75,
     anchor: { x: 98, y: 122 },
-    walk: 3.0, jumpVy: -16, dashVx: 8, backdashVx: 6.5, // 平衡: 力量型 walk 3.3->3.0 + 冲刺9->8/后撤7.5->6.5 都放慢(Eric: 接近速度整体更慢); Hayato 走默认 9/7.5
+    walk: 3.0, jumpVy: -16, dashVx: 7.6, backdashVx: 6.5, // 平衡: 冲刺 9->8->7.2->7.6(7.2 配合隼人手长buff过矫, 镜像反超38%后捞回半格); Hayato 走默认 9/7.5
     stats: { pow: 5, spd: 3, rng: 5 },
     quoteWin: '刀は、鞘に戻った。', quoteLose: '……見事だ。もう一度！',
     portrait: { x: 64, y: 40, w: 68, h: 68 },
@@ -48,7 +48,7 @@ const DATA = {
     moves: {
       /* seq = custom frame path: w(indup) -> i(mpact, held on active) -> r(ecovery) */
       light: { // 正手斩: 抬刀 -> 月牙斩 -> 收势 · 素材月牙重染(月华式 smear)
-        kind: 'light', anim: 'attack1', total: 24, startup: 7, active: 6, impact: 4,
+        kind: 'light', anim: 'attack1', total: 24, startup: 6, active: 6, impact: 4, // 平衡 2026-07-11: 7->6, 拉平第一下竞速(隼人 light 6t; 其速度身份在 light2 4t/短收招/走速)
         seq: { w: [0, 1, 2, 3], i: 4, r: [5] },
         smear: { phases: [{ f: 4, t: 4 }, { f: 5, t: 3 }], decay: 2, edge: '#ffd24a', core: '#fff8e2' },
         fx: { x: 103, y: -101, r: 116, ry: 0.6, a0: 2.3, a1: -2.35, w: 13, life: 11, color: '#fff6d8', color2: '#ffd24a' },
@@ -79,7 +79,7 @@ const DATA = {
         seq: { w: [2, 3], i: 4, r: [5, 0] }, dash: { from: 2, to: 10, vx: 6.5 },
         smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 4, dx: 8 }, edge: '#ff5a35', core: '#ffe27a' },
         fx: { x: 103, y: -101, r: 126, ry: 0.6, a0: 2.3, a1: -2.35, w: 22, life: 14, grow: 0.8, color: '#ffe27a', color2: '#ff4a3d' },
-        dmg: 11, chip: 2, guardDmg: 28, box: { x1: 15, x2: 208, y1: -190, y2: -35 }, // 平衡: 12->11
+        dmg: 10, chip: 2, guardDmg: 28, box: { x1: 15, x2: 208, y1: -190, y2: -35 }, // 平衡: 12->11->10(2026-07-11 Eric: 剣二一波半血过强, 只动这一个旋钮)
         knock: 9, hitstun: 28, blockstun: 15, hitstop: 14, shake: 6,
         meterHit: 13, sfx: 'whooshH', hitSfx: 'hitH',
       },
@@ -111,8 +111,8 @@ const DATA = {
         smear: { phases: [{ f: 4, t: 5 }, { f: 5, t: 4 }], decay: 2, rim: 4, echo: { t: 4, dx: 8 }, attach: true, edge: '#ff5a3d', core: '#ffe27a' },
         fx: { x: 103, y: -101, r: 120, ry: 0.6, a0: 2.3, a1: -2.35, w: 18, life: 14, rise: -1.2, color: '#ffe27a', color2: '#ff5a3d' },
         dmg: 9, chip: 2, guardDmg: 22, box: { x1: 5, x2: 208, y1: -195, y2: -20 }, // 平衡: 10->9
-        // launch 此前未接线(receiveHit 只认默认 -7.5), 接线后 -10 ≈ 高度 35px→62px
-        knock: 5, hitstun: 26, blockstun: 14, hitstop: 13, shake: 5, kd: true, launch: -10,
+        // launch -13(原-10): 挑空要能接超必 —— 收招~20tick+超必前摇8 → 需浮空≥30tick(Eric 2026-07-11)
+        knock: 1.5, hitstun: 26, blockstun: 14, hitstop: 13, shake: 5, kd: true, launch: -15, // knock 5->1.5 垂直上打; -16 太高(Eric)->-15: 接I窗口 ~3tick(实测 -14 只剩完美帧)
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
       air: {
@@ -136,7 +136,7 @@ const DATA = {
         startup: 10, active: 10, impact: 4, cooldown: 195, // 平衡: 110->130->195(Eric: U 冷却 x1.5); 降低最强中距突进斩复用频率, 伤害不变
         smear: { phases: [{ f: 4, t: 6 }, { f: 5, t: 5 }], decay: 3, rim: 4, gale: 1.06, echo: { t: 4, dx: 10 }, attach: true, edge: '#ff4a3d', core: '#ffe27a' },
         fx: { x: 113, y: -142, r: 124, ry: 0.82, a0: 2.75, a1: 0.05, w: 20, life: 13, vx: 7, color: '#ffe27a', color2: '#d64533' },
-        dmg: 11, chip: 5, guardDmg: 46, box: { x1: 0, x2: 208, y1: -152, y2: -9 }, // 平衡: 13->11(突进斩爆发偏高)
+        dmg: 11, chip: 5, guardDmg: 38, box: { x1: 0, x2: 208, y1: -152, y2: -9 }, // 平衡: dmg 13->11; 削护 46->38(隐藏破防怪, 2026-07-11)
         // 突进斩命中要把人斩飞: knock 加重 + launch 抬高(接线后生效)
         knock: 16, hitstun: 30, blockstun: 18, hitstop: 16, shake: 7, kd: true, launch: -9,
         dash: { from: 4, to: 20, vx: 6.25 },
@@ -184,7 +184,7 @@ const DATA = {
         seq: { w: [0], i: 1, r: [2, 3] },
         smear: { phases: [{ f: 1, t: 3 }], decay: 1, edge: '#66e8dc', core: '#eafffd' },
         fx: { x: 110, y: -75, r: 110, ry: 0.61, a0: -2.3, a1: 2.3, w: 11, life: 9, color: '#eafffd', color2: '#66e8dc' },
-        dmg: 5, chip: 0, guardDmg: 10, box: { x1: 12, x2: 192, y1: -165, y2: -40 },
+        dmg: 5, chip: 0, guardDmg: 10, box: { x1: 12, x2: 194, y1: -165, y2: -40 },
         knock: 4, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -192,7 +192,7 @@ const DATA = {
         kind: 'light', anim: 'attack1', total: 18, startup: 4, active: 5, impact: 1,
         seq: { w: [2], i: 3, r: [3] },
         smear: { standalone: true, sheet: 'fx:ka1', cullPrev: true, phases: [{ f: 0, t: 4 }], decay: 2, dy: -4, scale: 0.94, rot: -0.1, edge: '#35e0d8', core: '#ddfffa' },
-        dmg: 6, chip: 0, guardDmg: 10, box: { x1: 12, x2: 192, y1: -165, y2: -40 },
+        dmg: 6, chip: 0, guardDmg: 10, box: { x1: 12, x2: 194, y1: -165, y2: -40 },
         knock: 4.5, hitstun: 17, blockstun: 10, hitstop: 5, shake: 2,
         meterHit: 8, sfx: 'whooshL', hitSfx: 'hitL',
       },
@@ -201,7 +201,7 @@ const DATA = {
         seq: { w: [2, 3], i: 1, r: [0, { a: 'crouchin', f: 0 }] }, // 评审③: 弓步->半起身桥接, 消除收招硬切
         smear: { phases: [{ f: 1, t: 4 }], decay: 2, echo: { t: 3, dy: 7 }, edge: '#7d5bff', core: '#efe8ff' },
         fx: { x: 118, y: -118, r: 118, ry: 0.75, a0: -2.5, a1: 2.5, w: 17, life: 12, color: '#efe8ff', color2: '#7d5bff' },
-        dmg: 9, chip: 2, guardDmg: 20, box: { x1: 12, x2: 200, y1: -175, y2: -35 },
+        dmg: 9, chip: 2, guardDmg: 20, box: { x1: 12, x2: 202, y1: -175, y2: -35 },
         knock: 7.5, hitstun: 24, blockstun: 14, hitstop: 10, shake: 4,
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
@@ -210,8 +210,10 @@ const DATA = {
         seq: { w: [0], i: 3, r: [3] }, dash: { from: 2, to: 9, vx: 7 }, // 身体 f3 举刀, 随前突移动
         // F模式改(Eric: 重击第二下更有力): 同下劈月牙, 放大1.14+微转角, attach 随突进
         smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 5 }], decay: 2, dy: -14, scale: 1.14, rot: -0.12, edge: '#8f6fff', core: '#c8fff5' },
-        dmg: 10, chip: 2, guardDmg: 20, box: { x1: 12, x2: 200, y1: -180, y2: -35 },
-        knock: 8.5, hitstun: 26, blockstun: 14, hitstop: 11, shake: 5,
+        dmg: 11, chip: 2, guardDmg: 20, box: { x1: 12, x2: 202, y1: -180, y2: -35 }, // 平衡 2026-07-11: dmg 10->11; 手长 200->206->202(206 让隼人镜像 1.38x 反超, 回收一半)
+        // launch -9(默认-7.5): 连锁击倒后多浮 ~3tick — 隼人超必 startup 16(瞬身居合)远慢于
+        // 剣二的 8, K·K→I 的有效衔接窗被吃掉大半(Eric 2026-07-11: 判定间隙比剣二短得多)
+        knock: 8.5, hitstun: 26, blockstun: 14, hitstop: 11, shake: 5, launch: -10.5, // 实测 -9 仍差 3tick, -10.5 与剣二窗口对齐(~7tick)
         meterHit: 12, sfx: 'whooshH', hitSfx: 'hitH',
       },
       clight: { // 蹲刺·穿膝: 全程蹲姿(评审①), 低位刺击交给贴地 fx 表达
@@ -233,12 +235,13 @@ const DATA = {
         meterHit: 7, sfx: 'whooshL', hitSfx: 'hitL',
       },
       cheavy: { // 蹲撩·逆风: 独立挑空技,不参与连锁 · 青升弧
-        kind: 'heavy', noChain: true, anim: 'attack2', total: 30, startup: 8, active: 5, impact: 1,
+        kind: 'heavy', noChain: true, anim: 'attack2', total: 28, startup: 8, active: 5, impact: 1, // total 30->28: 接超必收招提前, 保留被防-2的可惩罚性(2026-07-11)
         seq: { w: [{ a: 'crouch', f: 0 }], i: 3, r: [3] }, hop: -7, // 身体 f3 举刀, 随小跳弹起
         // 升斩=KK第二下同源月牙(Eric: 保持一致), 只比 heavy2(1.14) 大一丢丢 + attach 随弹起
         smear: { standalone: true, sheet: 'fx:ka2', attach: true, phases: [{ f: 0, t: 6 }], decay: 2, dy: -18, scale: 1.16, rot: -0.18, edge: '#35e0d8', core: '#d6fff8' },
         dmg: 9, chip: 2, guardDmg: 20, box: { x1: 5, x2: 205, y1: -190, y2: -20 },
-        knock: 5, hitstun: 24, blockstun: 13, hitstop: 10, shake: 5, kd: true, launch: -12.5,
+        // launch -15(原-12.5): 隼人超必前摇 16, 挑空接 I 需要更高浮空(Eric 2026-07-11)
+        knock: 1.5, hitstun: 24, blockstun: 13, hitstop: 10, shake: 5, kd: true, launch: -16.5, // knock 5->1.5 同上; -17 太高(Eric)->-16.5 + total 28: 接I窗口 ~3tick 与剣二一致(实测 -16 只有 2tick)
         meterHit: 11, sfx: 'whooshH', hitSfx: 'hitH',
       },
       air: {
@@ -261,23 +264,23 @@ const DATA = {
       },
       special: { // 影·手裏剣: 单发旋转手里剑(Eric 定版: 最贴合日本忍者, 苦无导弹感被否)
         kind: 'special', name: '影·手裏剣', anim: 'attack1', total: 30,
-        startup: 11, active: 4, impact: 3, cooldown: 150, // 微加强 120->100, 后 Eric: U 冷却 x1.5 -> 150
+        startup: 11, active: 4, impact: 3, cooldown: 130, // 冷却史: 120->100->150->130(2026-07-11 平衡: zoning 身份)
         seq: { w: [0], i: 3, r: [3] }, // 投掷用 f3 收势帧, 避开 f1 刀光月牙
         fx: { lean: true, x: 40, y: -95, r: 26, ry: 0.9, a0: -0.6, a1: 0.4, w: 4, life: 5, sweep: 0.7, color: '#eafffd', color2: '#7d5bff' },
         dmg: 0, chip: 0, box: null,
         knock: 0, hitstun: 0, blockstun: 0, hitstop: 0, shake: 0,
-        projectile: { speed: 9.5, dmg: 8, chip: 3, guardDmg: 16, y: -95, hitstun: 22, blockstun: 12, knock: 5, hitstop: 6, meterHit: 12 },
+        projectile: { speed: 9.5, dmg: 9, chip: 3, guardDmg: 16, y: -95, hitstun: 26, blockstun: 12, knock: 2, hitstop: 6, meterHit: 12, launch: -10 }, // 平衡: dmg 9、hitstun 26(确认接超必)、空中被点上浮 -10
         meterHit: 0, sfx: 'projectile', hitSfx: 'hitL',
       },
-      airspecial: { // 空中手裏剣(空中+U): 滞空斜下掷, 制空/压制起跳
+      airspecial: { // 空中手裏剣(空中+U): 滞空平掷(直线), 制空/对空压制
         kind: 'special', name: '空中手裏剣', anim: 'attack1', air: true, total: 26,
         startup: 6, active: 4, impact: 3, cooldown: 120, // 微加强 80, 后 Eric: U 冷却 x1.5 -> 120(空中U)
         seq: { w: [0], i: 3, r: [3] },
         fx: { lean: true, x: 34, y: -60, r: 22, ry: 0.9, a0: -0.5, a1: 0.5, w: 4, life: 5, sweep: 0.7, color: '#eafffd', color2: '#7d5bff' },
         dmg: 0, chip: 0, box: null,
         knock: 0, hitstun: 0, blockstun: 0, hitstop: 0, shake: 0,
-        // vy 正=向下: 斜下掷(制空落点覆盖); y=-60 从空中腰位出手
-        projectile: { spread: [5], speed: 8.5, dmg: 7, chip: 2, guardDmg: 14, y: -60, hitstun: 20, blockstun: 11, knock: 4, hitstop: 5, meterHit: 10 },
+        // spread=[vy], vy 正=向下。原斜下掷 [5], Eric 2026-07-11 改直线 [0]; y=-60 从空中腰位出手
+        projectile: { spread: [0], speed: 8.5, dmg: 7, chip: 2, guardDmg: 14, y: -60, hitstun: 22, blockstun: 11, knock: 2, hitstop: 5, meterHit: 10, launch: -10 }, // 空中被点上浮 -10, 可被补 1 刀
         meterHit: 0, sfx: 'projectile', hitSfx: 'hitL',
       },
       dashslash: { // 疾駆斬(dash+J): 借冲刺前突的横斩, 重残影拖尾 —— 疾影突进
@@ -299,7 +302,7 @@ const DATA = {
         dmg: 0, chip: 9, guardDmg: 65, box: { x1: 0, x2: 192, y1: -180, y2: -25 },
         knock: 4, hitstun: 24, blockstun: 24, hitstop: 8, shake: 6, kd: true,
         teleport: { at: 6, offset: 92, invuln: 26 },
-        cine: { hits: 3, interval: 11, dmgPer: 7, final: 12, style: 'clones' }, // Eric 定版: 残影分身
+        cine: { hits: 4, interval: 11, dmgPer: 5, final: 13, style: 'clones' }, // Eric 定版: 残影分身; 2026-07-11 重分配 3x7+12→4x5+13(总33不变, 每个视觉节拍都掉血, 爆炸仍最高)
         meterHit: 0, sfx: 'tele', hitSfx: 'hitH',
       },
     },
@@ -383,8 +386,8 @@ const DATA = {
 const AI_DIFFS = {
   easy: {
     label: '易', en: 'EASY', desc: 'Slow reactions, rarely guards',
-    reactMin: 26, reactMax: 44, aggression: 0.45, blockChance: 0.15,
-    dodgeChance: 0.05, comboFollow: 0.3, superUse: 0.35, jumpiness: 0.1,
+    reactMin: 28, reactMax: 48, aggression: 0.38, blockChance: 0.12,
+    dodgeChance: 0.05, comboFollow: 0.25, superUse: 0.25, jumpiness: 0.1, // 2026-07-11 再放软(Eric: 简单=正常打也能赢)
   },
   normal: {
     label: '中', en: 'NORMAL', desc: 'Balanced offense and defense',
@@ -392,8 +395,21 @@ const AI_DIFFS = {
     dodgeChance: 0.26, comboFollow: 0.75, superUse: 0.7, jumpiness: 0.16,
   },
   hard: {
+    // 底层仍是读指令架构(cheatRead, ai.js), 但从"鬼级全 1.0"回调(Eric 实测判
+    // 稍微太难): readP 让 25% 按键漏读、资源回充与压制概率下调。
+    // 对玩家只呈现"困难", 不解释读取机制(Eric 2026-07-11)
     label: '難', en: 'HARD', desc: 'Sharp reactions, punishes mistakes',
-    reactMin: 1, reactMax: 2, aggression: 0.99, blockChance: 0.98,
-    dodgeChance: 0.62, comboFollow: 1.0, superUse: 1.0, jumpiness: 0.3,
+    reactMin: 0, reactMax: 1, aggression: 1.0, blockChance: 1.0,
+    dodgeChance: 0.5, comboFollow: 1.0, superUse: 1.0, jumpiness: 0.3,
+    punishBlock: 1.0,   // 防住/看到收招硬直 -> 必反打整套连招
+    okizeme: 0.95,      // 压起身 meaty
+    chase: 1.0,         // 追后撤冲刺贴上
+    bait: 0,
+    launcher: 0.25,     // 主动蹲重挑空起手(接浮空超必)
+    superJuggle: 0.95,  // 抓浮空接超必
+    pressureSuper: 0.8, // 被压制且有气 -> 无敌超必拆招
+    cheatRead: true,    // 读指令(隐藏机制)
+    readP: 0.92,        // 92% 读键(Eric 定位: 困难=初见连死、研究多轮才能赢; 8% 漏读+安全窗进攻=可研究的破绽)
+    meterRegen: 0.18,   // 回充史: 0.35鬼级->0.3->0.18(Eric: 挨打方比进攻方涨得快太离谱; 拆招威胁保留)
   },
 };

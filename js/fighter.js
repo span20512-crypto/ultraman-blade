@@ -124,6 +124,9 @@ class Fighter {
   /* 'block' (= blockstun) counts as busy via the state itself; never gate on
      the blockstun counter — a leaked counter once froze the AI permanently */
   busy() { return !['idle', 'walk', 'guard', 'crouch'].includes(this.state); }
+  // 浮空追击保护(Eric 2026-07-11): 挑空后空中最多吃 1 次追击, 之后免疫到落地。
+  // 各战斗解算器(main.js tryHit / anim-lab miniResolve / howto resolve)的无敌门都要带上
+  juggleImmune() { return !this.grounded && this.state === 'hit' && (this.juggleN || 0) >= 1; }
   /* directional guard: holding the direction away from x at this instant */
   holdingAway(fromX) {
     const away = this.x >= fromX ? 1 : -1;
@@ -492,6 +495,7 @@ class Fighter {
 
   knockdown() {
     this.kdPending = false;
+    this.juggleN = 0;
     this.state = 'down'; this.stateT = 52;
     this.setAnim('death', true);
     Effects.dust(this.x, this.y, 10);
@@ -685,6 +689,9 @@ class Fighter {
 
     // ── ① 瞬身敌后 + 完整重击: 举刀(f2→f3) → 抡下(f1 斩+月牙) ──
     if (s.t === 1) {
+      // 记住发动时自己在敌人哪一侧: 三回合交叉的方向以此为基准, 演出结束
+      // 回到原侧(旧版方向写死 -1/+1/-1, 无论从哪边放最后都落在敌人左边 — Eric 报的 bug)
+      s.side = Math.sign(this.x - opp.x) || -this.facing;
       this.x = opp.x + this.facing * 84;
       this.facing = -this.facing;
       Effects.ring(this.x, this.y - 90, '#c9baff', 12);
@@ -704,6 +711,7 @@ class Fighter {
         this.cineDamageTick(opp, s);                 // 第 1 段
         Effects.impact(opp.x, opp.y - 96, this.facing, { tier: 3, color: '#7d5bff' });
         this.world.hitstop(7); this.world.shake(5, 6);
+        Effects.flashFrame({ alpha: 0.3, t: 2 }); // 背刺闪屏(Eric: 隼人超必要有一闪一闪的冲击感)
         AudioSys.sfx('hitH');
       }
     }
@@ -721,7 +729,8 @@ class Fighter {
 
     // ── ③ 三回合交叉(方案差异) ──
     w.forEach((wStart, wi) => {
-      const dir = wi % 2 === 0 ? -1 : 1;             // 本体交替方向
+      // 注意: 超必 move 阶段已瞬身到敌后, s.side 是瞬身后的侧 —— 取反才是玩家发动侧
+      const dir = (wi % 2 === 0 ? -1 : 1) * (s.side || -1); // 本体交替方向(末回合落回玩家发动侧)
       if (s.t === wStart) {
         s.run = { from: opp.x - dir * 190, to: opp.x + dir * 190, dir, t0: wStart };
         this.x = s.run.from; this.facing = dir;
@@ -743,14 +752,13 @@ class Fighter {
           this.setAnim('attack1', true);
           this.cineSmear = { edge: '#35e0d8', core: '#eafffd', rim: 2 };
           s.hold = { name: 'attack1', frame: 1, until: s.t + 4 };
-          if (wi < 2) {                              // 前两回合有伤害
-            this.cineDamageTick(opp, s);
-            Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
-            this.world.hitstop(5); this.world.shake(4, 5);
-            AudioSys.sfx('hitH');
-          } else {
-            AudioSys.sfx('hitH');                    // 第三回合: 补命中音(Eric: 三次冲撞应有三次音效); 仍不结算伤害=纯声势对穿
-          }
+          // 三回合全部结算(2026-07-11 Eric: 第三回合有命中音却不掉血像 bug ——
+          // 伤害重分配为 4x5+13, 每个视觉节拍都对应血条一跳, 总量 33 不变)
+          this.cineDamageTick(opp, s);
+          Effects.impact(opp.x, opp.y - 96, dir, { tier: 3, color: '#7d5bff' });
+          this.world.hitstop(5); this.world.shake(4, 5);
+          Effects.flashFrame({ alpha: 0.26, t: 2 }); // 每回合交叉命中都闪一下
+          AudioSys.sfx('hitH');
         }
       }
     });
@@ -765,6 +773,7 @@ class Fighter {
             dy: g.gAnim === 'attack2' ? -12 : 0,
             edge: '#35e0d8', core: '#d6fff8',
           }, g.gAnim);
+          Effects.flashFrame({ alpha: 0.14, t: 2 }); // ghost 穿越微闪(叠出频闪节奏)
         }, { y1: opp.y });
         AudioSys.sfx('dash');
       }
@@ -881,6 +890,7 @@ class Fighter {
       return 'block';
     }
 
+    const wasAir = !this.grounded; // 在挑空 pop 之前采样: 本次是否空中受击
     const scale = attacker.comboScale(this);
     const dmg = Math.max(1, Math.round(info.dmg * scale));
     this.hp = Math.max(0, this.hp - dmg);
@@ -892,6 +902,10 @@ class Fighter {
     this.state = 'hit';
     this.move = null;
     this.setAnim('hit', true);
+    // 浮空追击计数: 空中吃的第 1 下允许, 之后 juggleImmune() 免疫到落地。
+    // 飞行道具(info.proj)不占配额 —— 空中被飞镖点到后仍可被近身补 1 刀(Eric);
+    // 配额用尽后飞镖同样被 juggleImmune 挡住, 上限依旧是"落地前多挨 1 次近身击"
+    this.juggleN = !wasAir ? 0 : (this.juggleN || 0) + (info.proj ? 0 : 1);
 
     if (info.kd || !this.grounded) {
       this.grounded = false;
@@ -983,7 +997,7 @@ class Fighter {
       case 'jump': this.setAnim('jump'); break;
       case 'fall': this.setAnim('fall'); break;
       case 'dash': this.setAnim('run'); break;
-      case 'backdash': this.setAnim('fall'); break;
+      case 'backdash': this.setAnim(this.dashT < 9 ? 'jump' : 'fall'); break; // 后跳: 起跳姿→落姿
       case 'hit': this.setAnim('hit'); break;
       case 'down': break;   // death anim set on knockdown
       case 'getup': this.setAnim('idle'); break;
@@ -1000,6 +1014,9 @@ class Fighter {
     // crouch frames (seq objects) are already baked at the right height
     if (this.state === 'attack' && this.move && this.move.def.yOff &&
         this.anim.name === this.move.def.anim) yOff = this.move.def.yOff;
+    // backdash 视觉后跳弧线(KOF 式): 面朝敌人向后小跳。纯视觉 —— y/判定框不动,
+    // 且 backdash 前 13 tick 无敌, 贴地判定与空中形象的观感差异可忽略
+    if (this.state === 'backdash') yOff -= 30 * Math.sin(Math.PI * Math.min(1, this.dashT / 17));
     const fw = c.fw || 200; // 帧边长: 主角色 200, 外部体(Huntress)150
     return {
       img: Assets.img(`${c.id}:${this.anim.name}`),

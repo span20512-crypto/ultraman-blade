@@ -156,6 +156,10 @@ const AudioSys = (() => {
 
   // smooth gain ramp, continuing from the current (possibly mid-ramp) value
   function fadeTo(track, target, when) {
+    // playBgm 被主循环每帧调用(60/s×全轨道): 目标没变就必须跳过, 否则每秒
+    // ~540 次 cancel+set+ramp 持续抽打音频线程(2026-07-11 声画不同步排查)
+    if (track.target === target) return;
+    track.target = target;
     const g = track.gain.gain;
     g.cancelScheduledValues(when);
     g.setValueAtTime(g.value, when);

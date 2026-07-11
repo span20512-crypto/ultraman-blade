@@ -14,6 +14,25 @@ const UI = {
     return ctx.measureText(str).width + spacing * Math.max(0, str.length - 1);
   },
 
+  // EN+汉字混排修正(Eric 2026-07-11): PressStart 大写把字号占满, 同字号的
+  // FusionPixel 汉字显小一圈且基线下沉 —— 按 CJK 段拆开, 汉字段放大 jpBump 号、
+  // 上提 jpLift px, 整体再按 align 对齐。凡是一串里同时有英文和汉字的都用它
+  _cjkRe: /[⺀-鿿぀-ヿ豈-﫿　-〿々〆ー]/,
+  pixTextMixed(ctx, str, x, y, opts = {}) {
+    const { size = 16, align = 'left', jpBump = 2, jpLift = 2 } = opts;
+    const runs = String(str).split(/([⺀-鿿぀-ヿ豈-﫿　-〿々〆ー]+)/).filter(s => s);
+    if (runs.length < 2) return this.pixText(ctx, str, x, y, opts); // 纯英文/纯汉字: 原路
+    const wOf = (s) => this.textW(ctx, s, this._cjkRe.test(s) ? size + jpBump : size);
+    const total = runs.reduce((a, s) => a + wOf(s), 0);
+    let cx = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
+    for (const s of runs) {
+      const jp = this._cjkRe.test(s);
+      this.pixText(ctx, s, cx, y - (jp ? jpLift : 0),
+        { ...opts, size: jp ? size + jpBump : size, align: 'left', spacing: 0, maxW: 0 });
+      cx += wOf(s);
+    }
+  },
+
   pixText(ctx, str, x, y, opts = {}) {
     const {
       color = '#f4f1e8', align = 'left', baseline = 'alphabetic',
@@ -254,8 +273,8 @@ const UI = {
     }
 
     // names (right one pulled clear of the hp-frame end-scroll ornament)
-    this.pixText(ctx, `${f1.c.name} · ${f1.c.cn}`, 138, 70, { size: 12, color: '#efe6d5', outline: true });
-    this.pixText(ctx, `${f2.c.name} · ${f2.c.cn}`, 862, 70, { size: 12, color: '#efe6d5', align: 'right', outline: true });
+    this.pixTextMixed(ctx, `${f1.c.name} · ${f1.c.cn}`, 138, 70, { size: 12, color: '#efe6d5', outline: true });
+    this.pixTextMixed(ctx, `${f2.c.name} · ${f2.c.cn}`, 862, 70, { size: 12, color: '#efe6d5', align: 'right', outline: true });
     if (G.p2IsAI) this.pixText(ctx, 'CPU', 862, 86, { size: 9, color: '#9a8f78', align: 'right' });
 
     // round pips
@@ -399,7 +418,10 @@ const UI = {
 
   guardBar(ctx, G, f, xa, xb, mirror) {
     if (f.guard <= 1) return;
-    const w = (xb - xa) * 0.6, y = this.ua.hpframe ? 57 : 52, h = 5;
+    // 定版(Eric 2026-07-11): 回到 HUD 顶栏 y90(名字/CPU 标签下方净空带, 不与
+    // 文字重叠); 头顶版被否 —— 会误读成血条且离角色太近分散注意力。
+    // 常驻小字 GUARD 标签标明身份, 快破防(≥65)时整体转红闪 + 感叹号
+    const w = (xb - xa) * 0.6, y = this.ua.hpframe ? 90 : 84, h = 5;
     const bx = mirror ? xb - w : xa;
     ctx.fillStyle = '#0d0f16';
     ctx.fillRect(bx - 1, y - 1, w + 2, h + 2);
@@ -407,8 +429,9 @@ const UI = {
     const hot = f.guard >= 65;
     ctx.fillStyle = hot ? (G.tick % 12 < 6 ? '#ff4a3d' : '#ffc531') : '#c9a24b';
     ctx.fillRect(mirror ? bx + w - gw : bx, y, gw, h);
-    if (hot) this.pixText(ctx, 'GUARD!', mirror ? bx - 6 : bx + w + 6, y + 6, {
-      size: 10, align: mirror ? 'right' : 'left', color: '#ff4a3d',
+    this.pixText(ctx, hot ? 'GUARD!' : 'GUARD', mirror ? bx - 8 : bx + w + 8, y + 6, {
+      size: 8, align: mirror ? 'right' : 'left',
+      color: hot ? (G.tick % 12 < 6 ? '#ff4a3d' : '#ffc531') : '#8a7a5f',
     });
   },
 
@@ -460,7 +483,7 @@ const UI = {
       }
       ctx.restore();
       const lx = mirror ? x + A.fill.w : x, la = mirror ? 'right' : 'left';
-      this.pixText(ctx, isFull ? 'MAX! 超必殺 READY' : '気 POWER', lx, dy - 4, {
+      this.pixTextMixed(ctx, isFull ? 'MAX! 超必殺 READY' : '気 POWER', lx, dy - 4, {
         size: 10, align: la, color: isFull ? '#ffe27a' : '#9a8f78',
       });
       return;
@@ -483,7 +506,7 @@ const UI = {
     ctx.fillStyle = '#0c0a09';
     for (let i = 1; i < 4; i++) ctx.fillRect(x + (w / 4) * i - 1, y, 2, h);
     const lx = mirror ? x + w : x, la = mirror ? 'right' : 'left';
-    this.pixText(ctx, full ? 'MAX! 超必殺 READY' : '気 POWER', lx, y - 7, {
+    this.pixTextMixed(ctx, full ? 'MAX! 超必殺 READY' : '気 POWER', lx, y - 7, {
       size: 10, align: la, color: full ? '#ffe27a' : '#9a8f78',
     });
   },
@@ -529,9 +552,18 @@ const UI = {
   },
 
   // announcement backdrop, style-switchable (?ann=): 'ink'/'ink2' brush swash,
-  // 'band' cinematic full-width lacquer band, 'plaque' wooden board
+  // 'band' cinematic full-width lacquer band, 'plaque' wooden board,
+  // DEFAULT 'band2' full-bleed plaque w/ tassels (2026-07-11 Eric 拍板).
+  // Returns true when text should switch to ink-on-parchment colors.
   annBack(ctx, cx, cy, w, mainSize) {
-    if (this.ann === 'band') {
+    if (this.ann === 'band2' && this.ua.band2) {
+      const B2 = this.ua.band2;
+      const bh = 1024 * B2.height / B2.width;
+      // 0.32 = parchment-center fraction of band2-cut.png (band_refine.py metric)
+      ctx.drawImage(B2, 0, cy - bh * 0.32, 1024, bh);
+      return true;
+    }
+    if (this.ann === 'band' || this.ann === 'band2') {
       const h = mainSize + 44;
       ctx.fillStyle = 'rgba(10,7,6,0.9)';
       ctx.fillRect(0, cy - h / 2, 1024, h);
@@ -582,7 +614,8 @@ const UI = {
   _fade(ctx, G) {
     const jumped = this._fadeTick !== undefined && G.tick - this._fadeTick > 2;
     if (G.screen !== this._fadeScr) {
-      this._fadeEnd = (this._fadeScr === undefined || jumped) ? 0 : G.tick + 18;
+      // boot→title is seamless: same page, the load bar swaps to PRESS ANY KEY
+      this._fadeEnd = (this._fadeScr === undefined || this._fadeScr === 'boot' || jumped) ? 0 : G.tick + 18;
       this._fadeScr = G.screen;
     }
     this._fadeTick = G.tick;
@@ -616,13 +649,18 @@ const UI = {
     } else if (a.style === 'round') {
       const slide = Math.max(0, 10 - a.t) * 16;
       // band center = cy-12; baseline = center + 0.42em so text sits dead center
-      this.annBack(ctx, cx, cy - 12, 560, 34);
-      this.pixText(ctx, a.text, cx - slide, cy + 2, { size: 34, align: 'center', color: '#f4f1e8', outline: true, shadow: 5 });
-      if (a.sub) this.pixText(ctx, a.sub, cx + slide, cy + 40, { size: 15, align: 'center', color: '#ffc531', outline: true });
+      const ink = this.annBack(ctx, cx, cy - 12, 560, 34);
+      this.pixText(ctx, a.text, cx - slide, cy + 2, ink
+        ? { size: 34, align: 'center', color: '#2a1b10' }
+        : { size: 34, align: 'center', color: '#f4f1e8', outline: true, shadow: 5 });
+      // ink mode: sub drops below the band's bottom rail (parchment fits one line)
+      if (a.sub) this.pixText(ctx, a.sub, cx + slide, cy + (ink ? 62 : 40), { size: 15, align: 'center', color: '#ffc531', outline: true });
     } else { // banner
-      this.annBack(ctx, cx, cy - 10, 640, 30);
-      this.pixText(ctx, a.text, cx, cy + 3, { size: 30, align: 'center', color: '#f4f1e8', outline: true, shadow: 5 });
-      if (a.sub) this.pixText(ctx, a.sub, cx, cy + 42, { size: 16, align: 'center', color: '#ffc531', outline: true });
+      const ink = this.annBack(ctx, cx, cy - 10, 640, 30);
+      this.pixText(ctx, a.text, cx, cy + 3, ink
+        ? { size: 30, align: 'center', color: '#2a1b10' }
+        : { size: 30, align: 'center', color: '#f4f1e8', outline: true, shadow: 5 });
+      if (a.sub) this.pixText(ctx, a.sub, cx, cy + (ink ? 64 : 42), { size: 16, align: 'center', color: '#ffc531', outline: true });
     }
     ctx.globalAlpha = 1;
   },
@@ -646,7 +684,7 @@ const UI = {
     ctx.fillRect(0, 220, 1024, 4);
     ctx.fillRect(0, 326, 1024, 4);
     this.pixText(ctx, sb.def.name, 512 + slide, 288, { size: 46, align: 'center', color: '#ffe27a', outline: true, shadow: 6 });
-    this.pixText(ctx, `${f.c.cn} · ${f.c.name}  超必殺`, 512 + slide, 318, { size: 15, align: 'center', color: '#aab3cc' });
+    this.pixTextMixed(ctx, `${f.c.cn} · ${f.c.name}  超必殺`, 512 + slide, 318, { size: 15, align: 'center', color: '#aab3cc' });
   },
 
   // ---- title ------------------------------------------------------------------
@@ -705,10 +743,29 @@ const UI = {
     ctx.restore();
   },
 
-  drawTitle(ctx, G) {
+  // loadingP (0..1): boot mode — same page, load bar in the PRESS ANY KEY slot
+  drawTitle(ctx, G, loadingP) {
     const V = this.variant || {};
+    // 加载态守门(Eric: 加载页与标题页必须像素级一致, 唯一区别=多一根进度条):
+    // 三件套(毛笔字体/城门背景/纹章)未全部就绪前只画暗底+进度条, 绝不画降级
+    // 版 logo(程序化红日+像素字)。字体也必须查 —— _brushGlyph 会把错字形永久缓存
+    if (loadingP !== undefined &&
+        !(this.ua.tbg && this.ua.temblem && document.fonts.check('90px KouzanBrush'))) {
+      const bg0 = ctx.createLinearGradient(0, 0, 0, 576);
+      bg0.addColorStop(0, '#2a1512'); bg0.addColorStop(0.55, '#160b0a'); bg0.addColorStop(1, '#080505');
+      ctx.fillStyle = bg0; ctx.fillRect(0, 0, 1024, 576);
+      this._loadBar(ctx, G, loadingP);
+      return;
+    }
     const bgCv = (V.tbg && this.ua.tbg) ? this.ua.tbg.cv : this.bgCanvas(G);
-    ctx.drawImage(bgCv, 0, 0);
+    if (bgCv) {
+      ctx.drawImage(bgCv, 0, 0);
+    } else {
+      // boot: gate art not decoded yet — blood-dusk stand-in until it lands
+      const bg = ctx.createLinearGradient(0, 0, 0, 576);
+      bg.addColorStop(0, '#2a1512'); bg.addColorStop(0.55, '#160b0a'); bg.addColorStop(1, '#080505');
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, 1024, 576);
+    }
     ctx.fillStyle = `rgba(7,8,12,${(V.tbg && this.ua.tbg) ? 0.38 : 0.78})`;
     ctx.fillRect(0, 0, 1024, 576);
 
@@ -794,6 +851,12 @@ const UI = {
     }
     ctx.restore();
 
+    // boot: the PRESS ANY KEY slot shows the load bar; on completion the bar
+    // is replaced in place by PRESS ANY KEY (seamless — same page)
+    if (loadingP !== undefined) {
+      this._loadBar(ctx, G, loadingP);
+      return;
+    }
     // 起始页: 未开始时用脉动的 PRESS ANY KEY 占位(菜单尚未出现)
     if (!G.titleStarted) {
       const pulse = 0.5 + 0.5 * Math.abs(Math.sin(G.tick * 0.055));
@@ -889,7 +952,7 @@ const UI = {
 
     // combo route
     y = 312;
-    this.pixText(ctx, 'COMBO · 連携', 100, y + 20, { size: 15, color: '#ffc531' });
+    this.pixTextMixed(ctx, 'COMBO · 連携', 100, y + 20, { size: 15, color: '#ffc531' });
     const route = ['J', 'J', 'K', 'K', 'U', 'I'];
     let rx = 300;
     route.forEach((k, i) => {
@@ -945,8 +1008,8 @@ const UI = {
       // matched busts instead of tiny floor-less idle sprites
       this.drawBust(ctx, s.p1, 118 - off, 158, 264, 232, false, 1);
       this.drawBust(ctx, s.p2, 686 + off, 158, 264, 232, false, 1); // 右立绘再外移, 加大与徽章间距
-      this.pixText(ctx, `${DATA[s.p1].name} · ${DATA[s.p1].cn}`, 250 - off, 480, { size: 20, align: 'center', color: DATA[s.p1].theme, outline: true });
-      this.pixText(ctx, `${DATA[s.p2].name} · ${DATA[s.p2].cn}`, 818 + off, 480, { size: 20, align: 'center', color: DATA[s.p2].theme, outline: true });
+      this.pixTextMixed(ctx, `${DATA[s.p1].name} · ${DATA[s.p1].cn}`, 250 - off, 480, { size: 20, align: 'center', color: DATA[s.p1].theme, outline: true });
+      this.pixTextMixed(ctx, `${DATA[s.p2].name} · ${DATA[s.p2].cn}`, 818 + off, 480, { size: 20, align: 'center', color: DATA[s.p2].theme, outline: true });
       const vsScale = 1 + Math.max(0, 12 - t) * 0.3;
       const VE = this.ua.vs;
       ctx.save(); ctx.translate(512, 290); ctx.scale(vsScale, vsScale);
@@ -958,8 +1021,17 @@ const UI = {
         this.pixText(ctx, 'VS', 0, 34, { size: 72, align: 'center', color: '#ffc531', outline: true, shadow: 6 });
       }
       ctx.restore();
-      this.pixText(ctx, s.training ? 'TRAINING' : `${AI_DIFFS[s.diff].en} · ${AI_DIFFS[s.diff].label}`,
-        512, 530, { size: 15, align: 'center', color: '#9aa3bd' });
+      if (s.training) {
+        this.pixText(ctx, 'TRAINING', 512, 530, { size: 15, align: 'center', color: '#9aa3bd' });
+      } else {
+        // EN 与汉字分开绘制并整体对中: 两种字体基线不齐(FusionPixel 汉字比
+        // PressStart 大写沉 ~3px), 混在一串里会错位(Eric 2026-07-11)
+        const en = `${AI_DIFFS[s.diff].en} · `, jp = AI_DIFFS[s.diff].label;
+        const enW = this.textW(ctx, en, 15), jpW = this.textW(ctx, jp, 15);
+        const x0 = 512 - (enW + jpW) / 2;
+        this.pixText(ctx, en, x0, 530, { size: 15, color: '#9aa3bd' });
+        this.pixText(ctx, jp, x0 + enW, 527, { size: 15, color: '#9aa3bd' });
+      }
       return;
     }
 
@@ -1041,7 +1113,7 @@ const UI = {
       this.pixText(ctx, s.training ? `DUMMY: ${DATA[other].name}` : `CPU: ${DATA[other].name}`,
         512, 478, { size: 12, align: 'center', color: '#5d6784' });
     } else if (s.phase === 'diff') {
-      this.pixText(ctx, 'DIFFICULTY · 難易度', 512, 478, { size: 15, align: 'center', color: '#ffc531', outline: true });
+      this.pixTextMixed(ctx, 'DIFFICULTY · 難易度', 512, 478, { size: 15, align: 'center', color: '#ffc531', outline: true });
       const keys = ['easy', 'normal', 'hard'];
       keys.forEach((k, i) => {
         const dd = AI_DIFFS[k];
@@ -1072,18 +1144,54 @@ const UI = {
 
   // ---- result -----------------------------------------------------------------------
   drawResult(ctx, G) {
-    ctx.drawImage(this.bgCanvas(G), 0, 0);
-    ctx.fillStyle = 'rgba(7,8,12,0.82)';
-    ctx.fillRect(0, 0, 1024, 576);
-
     const r = G.result;
     const winner = r.winner;
     const playerWon = winner === G.fighters[0];
+
+    // victory quotes in Japanese-flavored English (UI-layer table; data.js untouched)
+    const QUOTES_EN = {
+      mack: 'The blade... returns to its sheath.',
+      kenji: '...Too slow.',
+    };
 
     // winner bust per the layout editor (Eric placed hayato; kenji derived by
     // matching the displayed eye-line and face center: same anchors, own scale)
     const RW = { mack: { x: 392, y: 199, w: 266 }, kenji: { x: 409, y: 212, w: 232 } }[winner.c.id];
     const wart = winner.c.id === 'kenji' ? this.ua.selkenji : this.ua.selmack;
+
+    // 2026-07-11 R6 换皮 (静态稿拍板后实装): full-bleed sun/moon backdrop,
+    // 现网 layout 不动 — 标题改画在通栏匾额上(胜=朱漆金穗/败=藍染銀月,
+    // 与回合公告匾同字体同字号), 其余元素(勝利/敗北·MAX COMBO·居中立绘·
+    // 台词框·按键行)与旧版像素级同位。素材缺任何一件则整体回退旧画法。
+    const BG = playerWon ? this.ua.reswin : this.ua.reslose;
+    const TB = playerWon ? this.ua.bandwin : this.ua.bandlose;
+    if (BG && TB) {
+      ctx.drawImage(BG, 0, 0, 1024, 576);
+      if (wart) ctx.drawImage(wart, RW.x, RW.y, RW.w, RW.w * 344 / 320);
+      else this.drawBust(ctx, winner.c.id, 384, 246, 256, 190, false);
+      const bh = 1024 * TB.height / TB.width;
+      ctx.drawImage(TB, 0, 114 - bh * 0.32, 1024, bh); // parchment center 114
+      this.pixText(ctx, playerWon ? 'VICTORY' : 'DEFEAT', 512, 128, { // 114 + 0.42em
+        size: 34, align: 'center', color: playerWon ? '#2a1b10' : '#1a2028', spacing: 4,
+      });
+      this.pixText(ctx, playerWon ? '勝利' : '敗北', 512, 194, { size: 22, align: 'center', color: '#f4f1e8', outline: true });
+      this.pixText(ctx, `MAX COMBO: ${G.stats.maxCombo} ${G.stats.maxCombo === 1 ? 'HIT' : 'HITS'}`, 512, 220, { size: 13, align: 'center', color: '#c9d2e8', outline: true });
+      const quote2 = `${winner.c.name}: "${QUOTES_EN[winner.c.id] || winner.c.quoteWin}"`;
+      // 11 = 最长台词(剣二)不触发 maxW 缩放的字号 → 两个角色的台词字号统一
+      const qw2 = Math.ceil(this.textW(ctx, quote2, 11)) + 44;
+      if (this.ua.panel) this.nine(ctx, this.ua.panel, 512 - qw2 / 2, 428, qw2, 62, 0.14);
+      else this.panel(ctx, 512 - qw2 / 2, 428, qw2, 62, { accent: winner.c.theme });
+      this.pixText(ctx, quote2, 512, 464, { size: 11, align: 'center', color: '#dfe4f2' });
+      this.pixText(ctx, 'J REMATCH · K CHARACTER · ESC TITLE', 512, 530, {
+        size: 14, align: 'center', color: G.tick % 40 < 25 ? '#ffe27a' : '#8892ad',
+      });
+      return;
+    }
+
+    ctx.drawImage(this.bgCanvas(G), 0, 0);
+    ctx.fillStyle = 'rgba(7,8,12,0.82)';
+    ctx.fillRect(0, 0, 1024, 576);
+
     if (wart) ctx.drawImage(wart, RW.x, RW.y, RW.w, RW.w * 344 / 320);
     else this.drawBust(ctx, winner.c.id, 384, 246, 256, 190, false);
 
@@ -1094,11 +1202,6 @@ const UI = {
     });
     this.pixText(ctx, playerWon ? '勝利' : '敗北', 512, RB ? 194 : 172, { size: 22, align: 'center', color: '#f4f1e8', outline: true }); // 下移 176->194: 不压顶部彩带下边框(Eric)
 
-    // victory quotes in Japanese-flavored English (UI-layer table; data.js untouched)
-    const QUOTES_EN = {
-      mack: 'The blade... returns to its sheath.',
-      kenji: '...Too slow.',
-    };
     const quote = `${winner.c.name}: "${QUOTES_EN[winner.c.id] || winner.c.quoteWin}"`;
     // box hugs the text (long quotes shrank past pixText's size floor and overflowed a fixed box)
     const qw = Math.min(560, Math.ceil(this.textW(ctx, quote, 13)) + 44);
@@ -1117,7 +1220,7 @@ const UI = {
 
   // ---- pause ------------------------------------------------------------------------
   drawPause(ctx, G) {
-    if (G.pauseView === 'keys') { this.drawControls(ctx, G, true); return; }
+    if (G.pauseView === 'keys') { Howto.draw(ctx, G); return; } // 新图鉴(旧文字版仅存 git)
     ctx.fillStyle = 'rgba(7,8,12,0.7)';
     ctx.fillRect(0, 0, 1024, 576);
     if (this.ua.panel) this.nine(ctx, this.ua.panel, 352, 178, 320, 220, 0.2);
@@ -1140,7 +1243,7 @@ const UI = {
   // frames), alpha-bbox trim, inner-window metrics, and pre-composed
   // display-size canvases for the HUD bars. Every step is fail-safe: a broken
   // asset leaves ua[key] = null and the programmatic drawing takes over.
-  async loadAssets() {
+  async loadAssets(onProgress) {
     const jobs = {
       portrait: () => this._procHole('portrait-frame.png'),
       hpframe:  () => this._procHpFrame(),
@@ -1152,6 +1255,13 @@ const UI = {
       vs:       () => this._procSimple('vs-emblem-v2.png'),
       stage:    () => this._procStage(),
       announce: () => this._procSimple('announce-brush.png').then(t => this._inkCentroid(t)),
+      // 2026-07-11 R6 换皮: full-bleed plaque bands (公告黑金/胜朱漆/败藍染,
+      // band_refine.py 像素化烘焙) + result sun/moon backdrops
+      band2:    () => this._loadImg('band2-cut.png'),
+      bandwin:  () => this._loadImg('band-win.png'),
+      bandlose: () => this._loadImg('band-lose.png'),
+      reswin:   () => this._loadImg('result-win.png'),
+      reslose:  () => this._loadImg('result-lose.png'),
       cursor:   () => this._procSimple('cursor-fan.png'),
       // size-matched character-select busts (pre-composed transparent, 320x344)
       selmack:  () => this._loadImg('portrait-hayato-sel.png'),
@@ -1181,19 +1291,59 @@ const UI = {
       await Promise.race([document.fonts.load('90px KouzanBrush'), new Promise(r => setTimeout(r, 2500))]);
       return true;
     };
-    // announcement backdrop: DEFAULT = decorated lacquer band (Eric's pick);
-    // ?ann=ink|plaque|ink2 keeps the alternatives switchable
-    this.ann = ['ink', 'plaque', 'ink2'].includes(q.get('ann')) ? q.get('ann') : 'band';
+    // announcement backdrop: DEFAULT = band2 full-bleed plaque w/ tassels
+    // (2026-07-11 Eric 拍板 R6); ?ann=band 切回旧漆带, ink/plaque/ink2 备选
+    this.ann = ['ink', 'plaque', 'ink2', 'band'].includes(q.get('ann')) ? q.get('ann') : 'band2';
     if (this.ann === 'ink2') jobs.announce = () => this._procSimple('announce-brush-slim.png').then(t => this._inkCentroid(t));
     this.guardDemo = q.has('guarddemo'); // debug: freeze-frame the guard crescents
     // select screen uses the moonlit courtyard by default (拍板 C); ?selbg=dusk reverts
     this.selbg = q.get('selbg') !== 'dusk';
     if (this.selbg) jobs.selmoon = () => this._procTitleBg('titlebg-moon.png', 40);
 
-    for (const [k, fn] of Object.entries(jobs)) {
+    // ?loaddelay=N — debug: pause N ms per asset so the loading screen can be
+    // watched/reviewed (it flashes by on a fast/cached machine). 0 in normal use.
+    const loadDelay = Math.max(0, Math.min(600, parseInt(q.get('loaddelay'), 10) || 0));
+    // the loading screen IS the title page — fetch its three ingredients first
+    // so the boot screen becomes the real page as early as possible
+    const pr = k => { const i = ['brushfont', 'tbg', 'temblem'].indexOf(k); return i < 0 ? 9 : i; };
+    const entries = Object.entries(jobs).sort((a, b) => pr(a[0]) - pr(b[0]));
+    let done = 0;
+    for (const [k, fn] of entries) {
       try { this.ua[k] = await fn(); }
       catch (e) { console.warn('UI asset "' + k + '" failed, using fallback:', e); this.ua[k] = null; }
+      done++;
+      if (onProgress) onProgress(done / entries.length); // drives the loading bar
+      if (loadDelay) await new Promise(r => setTimeout(r, loadDelay));
     }
+  },
+
+  // boot/loading screen — literally the press-any-key title page (same bg,
+  // embers, emblem, brush 刀魂) with a load bar in the PRESS ANY KEY slot.
+  // main.js starts the render loop before assets resolve; drawTitle degrades
+  // gracefully (gradient bg / fallback logo) until its own art lands, which
+  // loadAssets fetches first.
+  drawLoading(ctx, G, progress) {
+    this.drawTitle(ctx, G, Math.max(0, Math.min(1, progress || 0)));
+  },
+
+  // lacquer load bar, sitting where PRESS ANY KEY will appear
+  _loadBar(ctx, G, p) {
+    const bw = 340, bh = 12, bx = 512 - bw / 2, by = 506;
+    const pulse = 0.6 + 0.4 * Math.abs(Math.sin(G.tick * 0.055));
+    ctx.save(); ctx.globalAlpha = pulse;
+    this.pixText(ctx, 'NOW LOADING', bx, by - 10, { size: 11, color: '#d9a441', spacing: 3 });
+    ctx.restore();
+    this.pixText(ctx, Math.round(p * 100) + '%', bx + bw, by - 10, { size: 11, align: 'right', color: '#ffe27a' });
+    ctx.fillStyle = '#0d0706'; ctx.fillRect(bx, by, bw, bh);
+    const fw = Math.round(bw * p);
+    if (fw > 0) {
+      const fg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      fg.addColorStop(0, '#8a1f16'); fg.addColorStop(0.6, '#c93527'); fg.addColorStop(1, '#e8b24e');
+      ctx.fillStyle = fg; ctx.fillRect(bx, by, fw, bh);
+      ctx.fillStyle = 'rgba(255,231,138,0.95)'; ctx.fillRect(bx + Math.max(0, fw - 2), by, 2, bh); // leading glint
+    }
+    ctx.strokeStyle = '#c9a24a'; ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
   },
 
   // square scene art → 1024x576 band starting at source row `top`
@@ -1210,7 +1360,8 @@ const UI = {
       const i = new Image();
       i.onload = () => res(i);
       i.onerror = () => rej(new Error('missing ' + file));
-      i.src = '/assets/ui-lab/' + file;
+      // 无损 WebP 版本(逐可见像素与 png 一致, 首屏 -3MB); png 原稿保留做源文件
+      i.src = '/assets/ui-lab/' + file.replace(/\.png$/, '.webp');
     });
   },
 

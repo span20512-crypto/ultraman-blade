@@ -166,7 +166,7 @@ function tryHit(a, b, boxA, moveA) {
   moveA.hasHit = true;
 
   // i-frames / off-the-ground: whiff
-  if (b.invuln > 0 || b.state === 'down' || b.state === 'getup') {
+  if (b.invuln > 0 || b.state === 'down' || b.state === 'getup' || b.juggleImmune()) {
     if (b.state === 'backdash') {
       Effects.text(b.x, b.y - 195, '回避!', '#35e0d8', 16);
       AudioSys.sfx('dodge');
@@ -251,7 +251,7 @@ function resolveCombat() {
     const t = pr.owner === f1 ? f2 : f1;
     if (t.dead || t.superSeq) continue;
     if (!rectsOverlap(pr.box(), t.bodyBox())) continue;
-    if (t.invuln > 0 || t.state === 'down' || t.state === 'getup') {
+    if (t.invuln > 0 || t.state === 'down' || t.state === 'getup' || t.juggleImmune()) {
       if (t.state === 'backdash' && !pr.dodged) {
         pr.dodged = true;
         Effects.text(t.x, t.y - 195, '回避!', '#35e0d8', 16);
@@ -261,9 +261,11 @@ function resolveCombat() {
       continue;
     }
     const pd = pr.def;
+    // proj: 飞行道具命中不消耗浮空追击配额(Eric: 空中点到人后还能贱贱补一刀);
+    // launch: 空中被点到会小幅上浮, 给投掷者冲过去补刀的时间
     const res = t.receiveHit({
       dmg: pd.dmg, chip: pd.chip, guardDmg: pd.guardDmg, knock: pd.knock, hitstun: pd.hitstun,
-      blockstun: pd.blockstun, meterHit: pd.meterHit, hitSfx: 'hitL',
+      blockstun: pd.blockstun, meterHit: pd.meterHit, hitSfx: 'hitL', proj: true, launch: pd.launch,
     }, pr.owner);
     pr.dead = true;
     Effects.spark(pr.x, pr.y, Math.sign(pr.vx), res === 'block' ? ['#35b9e0', '#8ad8ff'] : ['#c9baff', '#7d5bff', '#ffffff'], 10, 5);
@@ -311,11 +313,9 @@ function updateTitle() {
   }
 }
 
+// How to Play 图鉴(js/howto.js): 真引擎演示台; 旧文字版 drawControls 仅存于暂停 overlay
 function updateControls() {
-  if (Input.consume('KeyJ') || Input.consume('KeyK') || Input.consume('Escape')) {
-    AudioSys.sfx('menuBack');
-    G.screen = 'title';
-  }
+  Howto.update(G);
 }
 
 function updateSelect() {
@@ -386,7 +386,9 @@ function updateFight() {
       if (Input.consume('KeyJ')) { G.paused = false; AudioSys.sfx('menuSel'); }
       else if (Input.consume('KeyK')) { G.pauseView = 'keys'; AudioSys.sfx('menuMove'); }
     } else {
-      if (Input.consume('KeyJ') || Input.consume('KeyK')) { G.pauseView = 'menu'; AudioSys.sfx('menuBack'); }
+      // 暂停里的 How to Play = 完整新图鉴(旧文字版已废, Eric 2026-07-11);
+      // overlay 模式下 K/ESC 由 Howto 内部路由回暂停菜单
+      Howto.update(G, true);
     }
     return;
   }
@@ -585,12 +587,9 @@ function draw() {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, 1024, 576);
   switch (G.screen) {
-    case 'boot':
-      ctx.fillStyle = '#0b0d12'; ctx.fillRect(0, 0, 1024, 576);
-      UI.pixText(ctx, 'LOADING...', 512, 300, { size: 18, align: 'center', color: '#8892ad' });
-      break;
+    case 'boot': UI.drawLoading(ctx, G, bootProgress); break;
     case 'title': UI.drawTitle(ctx, G); break;
-    case 'controls': UI.drawControls(ctx, G); break;
+    case 'controls': Howto.draw(ctx, G); break;
     case 'select': UI.drawSelect(ctx, G); break;
     case 'result': UI.drawResult(ctx, G); break;
     case 'fight': drawFight(); break;
@@ -678,10 +677,23 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
+let bootProgress = 0; // 0..1 across the whole load; drives the loading-screen bar
+
 (async function boot() {
+  // start the render loop NOW so the loading screen shows immediately instead of
+  // a black canvas while assets stream in (G.screen is 'boot' until title).
+  last = performance.now();
+  requestAnimationFrame(loop);
+  // ?loadhold=<0-100> — debug: freeze on the (fully loaded) loading screen at N%
+  const _hold = new URLSearchParams(location.search).get('loadhold');
+  const _holdP = _hold === null ? null : Math.max(0, Math.min(1, (parseInt(_hold, 10) || 60) / 100));
   try {
+    // UI art first — the loading screen upgrades to the real title page as soon
+    // as its own ingredients (brush font + gate bg + emblem, fetched first) land
+    await UI.loadAssets(p => { bootProgress = _holdP !== null ? _holdP : p * 0.85; });
+    if (_holdP !== null) return; // debug: stay on the loading screen
     await Assets.load();
-    await UI.loadAssets(); // 和风 UI art; per-asset failures fall back internally
+    bootProgress = 0.92;
     try {
       await Promise.race([
         Promise.all([document.fonts.load('16px PressStart'), document.fonts.load('16px FusionPixel'), document.fonts.load('16px FusionPixelJA')]),
@@ -691,10 +703,9 @@ function loop(now) {
     Stage.build();
     UI.makePortraits();
     applyUrlParams();
+    bootProgress = 1;
     if (G.screen === 'boot') G.screen = 'title';
   } catch (e) {
     showErr(e);
   }
-  last = performance.now();
-  requestAnimationFrame(loop);
 })();
