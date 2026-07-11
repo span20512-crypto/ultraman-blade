@@ -1304,17 +1304,21 @@ const UI = {
     // watched/reviewed (it flashes by on a fast/cached machine). 0 in normal use.
     const loadDelay = Math.max(0, Math.min(600, parseInt(q.get('loaddelay'), 10) || 0));
     // the loading screen IS the title page — fetch its three ingredients first
-    // so the boot screen becomes the real page as early as possible
+    // so the boot screen becomes the real page as early as possible, then
+    // stream the REST CONCURRENTLY: the old serial `await` paid one full
+    // network round-trip per asset (~30×RTT ≈ 一分钟 on high-latency VPN links)
     const pr = k => { const i = ['brushfont', 'tbg', 'temblem'].indexOf(k); return i < 0 ? 9 : i; };
     const entries = Object.entries(jobs).sort((a, b) => pr(a[0]) - pr(b[0]));
     let done = 0;
-    for (const [k, fn] of entries) {
+    const runJob = async ([k, fn]) => {
       try { this.ua[k] = await fn(); }
       catch (e) { console.warn('UI asset "' + k + '" failed, using fallback:', e); this.ua[k] = null; }
+      if (loadDelay) await new Promise(r => setTimeout(r, loadDelay));
       done++;
       if (onProgress) onProgress(done / entries.length); // drives the loading bar
-      if (loadDelay) await new Promise(r => setTimeout(r, loadDelay));
-    }
+    };
+    for (const e of entries.slice(0, 3)) await runJob(e); // title trio, in order
+    await Promise.all(entries.slice(3).map(runJob));      // everything else at once
   },
 
   // boot/loading screen — literally the press-any-key title page (same bg,
