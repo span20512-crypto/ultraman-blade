@@ -1,0 +1,8 @@
+# Cloudflare Pages headers — 静态素材长缓存(重复访问免逐文件 revalidate,
+# 高延迟链路二次打开从 ~30×RTT 降到 0)。素材极少变动, 7 天可接受;
+# js/html 保持默认 revalidate(改版即时生效)。
+/assets/*
+  Cache-Control: public, max-age=604800
+
+/favicon.ico
+  Cache-Control: public, max-age=604800
