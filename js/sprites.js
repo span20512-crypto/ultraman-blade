@@ -10,7 +10,29 @@ const Assets = {
     const list = [
       ['bg', 'assets/img/background.png'],
       ['shop', 'assets/img/shop.png'],
+      ['icon:mack:portrait', 'assets/img/ultraman-icons/crops/ultraman-portrait.webp'],
+      ['icon:mack:light', 'assets/img/ultraman-icons/crops/ultraman-light.webp'],
+      ['icon:mack:special', 'assets/img/ultraman-icons/crops/ultraman-special.webp'],
+      ['icon:mack:super', 'assets/img/ultraman-icons/crops/ultraman-super.webp'],
+      ['icon:kenji:portrait', 'assets/img/ultraman-icons/crops/zero-portrait.webp'],
+      ['icon:kenji:light', 'assets/img/ultraman-icons/crops/zero-light.webp'],
+      ['icon:kenji:special', 'assets/img/ultraman-icons/crops/zero-special.webp'],
+      ['icon:kenji:super', 'assets/img/ultraman-icons/crops/zero-super.webp'],
+      ['icon:monster:mack', 'assets/img/ultraman-icons/crops/monster-1.webp'],
+      ['icon:monster:kenji', 'assets/img/ultraman-icons/crops/monster-2.webp'],
     ];
+    const monsterMoveIcons = [
+      'portrait', 'move', 'crouch', 'dash',
+      'light', 'heavy', 'clight', 'cheavy',
+      'airlight', 'dive', 'special', 'super',
+      'guard', 'crush', 'combo', 'finisher',
+    ];
+    const monsterIconFiles = { mack: 'monster-1', kenji: 'monster-2' };
+    for (const [cid, fileBase] of Object.entries(monsterIconFiles)) {
+      for (const move of monsterMoveIcons) {
+        list.push([`icon:monster:${cid}:${move}`, `assets/img/ultraman-icons/monster-moves/${fileBase}-${move}.webp`]);
+      }
+    }
     for (const cid of Object.keys(DATA)) {
       const c = DATA[cid];
       for (const [aname, a] of Object.entries(c.anims)) {

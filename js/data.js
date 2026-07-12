@@ -42,7 +42,7 @@ const CHAIN_RANK = { light: 1, heavy: 2, special: 3, super: 4 };
 const DATA = {
   mack: {
     id: 'mack',
-    name: 'KENJI', cn: '剣二', title: '豪剣の侍', type: 'POWER',
+    name: 'ULTRAMAN', cn: '初代奥特曼', title: '光之巨人', type: 'POWER',
     theme: '#ff4a3d', theme2: '#ffc531',
     dir: 'assets/img/mack', native: 1, scale: 2.75,
     anchor: { x: 98, y: 122 },
@@ -175,7 +175,7 @@ const DATA = {
 
   kenji: {
     id: 'kenji',
-    name: 'HAYATO', cn: '隼人', title: '疾影の忍', type: 'SPEED',
+    name: 'ZERO', cn: '赛罗奥特曼', title: '光之战士', type: 'SPEED',
     theme: '#7d5bff', theme2: '#35e0d8',
     dir: 'assets/img/kenji', native: -1, scale: 2.75,
     anchor: { x: 100, y: 126 },
