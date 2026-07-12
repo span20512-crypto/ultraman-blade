@@ -3,7 +3,7 @@
 KOF 风格的和风像素格斗游戏 —— 纯 vanilla JS + Canvas,**零依赖、零构建**,首屏 ~12MB。
 人机对战,2 个可选角色,完整格斗机制(连锁/方向格挡/护条破防/浮空连段/超必演出)+ 练习场 + 招式图鉴。
 
-**🎮 在线试玩:https://soul-blade.pages.dev**(电脑键盘操作)
+🎮 在线试玩:https://soul-blade.pages.dev (需要电脑 + 键盘操作)
 
 ![标题页](docs/title.webp)
 ![回合开场](docs/round-banner.webp)
