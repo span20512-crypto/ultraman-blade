@@ -4,3 +4,7 @@ assets/tmp/
 # 本地交接文件, 不入库
 HANDOFF.md
 .wrangler/
+
+# 本地部署产物/密钥, 不入库
+dist/
+.env

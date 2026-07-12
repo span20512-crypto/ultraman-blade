@@ -20,6 +20,23 @@ const FX_SHEETS = {
   ma2: { file: 'assets/img/fxcres/mack-a2.png', frames: 2, smearFrames: [0, 1] },
 };
 
+/* 奥特曼换皮 (2026-07-12): 战斗本体改静态立绘 —— 玩家侧 = 奥特曼英雄,
+   对手侧 = 怪兽(prep-stills.js 白底抠图, 烘焙成 320 方格单帧"表", 脚底线
+   y=304, 绘制比例 1:1)。姿态由 fighter.draw 的程序化 pose(倾角/压缩/弹跳)
+   表达; 帧数据/判定框/招式时序全部不动, 武士帧表仍加载供刀光 smear 提取。
+   native: 立绘素材朝向(怪兽画稿面朝左, 同旧剑二) */
+const STILLS = {
+  mack: {
+    hero:  { file: 'assets/img/still/ultra-mack.png', native: 1 },
+    rival: { file: 'assets/img/still/kaiju-mack.png', native: -1 },
+  },
+  kenji: {
+    hero:  { file: 'assets/img/still/ultra-kenji.png', native: 1 },
+    rival: { file: 'assets/img/still/kaiju-kenji.png', native: -1 },
+  },
+};
+const STILL_FS = 320, STILL_FEET = 304; // 方格边长 / 脚底线(烘焙常量)
+
 const CHAIN_RANK = { light: 1, heavy: 2, special: 3, super: 4 };
 
 const DATA = {

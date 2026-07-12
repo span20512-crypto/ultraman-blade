@@ -157,9 +157,24 @@ const UI = {
 
   // size-matched select/result bust (320x344, faces pre-aligned). Draws head+
   // shoulders into (rx,ry,rw,rh) clipped; falls back to the sprite preview.
+  // 奥特曼/怪兽立绘的 HUD 脸部取景(prep-portraits.js 按头部 bbox 计算,
+  // 88-unit 空间): u: = 英雄脸部特写, k: = 怪兽全身
+  stillCrop: {
+    'u:mack': { x: -51.5, y: -0.3, w: 191.9 }, 'u:kenji': { x: -63.3, y: -0.8, w: 214.8 },
+    'k:mack': { x: -3.2, y: 2.2, w: 93.1 }, 'k:kenji': { x: -13.8, y: 1.6, w: 117.7 },
+  },
+
+  // side-aware bust art: player side = Ultraman hero, rival side = kaiju.
+  // Falls back to the old samurai bust when the new art is missing.
+  bustArt(cid, rival) {
+    const nu = rival ? (cid === 'kenji' ? this.ua.kaijukenji : this.ua.kaijumack)
+                     : (cid === 'kenji' ? this.ua.ultrakenji : this.ua.ultramack);
+    return nu || (cid === 'kenji' ? this.ua.selkenji : this.ua.selmack);
+  },
+
   // zoom > 1 scales around the window center (hover feedback).
-  drawBust(ctx, cid, rx, ry, rw, rh, dim, zoom = 1) {
-    const art = cid === 'kenji' ? this.ua.selkenji : this.ua.selmack;
+  drawBust(ctx, cid, rx, ry, rw, rh, dim, zoom = 1, rival = false) {
+    const art = this.bustArt(cid, rival);
     if (!art) { this.drawCharPreview(ctx, cid, rx + rw / 2, ry + rh + 40, 2.25, 0, 'idle', cid === 'mack'); return; }
     const s = rw / 320 * zoom;          // fit width; art is 320 wide
     const ox = (320 * s - rw) / 2;
@@ -232,13 +247,19 @@ const UI = {
     // portraits: gold-corner lacquer frame asset (tassel mirrored to the
     // outside); face art = square crops of the select busts, sprite-crop fallback
     const P = this.ua.portrait;
-    // face crop framing set by Eric in the layout editor (88-unit space)
-    const HUD_CROP = { mack: { x: -2.7, y: -12.3, w: 110.3 }, kenji: { x: 7, y: -5.7, w: 99.3 } };
+    // face crop framing: old samurai values set by Eric in the layout editor
+    // (88-unit space); u:/k: entries live in stillCrop (shared with the baked
+    // howto-tab faces)
+    const HUD_CROP = Object.assign({
+      mack: { x: -2.7, y: -12.3, w: 110.3 }, kenji: { x: 7, y: -5.7, w: 99.3 },
+    }, this.stillCrop);
     for (const [f, px, mir] of [[f1, 12, true], [f2, 924, false]]) {
+      const rival = f === f2;
       const shakeX = f.flash > 0 ? (Math.random() * 4 - 2) : 0;
       const face = (f.c.id === 'kenji' ? this.ua.hudkenji : this.ua.hudmack) || this.portraits[f.c.id];
-      const selArt = f.c.id === 'kenji' ? this.ua.selkenji : this.ua.selmack;
-      const HC = HUD_CROP[f.c.id];
+      const selArt = this.bustArt(f.c.id, rival);
+      const newArt = selArt && selArt !== this.ua.selmack && selArt !== this.ua.selkenji;
+      const HC = HUD_CROP[newArt ? (rival ? 'k:' : 'u:') + f.c.id : f.c.id];
       if (P) {
         const s = 86 / P.inner.w;
         ctx.fillStyle = '#141110';
@@ -1007,7 +1028,7 @@ const UI = {
       ctx.restore();
       // matched busts instead of tiny floor-less idle sprites
       this.drawBust(ctx, s.p1, 118 - off, 158, 264, 232, false, 1);
-      this.drawBust(ctx, s.p2, 686 + off, 158, 264, 232, false, 1); // 右立绘再外移, 加大与徽章间距
+      this.drawBust(ctx, s.p2, 686 + off, 158, 264, 232, false, 1, true); // 右立绘再外移, 加大与徽章间距; 对手侧=怪兽
       this.pixTextMixed(ctx, `${DATA[s.p1].name} · ${DATA[s.p1].cn}`, 250 - off, 480, { size: 20, align: 'center', color: DATA[s.p1].theme, outline: true });
       this.pixTextMixed(ctx, `${DATA[s.p2].name} · ${DATA[s.p2].cn}`, 818 + off, 480, { size: 20, align: 'center', color: DATA[s.p2].theme, outline: true });
       const vsScale = 1 + Math.max(0, 12 - t) * 0.3;
@@ -1058,8 +1079,13 @@ const UI = {
       // bust exactly where Eric placed it in the layout editor (R12): the art
       // pops over the panel frame; nameplate strip is drawn ON TOP of the
       // chest afterwards, so name/type sit on the plate's dark backing
-      const B = { mack: { x: 188, y: 89, w: 300 }, kenji: { x: 609, y: 111, w: 262 } }[cid];
-      const art = cid === 'kenji' ? this.ua.selkenji : this.ua.selmack;
+      const art = this.bustArt(cid, false);
+      const newArt = art === this.ua.ultramack || art === this.ua.ultrakenji;
+      // new Ultraman art is centered full-figure in its 320 frame -> center on
+      // the panel; old bust art keeps Eric's layout-editor anchors
+      const B = newArt
+        ? { x: x + 10, y: 120, w: 300 }
+        : { mack: { x: 188, y: 89, w: 300 }, kenji: { x: 609, y: 111, w: 262 } }[cid];
       if (art) {
         ctx.save();
         if (!(hovered || chosen)) ctx.filter = 'brightness(0.72) saturate(0.9)';
@@ -1154,10 +1180,14 @@ const UI = {
       kenji: '...Too slow.',
     };
 
-    // winner bust per the layout editor (Eric placed hayato; kenji derived by
-    // matching the displayed eye-line and face center: same anchors, own scale)
-    const RW = { mack: { x: 392, y: 199, w: 266 }, kenji: { x: 409, y: 212, w: 232 } }[winner.c.id];
-    const wart = winner.c.id === 'kenji' ? this.ua.selkenji : this.ua.selmack;
+    // winner bust: player won -> Ultraman hero, rival won -> kaiju. New art is
+    // centered full-figure, so it centers on 1024; old samurai busts keep the
+    // layout-editor anchors (Eric placed hayato; kenji derived to match)
+    const wart = this.bustArt(winner.c.id, !playerWon);
+    const newArt = wart && wart !== this.ua.selmack && wart !== this.ua.selkenji;
+    const RW = newArt
+      ? { x: 379, y: 190, w: 266 }
+      : { mack: { x: 392, y: 199, w: 266 }, kenji: { x: 409, y: 212, w: 232 } }[winner.c.id];
 
     // 2026-07-11 R6 换皮 (静态稿拍板后实装): full-bleed sun/moon backdrop,
     // 现网 layout 不动 — 标题改画在通栏匾额上(胜=朱漆金穗/败=藍染銀月,
@@ -1168,7 +1198,7 @@ const UI = {
     if (BG && TB) {
       ctx.drawImage(BG, 0, 0, 1024, 576);
       if (wart) ctx.drawImage(wart, RW.x, RW.y, RW.w, RW.w * 344 / 320);
-      else this.drawBust(ctx, winner.c.id, 384, 246, 256, 190, false);
+      else this.drawBust(ctx, winner.c.id, 384, 246, 256, 190, false, 1, !playerWon);
       const bh = 1024 * TB.height / TB.width;
       ctx.drawImage(TB, 0, 114 - bh * 0.32, 1024, bh); // parchment center 114
       this.pixText(ctx, playerWon ? 'VICTORY' : 'DEFEAT', 512, 128, { // 114 + 0.42em
@@ -1193,7 +1223,7 @@ const UI = {
     ctx.fillRect(0, 0, 1024, 576);
 
     if (wart) ctx.drawImage(wart, RW.x, RW.y, RW.w, RW.w * 344 / 320);
-    else this.drawBust(ctx, winner.c.id, 384, 246, 256, 190, false);
+    else this.drawBust(ctx, winner.c.id, 384, 246, 256, 190, false, 1, !playerWon);
 
     const RB = this.ua.announce;
     if (RB) this.annBack(ctx, 512, 114, 640, 46); // band center 114
@@ -1266,6 +1296,12 @@ const UI = {
       // size-matched character-select busts (pre-composed transparent, 320x344)
       selmack:  () => this._loadImg('portrait-hayato-sel.png'),
       selkenji: () => this._loadImg('portrait-kenji-sel.png'),
+      // 奥特曼换皮 (2026-07-12): 玩家侧立绘 = 奥特曼英雄, 对手侧 = 怪兽
+      // (同 320x344 透明格式, prep-portraits.js 白底抠图烘焙; 缺失回退武士 bust)
+      ultramack:  () => this._loadImg('portrait-ultra-mack-sel.png'),
+      ultrakenji: () => this._loadImg('portrait-ultra-kenji-sel.png'),
+      kaijumack:  () => this._loadImg('portrait-kaiju-mack-sel.png'),
+      kaijukenji: () => this._loadImg('portrait-kaiju-kenji-sel.png'),
       // square face crops of the same busts for the battle HUD (168px → 84)
       hudmack:  () => this._loadImg('portrait-hayato-hud.png'),
       hudkenji: () => this._loadImg('portrait-kenji-hud.png'),
@@ -1319,6 +1355,18 @@ const UI = {
     };
     for (const e of entries.slice(0, 3)) await runJob(e); // title trio, in order
     await Promise.all(entries.slice(3).map(runJob));      // everything else at once
+
+    // 奥特曼小头像: 从英雄立绘烘 84 方脸, 顶替旧武士 hud 头像(图鉴 tab /
+    // HUD 兜底共用)。取景与 stillCrop u: 一致 —— 窗口原点在 (2,2) 偏移处
+    const bakeFace = (art, HC) => {
+      if (!art || !HC) return null;
+      const [cv, g] = this._cv(84, 84);
+      g.imageSmoothingEnabled = true;
+      g.drawImage(art, HC.x - 2, HC.y - 2, HC.w, HC.w * 344 / 320);
+      return cv;
+    };
+    this.ua.hudmack = bakeFace(this.ua.ultramack, this.stillCrop['u:mack']) || this.ua.hudmack;
+    this.ua.hudkenji = bakeFace(this.ua.ultrakenji, this.stillCrop['u:kenji']) || this.ua.hudkenji;
   },
 
   // boot/loading screen — literally the press-any-key title page (same bg,

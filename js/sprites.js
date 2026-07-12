@@ -20,6 +20,12 @@ const Assets = {
     if (typeof FX_SHEETS !== 'undefined') {
       for (const [name, s] of Object.entries(FX_SHEETS)) list.push([`fx:${name}`, s.file]);
     }
+    // 奥特曼/怪兽静态战斗立绘(单帧方格表, 键 still:hero:mack 等)
+    if (typeof STILLS !== 'undefined') {
+      for (const [cid, sides] of Object.entries(STILLS)) {
+        for (const [side, st] of Object.entries(sides)) list.push([`still:${side}:${cid}`, st.file]);
+      }
+    }
     return Promise.all(list.map(([key, src]) => new Promise((res, rej) => {
       const img = new Image();
       img.onload = () => { Assets.images[key] = img; res(); };
@@ -321,6 +327,18 @@ const Effects = {
   cloneRun(fighter, animName, x0, x1, y, dur, onMid, opts = {}) {
     const mvDir = Math.sign(x1 - x0) || 1;
     const face = opts.face !== undefined ? opts.face : mvDir;
+    // 静态立绘模式: 分身用本体的 still 单帧(帧序钳到 0), 锚点=方格脚底中心
+    const st = fighter.stillDef && fighter.stillDef();
+    if (st) {
+      this.cloneRuns.push({
+        sheet: st.key, fs: STILL_FS, sc: 1,
+        anchorX: STILL_FS / 2, anchorY: STILL_FEET,
+        x0, x1, y, y1: opts.y1 !== undefined ? opts.y1 : y,
+        fadeIn: opts.fadeIn || 0,
+        t: 0, dur, onMid, midFired: false, flip: face !== st.native,
+      });
+      return;
+    }
     this.cloneRuns.push({
       sheet: `${fighter.c.id}:${animName}`, fs: fighter.c.fw || 200, sc: fighter.c.scale,
       anchorX: fighter.c.anchor.x, anchorY: fighter.c.anchor.y,
@@ -961,8 +979,9 @@ const Effects = {
       const u = Math.min(1, c.t / c.dur);
       const x = c.x0 + (c.x1 - c.x0) * u;
       const y = c.y + (c.y1 - c.y) * u;
-      // 攻击帧序: 前半程 f0(奔), 中段 f1(斩), 后段 f2/f3(收)
-      const f = u < 0.35 ? 0 : u < 0.6 ? 1 : u < 0.8 ? 2 : 3;
+      // 攻击帧序: 前半程 f0(奔), 中段 f1(斩), 后段 f2/f3(收); 单帧表钳到 0
+      const f = Math.min(u < 0.35 ? 0 : u < 0.6 ? 1 : u < 0.8 ? 2 : 3,
+        Math.max(0, Math.floor(img.width / c.fs) - 1));
       const dw = c.fs * c.sc, dh = c.fs * c.sc;
       const dx = x - c.anchorX * c.sc, dy = y - c.anchorY * c.sc;
       ctx.save();

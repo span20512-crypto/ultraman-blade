@@ -5,6 +5,9 @@
 class Fighter {
   constructor(charId, x, facing, world) {
     this.c = DATA[charId];
+    // 奥特曼换皮: 出生朝向定阵营 —— 所有创建点(main/howto/labs)玩家侧都
+    // facing=1, 对手/木桩侧 facing=-1。hero=奥特曼立绘, rival=怪兽立绘
+    this.side = facing < 0 ? 'rival' : 'hero';
     this.world = world;
     this.x = x; this.y = STAGE.ground;
     this.vx = 0; this.vy = 0;
@@ -390,7 +393,10 @@ class Fighter {
       // cullSmear: 连锁第二刀出手瞬间清掉前一刀残迹(两刀不糊)
       if (d.cullSmear) Effects.smears = Effects.smears.filter(s => s.owner !== this);
       // smearAlt: 同招多方案(蹲J·J 三版本), lab 用 cjjVariant 切换预览
-      const sdef = (this.cjjVariant && d.smearAlt && d.smearAlt[this.cjjVariant]) || d.smear;
+      let sdef = (this.cjjVariant && d.smearAlt && d.smearAlt[this.cjjVariant]) || d.smear;
+      // 静态立绘: 帧同步基底不可用(见 draw), smear 转 standalone 独立基底 ——
+      // 闭合月牙按相位在世界坐标绘制, 亮刀光照常出现在旧刀路位置
+      if (sdef && !sdef.standalone && this.stillDef()) sdef = Object.assign({}, sdef, { standalone: true });
       const smeared = sdef && !this.legacyFx ? Effects.smearFx(this, sdef) : false;
       const fxDef = d.fx;
       if (!smeared && fxDef) {
@@ -1006,7 +1012,67 @@ class Fighter {
   }
 
   // ---- drawing ---------------------------------------------------------------
+  // 静态立绘模式: STILLS 里有本方立绘且已加载时, 本体不再画武士帧表。
+  // 帧数据/判定框照旧驱动时序, 只有"画什么"换成单帧 still + 程序化姿态
+  stillDef() {
+    const s = typeof STILLS !== 'undefined' && STILLS[this.c.id] && STILLS[this.c.id][this.side];
+    if (!s) return null;
+    const key = `still:${this.side}:${this.c.id}`;
+    return Assets.img(key) ? { key, native: s.native } : null;
+  }
+
+  /* 静态立绘姿态: 绕脚底(x, y)的倾角/压缩/沉降。旋转正值 = 朝面向方向
+     前倾(镜像内按 flip 补偿, 同俯冲倾角的约定)。幅度刻意克制 —— 立绘是
+     实拍感渲染图, 大角度会露"纸片人"馅 */
+  _stillPose(ctx, p) {
+    const k = p.flip ? -1 : 1;
+    const t = this.world.tick;
+    let rot = 0, sx = 1, sy = 1, dy = 0;
+    // 行走/跑动等身体状态还叫 idle, 姿态跟动画名走
+    const st = this.state === 'idle' ? this.anim.name : this.state;
+    if (st === 'idle') { sy = 1 + 0.012 * Math.sin(t * 0.08); sx = 1 - (sy - 1) * 0.5; }
+    else if (st === 'run') { rot = 0.07; sy = 1 + 0.025 * Math.sin(t * 0.45); }
+    else if (st === 'dash') rot = 0.15;
+    else if (st === 'backdash') rot = -0.11;
+    else if (st === 'jump') { sy = 1.05; sx = 0.96; }
+    else if (st === 'fall') { sy = 0.97; sx = 1.03; }
+    else if (st === 'crouch' || st === 'crouchin') { sy = 0.72; sx = 1.1; }
+    else if (st === 'guard') rot = -0.05;
+    else if (st === 'block') rot = -0.1;
+    else if (st === 'hit') rot = -0.2;
+    else if (st === 'down' || st === 'dead') { rot = -1.45; dy = 4; }
+    else if (st === 'getup') rot = -1.45 * Math.max(0, 1 - this.stateT / 12);
+    else if (st === 'attack' && this.move && !this.move.def.dive) {
+      const m = this.move, d = m.def;
+      const a0 = Math.max(1, d.startup || 6), a1 = a0 + (d.active || 4);
+      const amp = (d.kind === 'heavy' || d.kind === 'super') ? 0.26 : 0.18;
+      if (m.t < a0) rot = -0.08 * (m.t / a0);                 // 起手蓄势后仰
+      else if (m.t <= a1) rot = amp;                          // 判定期前倾突进
+      else rot = Math.max(0, amp - (m.t - a1) * 0.02);        // 收招回正
+      if (this.crouching || d.anim === 'crouch' ||
+          (d.seq && d.seq.i && d.seq.i.a === 'crouch')) { sy = 0.8; sx = 1.06; }
+    }
+    if (this.superSeq) { rot = 0; dy = 0; sy = 1 + 0.01 * Math.sin(t * 0.3); sx = 1; }
+    if (!rot && !dy && sx === 1 && sy === 1) return;
+    const py = this.y + dy;
+    ctx.translate(this.x, py);
+    if (rot) ctx.rotate(rot * k);
+    ctx.scale(sx, sy);
+    ctx.translate(-this.x, -py);
+  }
+
   spriteParams() {
+    const st = this.stillDef();
+    if (st) {
+      let yOff = 0;
+      if (this.state === 'backdash') yOff -= 30 * Math.sin(Math.PI * Math.min(1, this.dashT / 17));
+      return {
+        img: Assets.img(st.key), sx: 0, fw: STILL_FS,
+        dx: this.x - STILL_FS / 2, dy: this.y - STILL_FEET + yOff,
+        dw: STILL_FS, dh: STILL_FS,
+        flip: this.facing !== st.native, mirrorX: this.x, still: true,
+      };
+    }
     const c = this.c;
     const s = c.scale;
     let yOff = 0;
@@ -1044,6 +1110,8 @@ class Fighter {
     if (p.flip) {
       ctx.translate(p.mirrorX, 0); ctx.scale(-1, 1); ctx.translate(-p.mirrorX, 0);
     }
+    // 静态立绘: 绕脚底的程序化姿态(倾/压/弹) —— 单帧的"逐帧动画"平替
+    if (p.still) this._stillPose(ctx, p);
     // nose-down tilt while plunging
     const diving = this.state === 'attack' && this.move && this.move.def.dive &&
                    !this.move.landed && this.move.t >= this.move.def.startup;
@@ -1075,7 +1143,9 @@ class Fighter {
     // 帧同步月牙重染: 画师烘焙在攻击帧里的白月牙, 实时染成招式主题色盖回
     // 原位(同帧同变换, 俯冲旋转/倾角自动继承)。绝不擦原图 —— 月牙压身帧
     // 擦除会咬穿身体(踩过坑)
-    const sm = this.legacyFx ? null
+    // 静态立绘无帧同步基底(p.dx/dw 是 still 方格, 不是攻击帧空间) —— 刀光
+    // 走 attackLogic 的 standalone smear / 程序化 fx 弧线
+    const sm = (this.legacyFx || p.still) ? null
       : (this.state === 'attack' && this.move && this.move.def.smear &&
          this.anim.name === this.move.def.anim) ? this.move.def.smear
       : (this.superSeq && this.cineSmear) ? this.cineSmear : null;

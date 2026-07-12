@@ -3,6 +3,14 @@
 KOF 式和风像素格斗游戏。纯 vanilla JS + Canvas,零依赖,零构建。人机对战,完整格斗机制 + 练习场。
 **2 角色(2026-07 改名:内部 id 不变,只改 DATA.name/cn)**:内部 id `mack` = 显示「**剣二 KENJI**」力量型武士(红/POWER);内部 id `kenji` = 显示「**隼人 HAYATO**」速度型忍者(蓝/SPEED)。注意代码注释里"剑二/隼人"仍按旧义(纯注释)。逻辑一律用 id,不 key 显示名。
 
+## 奥特曼换皮(2026-07-12)
+
+外观层换皮:**玩家侧 = 奥特曼英雄,对手/CPU 侧 = 怪兽**;帧数据/判定框/招式时序/AI 全部不动,武士帧表仍加载(刀光 smear 提取仍靠它)。素材源 `/Users/nana/Desktop/游戏制作/素材/{英雄,怪兽}/基础形象`(白底渲染图),scratchpad 脚本 prep-stills.js / prep-portraits.js 抠底烘焙。
+
+- **战斗本体** = 静态立绘单帧"表"(`assets/img/still/{ultra,kaiju}-{mack,kenji}.png`,320 方格,脚底线 y=304,1:1 绘制)。`data.js STILLS` 注册;`Fighter.side` 由出生朝向定(facing=1 hero / -1 rival,所有创建点一致);`spriteParams()` 走 still 分支;姿态 = `fighter._stillPose()` 程序化倾/压/弹(单帧的逐帧动画平替)。帧同步月牙基底在 still 模式不可用 → attackLogic 把 smear 自动转 standalone;cloneRun 分身也走 still 单帧
+- **UI 立绘/头像** = `assets/ui-lab/portrait-{ultra,kaiju}-{mack,kenji}-sel.{png,webp}`(320x344,同旧 bust 格式);`ui.js bustArt(cid, rival)` 按侧选图,选人页/VS/HUD/结算/图鉴 tab 全接入;HUD 取景表 `UI.stillCrop`,小头像 hudmack/hudkenji 加载后用英雄脸烘焙顶替
+- 英雄映射:mack=01-初代,kenji=03-赛罗;怪兽:mack=怪兽1(独角兽型),kenji=怪兽2(鸟型)。显示名仍是 KENJI/HAYATO 武士名 —— 改名属后续欠账
+
 ## Git 账户(重要,勿违反)
 
 本项目是 Eric 的**个人项目**,一切 git 操作只用个人账户 **ericfu-tianchi**(仓库已 `git config` 锁定 `ericfu-tianchi <ericfu-tianchi@users.noreply.github.com>`)。**严禁**使用其他账户 commit 或 push;push 需 Eric 明确指示。
