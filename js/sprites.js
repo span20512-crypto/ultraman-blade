@@ -10,6 +10,16 @@ const Assets = {
     const list = [
       ['bg', 'assets/img/background.png'],
       ['shop', 'assets/img/shop.png'],
+      ['icon:mack:portrait', 'assets/img/ultraman-icons/crops/ultraman-portrait.webp'],
+      ['icon:mack:light', 'assets/img/ultraman-icons/crops/ultraman-light.webp'],
+      ['icon:mack:special', 'assets/img/ultraman-icons/crops/ultraman-special.webp'],
+      ['icon:mack:super', 'assets/img/ultraman-icons/crops/ultraman-super.webp'],
+      ['icon:kenji:portrait', 'assets/img/ultraman-icons/crops/zero-portrait.webp'],
+      ['icon:kenji:light', 'assets/img/ultraman-icons/crops/zero-light.webp'],
+      ['icon:kenji:special', 'assets/img/ultraman-icons/crops/zero-special.webp'],
+      ['icon:kenji:super', 'assets/img/ultraman-icons/crops/zero-super.webp'],
+      ['icon:monster:mack', 'assets/img/ultraman-icons/crops/monster-1.webp'],
+      ['icon:monster:kenji', 'assets/img/ultraman-icons/crops/monster-2.webp'],
     ];
     for (const cid of Object.keys(DATA)) {
       const c = DATA[cid];

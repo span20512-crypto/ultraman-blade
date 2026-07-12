@@ -397,7 +397,17 @@ const Howto = (() => {
           ctx.fillStyle = '#d9a441'; ctx.fillRect(LIST.x + 4, y - 2, 3, LH);
           if (G.tick % 30 < 22) UI.pixText(ctx, '▶', LIST.x + 12, y + 13, { size: 9, color: '#ffc531' });
         }
-        UI.pixText(ctx, r.en, LIST.x + 26, y + 13, { size: 10, color: i === sel ? '#ffe27a' : '#b3a68d', maxW: 164 });
+        const iconKind = r.def ? 'monster' : (r.mv === 'super' ? 'super' : r.mv === 'special' || r.mv === 'airspecial' ? 'special' : r.mv ? 'light' : 'portrait');
+        const moveIcon = iconKind === 'monster' ? Assets.img(`icon:monster:${charId}`) : Assets.img(`icon:${charId}:${iconKind}`);
+        if (moveIcon) {
+          ctx.save();
+          ctx.beginPath(); ctx.rect(LIST.x + 24, y, 24, 24); ctx.clip();
+          ctx.drawImage(moveIcon, LIST.x + 24, y, 24, 24);
+          ctx.restore();
+          ctx.strokeStyle = i === sel ? '#ffe27a' : '#6a4a24';
+          ctx.strokeRect(LIST.x + 23.5, y - 0.5, 25, 25);
+        }
+        UI.pixText(ctx, r.en, LIST.x + 56, y + 13, { size: 10, color: i === sel ? '#ffe27a' : '#b3a68d', maxW: 134 });
         UI.pixText(ctx, r.jp, LIST.x + LIST.w - 14, y + 14, { size: 11, align: 'right', color: i === sel ? '#d9a441' : '#8a7a5f', maxW: 100 });
       }
     }
