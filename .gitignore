@@ -1,2 +1,6 @@
 assets/tmp/
 .DS_Store
+
+# 本地交接文件, 不入库
+HANDOFF.md
+.wrangler/
