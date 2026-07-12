@@ -335,6 +335,18 @@ const Howto = (() => {
   const INFO = { x: 352, y: 398, w: 646, h: 136 };
   const LH = 22; // list line height
 
+  function monsterIconMove(r) {
+    if (r.def) return r.def === 'crush' ? 'crush' : 'guard';
+    const byKey = {
+      move: 'move', crouch: 'crouch', dash: 'dash',
+      lJ: 'light', hK: 'heavy', cJ: 'clight', cK: 'cheavy',
+      airJ: 'airlight', dive: 'dive', U: 'special', airU: 'special',
+      dashJ: 'dash', I: 'super', JJ: 'combo', KK: 'combo',
+      JJKK: 'combo', JJKU: 'finisher', JJKI: 'finisher',
+    };
+    return byKey[r.key] || 'portrait';
+  }
+
   function draw(ctx, G) {
     ensure();
     ctx.drawImage(UI.bgCanvas(G), 0, 0);
@@ -397,8 +409,7 @@ const Howto = (() => {
           ctx.fillStyle = '#d9a441'; ctx.fillRect(LIST.x + 4, y - 2, 3, LH);
           if (G.tick % 30 < 22) UI.pixText(ctx, '▶', LIST.x + 12, y + 13, { size: 9, color: '#ffc531' });
         }
-        const iconKind = r.def ? 'monster' : (r.mv === 'super' ? 'super' : r.mv === 'special' || r.mv === 'airspecial' ? 'special' : r.mv ? 'light' : 'portrait');
-        const moveIcon = iconKind === 'monster' ? Assets.img(`icon:monster:${charId}`) : Assets.img(`icon:${charId}:${iconKind}`);
+        const moveIcon = Assets.img(`icon:monster:${charId}:${monsterIconMove(r)}`) || Assets.img(`icon:monster:${charId}`);
         if (moveIcon) {
           ctx.save();
           ctx.beginPath(); ctx.rect(LIST.x + 24, y, 24, 24); ctx.clip();

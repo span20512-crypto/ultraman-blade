@@ -21,6 +21,18 @@ const Assets = {
       ['icon:monster:mack', 'assets/img/ultraman-icons/crops/monster-1.webp'],
       ['icon:monster:kenji', 'assets/img/ultraman-icons/crops/monster-2.webp'],
     ];
+    const monsterMoveIcons = [
+      'portrait', 'move', 'crouch', 'dash',
+      'light', 'heavy', 'clight', 'cheavy',
+      'airlight', 'dive', 'special', 'super',
+      'guard', 'crush', 'combo', 'finisher',
+    ];
+    const monsterIconFiles = { mack: 'monster-1', kenji: 'monster-2' };
+    for (const [cid, fileBase] of Object.entries(monsterIconFiles)) {
+      for (const move of monsterMoveIcons) {
+        list.push([`icon:monster:${cid}:${move}`, `assets/img/ultraman-icons/monster-moves/${fileBase}-${move}.webp`]);
+      }
+    }
     for (const cid of Object.keys(DATA)) {
       const c = DATA[cid];
       for (const [aname, a] of Object.entries(c.anims)) {
