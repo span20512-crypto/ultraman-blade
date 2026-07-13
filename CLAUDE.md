@@ -1,7 +1,7 @@
 # 刀魂 SOUL BLADE — 项目交接 (CLAUDE.md)
 
 KOF 式和风像素格斗游戏。纯 vanilla JS + Canvas,零依赖,零构建。人机对战,完整格斗机制 + 练习场。
-**2 角色(2026-07 改名:内部 id 不变,只改 DATA.name/cn)**:内部 id `mack` = 显示「**剣二 KENJI**」力量型武士(红/POWER);内部 id `kenji` = 显示「**隼人 HAYATO**」速度型忍者(蓝/SPEED)。注意代码注释里"剑二/隼人"仍按旧义(纯注释)。逻辑一律用 id,不 key 显示名。
+**2 角色(2026-07-13 奥特曼定名:内部 id 永不变,只改 DATA.name/cn)**:内部 id `mack` = 显示「**ULTRAMAN 初代奥特曼**」力量型(红/POWER);内部 id `kenji` = 显示「**ZERO 赛罗奥特曼**」速度型(蓝/SPEED)。对手侧(rival/CPU)显示名 = `STILLS[cid].rival`「KAIJU 1 怪兽一号 / KAIJU 2 怪兽二号」(`UI.sideName(cid, rival)` 统一取)。注意代码注释里"剑二/隼人"仍按旧武士义(纯注释)。逻辑一律用 id,不 key 显示名。
 
 ## 奥特曼换皮(2026-07-12)
 
@@ -9,7 +9,9 @@ KOF 式和风像素格斗游戏。纯 vanilla JS + Canvas,零依赖,零构建。
 
 - **战斗本体** = 静态立绘单帧"表"(`assets/img/still/{ultra,kaiju}-{mack,kenji}.png`,320 方格,脚底线 y=304,1:1 绘制)。`data.js STILLS` 注册;`Fighter.side` 由出生朝向定(facing=1 hero / -1 rival,所有创建点一致);`spriteParams()` 走 still 分支;姿态 = `fighter._stillPose()` 程序化倾/压/弹(单帧的逐帧动画平替)。帧同步月牙基底在 still 模式不可用 → attackLogic 把 smear 自动转 standalone;cloneRun 分身也走 still 单帧
 - **UI 立绘/头像** = `assets/ui-lab/portrait-{ultra,kaiju}-{mack,kenji}-sel.{png,webp}`(320x344,同旧 bust 格式);`ui.js bustArt(cid, rival)` 按侧选图,选人页/VS/HUD/结算/图鉴 tab 全接入;HUD 取景表 `UI.stillCrop`,小头像 hudmack/hudkenji 加载后用英雄脸烘焙顶替
-- 英雄映射:mack=01-初代,kenji=03-赛罗;怪兽:mack=怪兽1(独角兽型),kenji=怪兽2(鸟型)。显示名仍是 KENJI/HAYATO 武士名 —— 改名属后续欠账
+- 英雄映射:mack=01-初代,kenji=03-赛罗;怪兽:mack=怪兽1(独角兽型),kenji=怪兽2(鸟型)
+- **出招姿态立绘(2026-07-13, 源自 codex 分支 `assets/img/ultraman-icons/` 图集)**:英雄侧攻击时本体换姿态图 —— kind light/heavy→light 打击姿(能量手刀)、special→光线技(初代=十字光线朝左 native:-1 / 赛罗=能量拳朝左 native:-1…逐姿态标)、super→必杀演出;`STILLS[cid].hero.moves` 注册,`stillDef()` 按 move.def.kind/superSeq 选键 `still:hero:cid:pose`。烘焙脚本 prep-pose-stills.js(scratchpad,身高对齐 idle 250)
+- **图鉴/招式图标(codex 分支)**:howto 招式行 24px 怪兽招式图标(`icon:monster:cid:move`,monster-moves/ 16 张成套);英雄图标 `icon:cid:{portrait,light,special,super}` = crops/ 透明抠图,也是姿态立绘的源
 
 ## Git 账户(重要,勿违反)
 

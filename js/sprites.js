@@ -42,10 +42,16 @@ const Assets = {
     if (typeof FX_SHEETS !== 'undefined') {
       for (const [name, s] of Object.entries(FX_SHEETS)) list.push([`fx:${name}`, s.file]);
     }
-    // 奥特曼/怪兽静态战斗立绘(单帧方格表, 键 still:hero:mack 等)
+    // 奥特曼/怪兽静态战斗立绘(单帧方格表, 键 still:hero:mack 等);
+    // 出招姿态变体挂子键 still:hero:mack:light / :special / :super
     if (typeof STILLS !== 'undefined') {
       for (const [cid, sides] of Object.entries(STILLS)) {
-        for (const [side, st] of Object.entries(sides)) list.push([`still:${side}:${cid}`, st.file]);
+        for (const [side, st] of Object.entries(sides)) {
+          list.push([`still:${side}:${cid}`, st.file]);
+          for (const [mv, m] of Object.entries(st.moves || {})) {
+            list.push([`still:${side}:${cid}:${mv}`, m.file]);
+          }
+        }
       }
     }
     return Promise.all(list.map(([key, src]) => new Promise((res, rej) => {

@@ -1017,8 +1017,17 @@ class Fighter {
   stillDef() {
     const s = typeof STILLS !== 'undefined' && STILLS[this.c.id] && STILLS[this.c.id][this.side];
     if (!s) return null;
-    const key = `still:${this.side}:${this.c.id}`;
-    return Assets.img(key) ? { key, native: s.native } : null;
+    const base = `still:${this.side}:${this.c.id}`;
+    if (!Assets.img(base)) return null;
+    // 出招姿态变体(英雄侧): kind light/heavy -> light 打击姿(能量手刀),
+    // special -> 光线技, super -> 必杀演出。native 逐姿态(画稿出手方向不一)
+    const POSE = { light: 'light', heavy: 'light', special: 'special', super: 'super' };
+    const kind = this.superSeq ? 'super'
+      : (this.state === 'attack' && this.move) ? this.move.def.kind : null;
+    const pose = kind && POSE[kind];
+    const mdef = pose && s.moves && s.moves[pose];
+    if (mdef && Assets.img(`${base}:${pose}`)) return { key: `${base}:${pose}`, native: mdef.native };
+    return { key: base, native: s.native };
   }
 
   /* 静态立绘姿态: 绕脚底(x, y)的倾角/压缩/沉降。旋转正值 = 朝面向方向

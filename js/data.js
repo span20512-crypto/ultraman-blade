@@ -26,13 +26,37 @@ const FX_SHEETS = {
    表达; 帧数据/判定框/招式时序全部不动, 武士帧表仍加载供刀光 smear 提取。
    native: 立绘素材朝向(怪兽画稿面朝左, 同旧剑二) */
 const STILLS = {
+  /* hero.moves: 出招姿态立绘(codex ultraman-icons crops 烘焙, 自带能量 fx),
+     kind light/heavy -> light 打击姿, special -> 光线技, super -> 必杀演出。
+     native 逐姿态标(画稿出手方向不一): 初代光线朝左, 赛罗拳击朝左。
+     rival.name/cn/quote: 对手侧显示名(怪兽不该顶着奥特曼的名字) */
   mack: {
-    hero:  { file: 'assets/img/still/ultra-mack.png', native: 1 },
-    rival: { file: 'assets/img/still/kaiju-mack.png', native: -1 },
+    hero: {
+      file: 'assets/img/still/ultra-mack.png', native: 1,
+      moves: {
+        light:   { file: 'assets/img/still/ultra-mack-light.png', native: 1 },
+        special: { file: 'assets/img/still/ultra-mack-special.png', native: -1 },
+        super:   { file: 'assets/img/still/ultra-mack-super.png', native: 1 },
+      },
+    },
+    rival: {
+      file: 'assets/img/still/kaiju-mack.png', native: -1,
+      name: 'KAIJU 1', cn: '怪兽一号', quote: 'GRRRAAAGH...!!',
+    },
   },
   kenji: {
-    hero:  { file: 'assets/img/still/ultra-kenji.png', native: 1 },
-    rival: { file: 'assets/img/still/kaiju-kenji.png', native: -1 },
+    hero: {
+      file: 'assets/img/still/ultra-kenji.png', native: 1,
+      moves: {
+        light:   { file: 'assets/img/still/ultra-kenji-light.png', native: -1 },
+        special: { file: 'assets/img/still/ultra-kenji-special.png', native: 1 },
+        super:   { file: 'assets/img/still/ultra-kenji-super.png', native: 1 },
+      },
+    },
+    rival: {
+      file: 'assets/img/still/kaiju-kenji.png', native: -1,
+      name: 'KAIJU 2', cn: '怪兽二号', quote: 'SKREEEEE...!!',
+    },
   },
 };
 const STILL_FS = 320, STILL_FEET = 304; // 方格边长 / 脚底线(烘焙常量)

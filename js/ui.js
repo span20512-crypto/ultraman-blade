@@ -164,6 +164,14 @@ const UI = {
     'k:mack': { x: -3.2, y: 2.2, w: 93.1 }, 'k:kenji': { x: -13.8, y: 1.6, w: 117.7 },
   },
 
+  // 侧别显示名: 对手侧显示怪兽名(STILLS rival.name/cn), 玩家侧 = DATA 英雄名
+  // —— 怪兽不该顶着奥特曼的名字(HUD/VS/结算/CPU 行共用)
+  sideName(cid, rival) {
+    const st = typeof STILLS !== 'undefined' && STILLS[cid] && STILLS[cid].rival;
+    if (rival && st && st.name) return { name: st.name, cn: st.cn || '' };
+    return { name: DATA[cid].name, cn: DATA[cid].cn };
+  },
+
   // side-aware bust art: player side = Ultraman hero, rival side = kaiju.
   // Falls back to the old samurai bust when the new art is missing.
   bustArt(cid, rival) {
@@ -294,8 +302,9 @@ const UI = {
     }
 
     // names (right one pulled clear of the hp-frame end-scroll ornament)
-    this.pixTextMixed(ctx, `${f1.c.name} · ${f1.c.cn}`, 138, 70, { size: 12, color: '#efe6d5', outline: true });
-    this.pixTextMixed(ctx, `${f2.c.name} · ${f2.c.cn}`, 862, 70, { size: 12, color: '#efe6d5', align: 'right', outline: true });
+    const hn1 = this.sideName(f1.c.id, false), hn2 = this.sideName(f2.c.id, true);
+    this.pixTextMixed(ctx, `${hn1.name} · ${hn1.cn}`, 138, 70, { size: 12, color: '#efe6d5', outline: true });
+    this.pixTextMixed(ctx, `${hn2.name} · ${hn2.cn}`, 862, 70, { size: 12, color: '#efe6d5', align: 'right', outline: true });
     if (G.p2IsAI) this.pixText(ctx, 'CPU', 862, 86, { size: 9, color: '#9a8f78', align: 'right' });
 
     // round pips
@@ -1029,8 +1038,9 @@ const UI = {
       // matched busts instead of tiny floor-less idle sprites
       this.drawBust(ctx, s.p1, 118 - off, 158, 264, 232, false, 1);
       this.drawBust(ctx, s.p2, 686 + off, 158, 264, 232, false, 1, true); // 右立绘再外移, 加大与徽章间距; 对手侧=怪兽
-      this.pixTextMixed(ctx, `${DATA[s.p1].name} · ${DATA[s.p1].cn}`, 250 - off, 480, { size: 20, align: 'center', color: DATA[s.p1].theme, outline: true });
-      this.pixTextMixed(ctx, `${DATA[s.p2].name} · ${DATA[s.p2].cn}`, 818 + off, 480, { size: 20, align: 'center', color: DATA[s.p2].theme, outline: true });
+      const vn1 = this.sideName(s.p1, false), vn2 = this.sideName(s.p2, true);
+      this.pixTextMixed(ctx, `${vn1.name} · ${vn1.cn}`, 250 - off, 480, { size: 20, align: 'center', color: DATA[s.p1].theme, outline: true });
+      this.pixTextMixed(ctx, `${vn2.name} · ${vn2.cn}`, 818 + off, 480, { size: 20, align: 'center', color: DATA[s.p2].theme, outline: true });
       const vsScale = 1 + Math.max(0, 12 - t) * 0.3;
       const VE = this.ua.vs;
       ctx.save(); ctx.translate(512, 290); ctx.scale(vsScale, vsScale);
@@ -1136,7 +1146,7 @@ const UI = {
     if (s.phase === 'char') {
       this.pixText(ctx, 'A/D SELECT · J OK · K BACK', 512, 500, { size: 12, align: 'center', color: '#9a8f78', spacing: 1 });
       const other = s.cursor === 0 ? 'kenji' : 'mack';
-      this.pixText(ctx, s.training ? `DUMMY: ${DATA[other].name}` : `CPU: ${DATA[other].name}`,
+      this.pixText(ctx, s.training ? `DUMMY: ${this.sideName(other, true).name}` : `CPU: ${this.sideName(other, true).name}`,
         512, 478, { size: 12, align: 'center', color: '#5d6784' });
     } else if (s.phase === 'diff') {
       this.pixTextMixed(ctx, 'DIFFICULTY · 難易度', 512, 478, { size: 15, align: 'center', color: '#ffc531', outline: true });
@@ -1180,6 +1190,12 @@ const UI = {
       kenji: '...Too slow.',
     };
 
+    // winner name/quote: rival won -> 怪兽名 + 吼声(STILLS rival.quote)
+    const wn = this.sideName(winner.c.id, !playerWon);
+    const wquote = playerWon
+      ? (QUOTES_EN[winner.c.id] || winner.c.quoteWin)
+      : ((typeof STILLS !== 'undefined' && STILLS[winner.c.id].rival || {}).quote || QUOTES_EN[winner.c.id]);
+
     // winner bust: player won -> Ultraman hero, rival won -> kaiju. New art is
     // centered full-figure, so it centers on 1024; old samurai busts keep the
     // layout-editor anchors (Eric placed hayato; kenji derived to match)
@@ -1206,7 +1222,7 @@ const UI = {
       });
       this.pixText(ctx, playerWon ? '勝利' : '敗北', 512, 194, { size: 22, align: 'center', color: '#f4f1e8', outline: true });
       this.pixText(ctx, `MAX COMBO: ${G.stats.maxCombo} ${G.stats.maxCombo === 1 ? 'HIT' : 'HITS'}`, 512, 220, { size: 13, align: 'center', color: '#c9d2e8', outline: true });
-      const quote2 = `${winner.c.name}: "${QUOTES_EN[winner.c.id] || winner.c.quoteWin}"`;
+      const quote2 = `${wn.name}: "${wquote}"`;
       // 11 = 最长台词(剣二)不触发 maxW 缩放的字号 → 两个角色的台词字号统一
       const qw2 = Math.ceil(this.textW(ctx, quote2, 11)) + 44;
       if (this.ua.panel) this.nine(ctx, this.ua.panel, 512 - qw2 / 2, 428, qw2, 62, 0.14);
@@ -1232,7 +1248,7 @@ const UI = {
     });
     this.pixText(ctx, playerWon ? '勝利' : '敗北', 512, RB ? 194 : 172, { size: 22, align: 'center', color: '#f4f1e8', outline: true }); // 下移 176->194: 不压顶部彩带下边框(Eric)
 
-    const quote = `${winner.c.name}: "${QUOTES_EN[winner.c.id] || winner.c.quoteWin}"`;
+    const quote = `${wn.name}: "${wquote}"`;
     // box hugs the text (long quotes shrank past pixText's size floor and overflowed a fixed box)
     const qw = Math.min(560, Math.ceil(this.textW(ctx, quote, 13)) + 44);
     if (this.ua.panel) this.nine(ctx, this.ua.panel, 512 - qw / 2, 428, qw, 62, 0.14);
