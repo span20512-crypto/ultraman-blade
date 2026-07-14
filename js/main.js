@@ -650,10 +650,7 @@ function applyUrlParams() {
 }
 
 function desiredBgm() {
-  switch (G.screen) {
-    case 'result': return 'result';
-    default: return 'title'; // 英雄主题贯穿 标题/选人/对战(同键 = 跨屏无缝续播)
-  }
+  return 'title'; // 英雄主题贯穿全游戏(同键 = 跨屏无缝续播); 分场景配乐时在此按 G.screen 分支
 }
 
 let firstInput = false; // 起始页「按任意键」: 首次用户手势(键/点/触)置真

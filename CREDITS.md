@@ -30,8 +30,8 @@
 
 - **The Hero** — by [DF_wahyumusicproduction](https://pixabay.com/users/df_wahyumusicproduction-45033356/),
   sourced from [Pixabay](https://pixabay.com/music/rock-the-hero-241475/).
-  用作标题/选人/对战英雄主题,按 [Pixabay Content License](https://pixabay.com/service/license-summary/) 使用。
-- 结算 BGM 为生成式音乐模型生成的和风器乐;其余和风曲目保留在 assets/audio/bgm/ 作候补。
+  用作全游戏英雄主题(标题/选人/对战/结算),按 [Pixabay Content License](https://pixabay.com/service/license-summary/) 使用。
+- 生成式音乐模型生成的和风器乐保留在 assets/audio/bgm/ 作候补,当前未使用。
 
 ## 引擎与依赖
 

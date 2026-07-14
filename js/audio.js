@@ -4,13 +4,12 @@
 const AudioSys = (() => {
   let ctx = null, master = null, sfxBus = null, bgmBus = null, noiseBuf = null;
   let muted = false;
-  // BGM = real instrumental MP3s, one per scene, routed through bgmBus.
-  // 2026-07-14: 英雄主题接管 标题/选人/对战(desiredBgm 三场景同键 → 跨屏无缝
-  // 续播不重头); 旧和风曲(select-*/battle-*/title-*)留在 assets 作候补, 不再
-  // 注册 —— 注册即启动预取, 每首多拉 1-4MB
+  // BGM = real instrumental MP3s routed through bgmBus.
+  // 2026-07-14: 英雄主题 = 全游戏唯一 BGM(标题/选人/对战/结算同键 → 全程无缝
+  // 续播不重头); 旧和风曲(select-*/battle-*/title-*/result-*)留在 assets 作
+  // 候补, 不再注册 —— 注册即启动预取, 每首多拉 1-4MB
   const BGM_SRC = {
-    title: 'assets/audio/bgm/ultraman-hero-theme.mp3', // 英雄摇滚主题 — 标题/选人/对战
-    result: 'assets/audio/bgm/result-1.mp3',  // 结算 = 余韵 LINGERING (Eric 选定)
+    title: 'assets/audio/bgm/ultraman-hero-theme.mp3', // 英雄摇滚主题 — 全场景
   };
   const bgmTrk = {}, bgmBuf = {}; let curBgm = null, bgmInit = false;
 
