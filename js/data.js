@@ -32,7 +32,9 @@ const STILLS = {
      rival.name/cn/quote: 对手侧显示名(怪兽不该顶着奥特曼的名字) */
   mack: {
     hero: {
-      file: 'assets/img/still/ultra-mack.png', native: 1,
+      // 基础身 = 战斗预备姿(light 姿去能量爆, prep-stance.js 色键) —— 正脸
+      // 立绘(ultra-mack.png)只在 UI 立绘用, 战斗里必须侧身面向对手
+      file: 'assets/img/still/ultra-mack-stance.png', native: 1,
       moves: {
         light:   { file: 'assets/img/still/ultra-mack-light.png', native: 1 },
         special: { file: 'assets/img/still/ultra-mack-special.png', native: -1 },
@@ -46,7 +48,8 @@ const STILLS = {
   },
   kenji: {
     hero: {
-      file: 'assets/img/still/ultra-kenji.png', native: 1,
+      // 同上: 预备姿出拳朝左 → native -1
+      file: 'assets/img/still/ultra-kenji-stance.png', native: -1,
       moves: {
         light:   { file: 'assets/img/still/ultra-kenji-light.png', native: -1 },
         special: { file: 'assets/img/still/ultra-kenji-special.png', native: 1 },
