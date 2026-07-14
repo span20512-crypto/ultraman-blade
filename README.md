@@ -50,7 +50,7 @@ python3 serve.py          # http://localhost:8787(开发用,带 no-store 头)
 回合制 BO3(60 秒计时 / TIME UP / PERFECT / DOUBLE K.O.)· AI 三档难度(困难 = 读指令的 SNK Boss 式鬼级)·
 练习场(木桩三态 / 无限气 / 自动回血)· 180ms 输入缓冲(高刷屏不吃键)。
 
-音频:音效为 WebAudio 实时合成;标题使用授权英雄摇滚主题,其余 BGM 为 AI 生成的和风器乐(mp3,逐场景切换,无缝循环)。
+音频:音效为 WebAudio 实时合成;标题/选人/对战使用授权英雄摇滚主题(跨屏无缝续播),结算 BGM 为 AI 生成的和风器乐(mp3,无缝循环)。
 
 ## 开发工具页(仓库自带)
 

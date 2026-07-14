@@ -651,10 +651,8 @@ function applyUrlParams() {
 
 function desiredBgm() {
   switch (G.screen) {
-    case 'fight': return 'battle';
     case 'result': return 'result';
-    case 'select': return 'select';
-    default: return 'title'; // 标题/说明页使用英雄主题
+    default: return 'title'; // 英雄主题贯穿 标题/选人/对战(同键 = 跨屏无缝续播)
   }
 }
 
