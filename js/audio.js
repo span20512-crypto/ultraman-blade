@@ -1,12 +1,13 @@
-/* WebAudio synth: all SFX + chiptune BGM are generated, no audio assets. */
+/* WebAudio synth SFX + licensed/generated MP3 background music. */
 'use strict';
 
 const AudioSys = (() => {
   let ctx = null, master = null, sfxBus = null, bgmBus = null, noiseBuf = null;
   let muted = false;
-  // BGM = real instrumental mp3s (Lyria-generated), one per scene, routed through bgmBus.
+  // BGM = real instrumental MP3s, one per scene, routed through bgmBus.
   const BGM_SRC = {
-    select: 'assets/audio/bgm/select-3.mp3',  // 丙 幽冷 — 菜单/标题/选人 共用此曲
+    title: 'assets/audio/bgm/ultraman-hero-theme.mp3', // 英雄摇滚主题 — 标题/主菜单
+    select: 'assets/audio/bgm/select-3.mp3',  // 丙 幽冷 — 选人
     battle: 'assets/audio/bgm/battle-1.mp3',  // 甲 幽玄 (丙 battle-3 = 候补)
     result: 'assets/audio/bgm/result-1.mp3',  // 结算 = 余韵 LINGERING (Eric 选定)
   };

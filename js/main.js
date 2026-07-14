@@ -653,7 +653,8 @@ function desiredBgm() {
   switch (G.screen) {
     case 'fight': return 'battle';
     case 'result': return 'result';
-    default: return 'select'; // 菜单/标题/选人/说明 共用 select 主题
+    case 'select': return 'select';
+    default: return 'title'; // 标题/说明页使用英雄主题
   }
 }
 

@@ -26,6 +26,13 @@
 - **背景音乐(BGM)**:由生成式音乐模型生成的和风器乐。
 - **代码与游戏设计**:在 Claude(Anthropic)辅助下开发,由项目作者担任设计决策与验收。
 
+## 背景音乐(Background Music)
+
+- **The Hero** — by [DF_wahyumusicproduction](https://pixabay.com/users/df_wahyumusicproduction-45033356/),
+  sourced from [Pixabay](https://pixabay.com/music/rock-the-hero-241475/).
+  用作标题/主菜单英雄主题,按 [Pixabay Content License](https://pixabay.com/service/license-summary/) 使用。
+- 选人、对战与结算 BGM 为生成式音乐模型生成的和风器乐。
+
 ## 引擎与依赖
 
 无第三方运行时依赖 —— 纯 vanilla JavaScript + HTML5 Canvas / WebAudio。
