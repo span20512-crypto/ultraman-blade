@@ -569,7 +569,7 @@ class Fighter {
         const cutA = [[-2.5, 0.45], [0.7, -2.55], [-1.15, 1.0]][(s.done - 1) % 3];
         Effects.slash(opp.x - this.facing * 8, opp.y - 96, this.facing, {
           r: 130, a0: cutA[0], a1: cutA[1], w: 20, life: 13, grow: 2.2, sweep: 0.34,
-          color: s.done % 2 === 0 ? '#ffffff' : (this.c.id === 'mack' ? '#ffe27a' : '#b9fff7'),
+          color: s.done % 2 === 0 ? '#ffffff' : (this.c.base === 'mack' ? '#ffe27a' : '#b9fff7'),
           color2: s.done % 2 === 0 ? this.c.theme2 : this.c.theme,
         });
       }
@@ -1182,7 +1182,9 @@ class Fighter {
     // super act 1 聚气: pulsing additive body glow in the character's theme
     if (this.state === 'attack' && this.move && this.move.def.kind === 'super' &&
         this.move.t <= this.move.def.startup + 2) {
-      const hue = this.c.id === 'kenji' ? '215deg' : '-22deg';
+      // 聚气色相: mack/kenji 手调值不动, 克隆角色按主题色相推算(sepia 基准 ~32°)
+      const hue = { mack: '-22deg', kenji: '215deg' }[this.c.id]
+        || (Math.round(_hexHue(this.c.theme) - 32) + 'deg');
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.34 + 0.24 * Math.sin(this.world.tick * 0.55);
       ctx.filter = `sepia(1) saturate(4.5) hue-rotate(${hue}) brightness(1.15) blur(2px)`;

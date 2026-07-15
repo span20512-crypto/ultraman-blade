@@ -21,13 +21,27 @@ const Assets = {
       ['icon:monster:mack', 'assets/img/ultraman-icons/crops/monster-1.webp'],
       ['icon:monster:kenji', 'assets/img/ultraman-icons/crops/monster-2.webp'],
     ];
+    // 新英雄(2026-07-15): 动作图标直接用 codex hero-moves 320 图集
+    // (无独立肖像稿 -> portrait 用 light 姿)
+    const heroMoveIcons = { taro: '04-taro', tiga: '05-tiga', dyna: '06-dyna', gaia: '07-gaia', zett: '08-z' };
+    for (const [cid, base] of Object.entries(heroMoveIcons)) {
+      list.push([`icon:${cid}:portrait`, `assets/img/ultraman-icons/hero-moves/${base}-light.png`]);
+      for (const mv of ['light', 'special', 'super']) {
+        list.push([`icon:${cid}:${mv}`, `assets/img/ultraman-icons/hero-moves/${base}-${mv}.png`]);
+      }
+      const mon = (STILLS[cid].rival.art === 'mack') ? 'monster-1' : 'monster-2';
+      list.push([`icon:monster:${cid}`, `assets/img/ultraman-icons/crops/${mon}.webp`]);
+    }
     const monsterMoveIcons = [
       'portrait', 'move', 'crouch', 'dash',
       'light', 'heavy', 'clight', 'cheavy',
       'airlight', 'dive', 'special', 'super',
       'guard', 'crush', 'combo', 'finisher',
     ];
-    const monsterIconFiles = { mack: 'monster-1', kenji: 'monster-2' };
+    const monsterIconFiles = {
+      mack: 'monster-1', kenji: 'monster-2',
+      taro: 'monster-2', tiga: 'monster-1', dyna: 'monster-1', gaia: 'monster-2', zett: 'monster-1',
+    };
     for (const [cid, fileBase] of Object.entries(monsterIconFiles)) {
       for (const move of monsterMoveIcons) {
         list.push([`icon:monster:${cid}:${move}`, `assets/img/ultraman-icons/monster-moves/${fileBase}-${move}.webp`]);
@@ -483,7 +497,7 @@ const Effects = {
       this.shockRing(x, y - 60, th, 6);
       this.pillar(x, y, th2);
       // 余韵按角色分语: 隼人=樱瓣落, 剑二=残影余烬升(冷)
-      if (f.c.id === 'mack') this.petals(x, y - 40, 18);
+      if (f.c.base === 'mack') this.petals(x, y - 40, 18);
       else { this.rise(x, y - 30, th2, 6); this.rise(x, y - 60, '#c8fff5', 5); }
     } else if (variant === 'C') {
       const key = `${f.c.id}:attack1`;

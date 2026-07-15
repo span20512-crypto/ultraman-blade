@@ -162,6 +162,14 @@ const UI = {
   stillCrop: {
     'u:mack': { x: -51.5, y: -0.3, w: 191.9 }, 'u:kenji': { x: -63.3, y: -0.8, w: 214.8 },
     'k:mack': { x: -3.2, y: 2.2, w: 93.1 }, 'k:kenji': { x: -13.8, y: 1.6, w: 117.7 },
+    // 新英雄(2026-07-15): u: 由烘焙脚本按头部取景计算(同 prep-portraits 规则);
+    // k: = 各自 rival 怪兽皮的取景(kaiju 立绘只有两张, 直接复用对应值)
+    'u:taro': { x: -46.7, y: -0.4, w: 192 }, 'u:tiga': { x: -75.9, y: -0.4, w: 192 },
+    'u:dyna': { x: -50.6, y: -0.4, w: 192 }, 'u:gaia': { x: -65.8, y: -0.4, w: 192 },
+    'u:zett': { x: -65.2, y: -0.4, w: 192 },
+    'k:taro': { x: -13.8, y: 1.6, w: 117.7 }, 'k:tiga': { x: -3.2, y: 2.2, w: 93.1 },
+    'k:dyna': { x: -3.2, y: 2.2, w: 93.1 }, 'k:gaia': { x: -13.8, y: 1.6, w: 117.7 },
+    'k:zett': { x: -3.2, y: 2.2, w: 93.1 },
   },
 
   // 侧别显示名: 对手侧显示怪兽名(STILLS rival.name/cn), 玩家侧 = DATA 英雄名
@@ -173,11 +181,14 @@ const UI = {
   },
 
   // side-aware bust art: player side = Ultraman hero, rival side = kaiju.
+  // 怪兽皮按 STILLS[cid].rival.art 选(只有两张 kaiju 立绘, 名册共用);
   // Falls back to the old samurai bust when the new art is missing.
   bustArt(cid, rival) {
-    const nu = rival ? (cid === 'kenji' ? this.ua.kaijukenji : this.ua.kaijumack)
-                     : (cid === 'kenji' ? this.ua.ultrakenji : this.ua.ultramack);
-    return nu || (cid === 'kenji' ? this.ua.selkenji : this.ua.selmack);
+    if (rival) {
+      const ra = (typeof STILLS !== 'undefined' && STILLS[cid] && STILLS[cid].rival || {}).art || cid;
+      return this.ua['kaiju' + ra] || this.ua['sel' + cid] || this.ua.selmack;
+    }
+    return this.ua['ultra' + cid] || this.ua['sel' + cid] || this.ua.selmack;
   },
 
   // zoom > 1 scales around the window center (hover feedback).
@@ -264,7 +275,7 @@ const UI = {
     for (const [f, px, mir] of [[f1, 12, true], [f2, 924, false]]) {
       const rival = f === f2;
       const shakeX = f.flash > 0 ? (Math.random() * 4 - 2) : 0;
-      const face = (f.c.id === 'kenji' ? this.ua.hudkenji : this.ua.hudmack) || this.portraits[f.c.id];
+      const face = this.ua['hud' + f.c.id] || this.portraits[f.c.id];
       const selArt = this.bustArt(f.c.id, rival);
       const newArt = selArt && selArt !== this.ua.selmack && selArt !== this.ua.selkenji;
       const HC = HUD_CROP[newArt ? (rival ? 'k:' : 'u:') + f.c.id : f.c.id];
@@ -1069,45 +1080,25 @@ const UI = {
     this.pixText(ctx, '選べ、己の剣', 512, 66, { size: 28, align: 'center', color: '#f4ead6', outline: true, shadow: 4 });
     this.pixText(ctx, 'CHOOSE YOUR FIGHTER', 512, 92, { size: 11, align: 'center', color: '#8892ad', spacing: 4 });
 
-    const ids = ['mack', 'kenji'];
-    ids.forEach((cid, i) => {
-      const c = DATA[cid];
-      const x = i === 0 ? 152 : 552;
-      const hovered = s.phase === 'char' && s.cursor === i;
-      const chosen = s.p1 === cid;
-      if (this.ua.panel) {
-        if (!hovered && !chosen) { ctx.save(); ctx.filter = 'brightness(0.72)'; }
-        this.nine(ctx, this.ua.panel, x, 116, 320, 330, 0.26);
-        if (!hovered && !chosen) ctx.restore();
-      } else {
-        this.panel(ctx, x, 116, 320, 330, {
-          border: hovered || chosen ? c.theme : '#3a4157',
-          accent: c.theme,
-          fill: hovered ? 'rgba(22,26,40,0.95)' : 'rgba(16,19,28,0.92)',
-        });
-      }
-      // bust exactly where Eric placed it in the layout editor (R12): the art
-      // pops over the panel frame; nameplate strip is drawn ON TOP of the
-      // chest afterwards, so name/type sit on the plate's dark backing
+    // 7 人名册版式(2026-07-15 扩编): 左 = 英雄展示大面板(光标所指), 右 = 对手
+    // 怪兽预告面板(= 名册下一位的 rival 皮), 底 = 7 格头像名册条(char 阶段)。
+    // diff 阶段沿用底部难度条, 名册条让位。
+    const ids = ROSTER;
+    const hovId = s.phase === 'char' ? ids[s.cursor] : s.p1;
+    const cpuId = s.phase === 'char' ? ids[(s.cursor + 1) % ids.length] : s.p2;
+
+    // ── 左: 英雄展示面板 ──────────────────────────────────────────────
+    {
+      const cid = hovId, c = DATA[cid], x = 88;
+      if (this.ua.panel) this.nine(ctx, this.ua.panel, x, 116, 320, 330, 0.26);
+      else this.panel(ctx, x, 116, 320, 330, { border: c.theme, accent: c.theme, fill: 'rgba(22,26,40,0.95)' });
       const art = this.bustArt(cid, false);
-      const newArt = art === this.ua.ultramack || art === this.ua.ultrakenji;
-      // new Ultraman art is centered full-figure in its 320 frame -> center on
-      // the panel; old bust art keeps Eric's layout-editor anchors
-      const B = newArt
-        ? { x: x + 10, y: 120, w: 300 }
-        : { mack: { x: 188, y: 89, w: 300 }, kenji: { x: 609, y: 111, w: 262 } }[cid];
       if (art) {
-        ctx.save();
-        if (!(hovered || chosen)) ctx.filter = 'brightness(0.72) saturate(0.9)';
-        const z = hovered ? 1.03 : 1, bw = B.w * z, bh = bw * 344 / 320;
-        ctx.drawImage(art, B.x - (bw - B.w) / 2, B.y - (bh - B.w * 344 / 320) / 2, bw, bh);
-        ctx.restore();
+        ctx.drawImage(art, x + 10, 120, 300, 300 * 344 / 320);
       } else {
         this.drawCharPreview(ctx, cid, x + 160, 344, 2.25, 0, 'idle', cid === 'mack');
       }
-      // nameplate near the panel foot: name + TYPE both inside the plate's
-      // clear area (knot ornament owns its left ~38px), POW/SPD below the panel
-      // POW/SPD inside the frame on a slim lacquer strip above the plate
+      // POW/SPD lacquer strip + nameplate (布局与旧卡片逐像素同位)
       ctx.fillStyle = 'rgba(10,7,6,0.72)';
       ctx.fillRect(x + 16, 352, 288, 22);
       ctx.fillStyle = 'rgba(217,164,65,0.45)';
@@ -1126,28 +1117,83 @@ const UI = {
       const plateW = 220, plateH = NP ? plateW * NP.h / NP.w : 60;
       const plateY = 376, plateCy = plateY + plateH / 2;
       if (NP) ctx.drawImage(NP.cv, x + 50, plateY, plateW, plateH);
-      // name + TYPE centered in the plate's clear span (knot left, tip right)
-      // 名: EN + · + 汉字 分段绘制, 都 baseline:middle 居中不贴边; 汉字比拉丁下沉→上抬 2px 对齐
-      const nmCol = hovered || chosen ? c.theme : '#c9bfa8';
+      const nmCol = c.theme;
       const w1 = this.textW(ctx, c.name, 14), wd = this.textW(ctx, '·', 14), w2 = this.textW(ctx, c.cn, 14);
       const gp = 7, totW = w1 + gp + wd + gp + w2, sx = x + 170 - totW / 2, ny = plateCy - 6;
       this.pixText(ctx, c.name, sx, ny, { size: 14, baseline: 'middle', color: nmCol, outline: true });
       this.pixText(ctx, '·', sx + w1 + gp, ny - 1, { size: 14, baseline: 'middle', color: nmCol });
       this.pixText(ctx, c.cn, sx + w1 + gp + wd + gp, ny - 2, { size: 14, baseline: 'middle', color: nmCol, outline: true });
       this.pixText(ctx, `${c.type} TYPE`, x + 170, plateCy + 16, { size: 9, align: 'center', color: '#9a8f78', spacing: 2, maxW: 140 });
-      if (hovered && G.tick % 30 < 20) {
-        this.pixText(ctx, '▼', x + 160, 80, { size: 16, align: 'center', color: '#ffc531' });
-      }
-      if (chosen && s.phase !== 'char') {
+      if (s.phase !== 'char') {
         this.pixText(ctx, '1P', x + 18, 146, { size: 14, color: '#ffe27a', outline: true });
       }
-    });
+    }
+
+    // ── 右: 对手预告面板(怪兽皮, 压暗示意"敌方") ─────────────────────────
+    {
+      const x = 616;
+      if (this.ua.panel) {
+        ctx.save(); ctx.filter = 'brightness(0.8)';
+        this.nine(ctx, this.ua.panel, x, 116, 320, 330, 0.26);
+        ctx.restore();
+      } else {
+        this.panel(ctx, x, 116, 320, 330, { border: '#3a4157', accent: '#8a2f27', fill: 'rgba(16,19,28,0.92)' });
+      }
+      const rart = this.bustArt(cpuId, true);
+      if (rart) {
+        ctx.save();
+        ctx.filter = 'brightness(0.82) saturate(0.92)';
+        ctx.drawImage(rart, x + 10, 120, 300, 300 * 344 / 320);
+        ctx.restore();
+      }
+      ctx.fillStyle = 'rgba(10,7,6,0.72)';
+      ctx.fillRect(x + 16, 352, 288, 22);
+      ctx.fillStyle = 'rgba(217,164,65,0.45)';
+      ctx.fillRect(x + 16, 352, 288, 1);
+      ctx.fillRect(x + 16, 373, 288, 1);
+      this.pixText(ctx, s.training ? 'TRAINING DUMMY' : 'YOUR RIVAL', x + 170, 368, { size: 9, align: 'center', color: '#9a8f78', spacing: 2 });
+      const NP2 = this.ua.nameplate;
+      const plateW2 = 220, plateH2 = NP2 ? plateW2 * NP2.h / NP2.w : 60;
+      const plateY2 = 376, plateCy2 = plateY2 + plateH2 / 2;
+      if (NP2) ctx.drawImage(NP2.cv, x + 50, plateY2, plateW2, plateH2);
+      const rn = this.sideName(cpuId, true);
+      const rw1 = this.textW(ctx, rn.name, 14), rwd = this.textW(ctx, '·', 14), rw2 = this.textW(ctx, rn.cn, 14);
+      const rgp = 7, rtotW = rw1 + rgp + rwd + rgp + rw2, rsx = x + 170 - rtotW / 2, rny = plateCy2 - 6;
+      this.pixText(ctx, rn.name, rsx, rny, { size: 14, baseline: 'middle', color: '#c9bfa8', outline: true });
+      this.pixText(ctx, '·', rsx + rw1 + rgp, rny - 1, { size: 14, baseline: 'middle', color: '#c9bfa8' });
+      this.pixText(ctx, rn.cn, rsx + rw1 + rgp + rwd + rgp, rny - 2, { size: 14, baseline: 'middle', color: '#c9bfa8', outline: true });
+      this.pixText(ctx, 'CPU', x + 170, plateCy2 + 16, { size: 9, align: 'center', color: '#9a8f78', spacing: 2 });
+    }
+
+    // 中缝 VS 小徽章(两面板之间)
+    this.pixText(ctx, 'VS', 512, 290, { size: 22, align: 'center', color: '#ffc531', outline: true, shadow: 4 });
 
     if (s.phase === 'char') {
-      this.pixText(ctx, 'A/D SELECT · J OK · K BACK', 512, 500, { size: 12, align: 'center', color: '#9a8f78', spacing: 1 });
-      const other = s.cursor === 0 ? 'kenji' : 'mack';
-      this.pixText(ctx, s.training ? `DUMMY: ${this.sideName(other, true).name}` : `CPU: ${this.sideName(other, true).name}`,
-        512, 478, { size: 12, align: 'center', color: '#5d6784' });
+      // ── 底: 名册条(7 格头像) ─────────────────────────────────────────
+      const N = ids.length, tile = 88, gap = 8;
+      const x0 = 512 - (N * (tile + gap) - gap) / 2, ty = 464;
+      ids.forEach((cid, i) => {
+        const c = DATA[cid], tx = x0 + i * (tile + gap);
+        const hovered = s.cursor === i;
+        ctx.fillStyle = hovered ? 'rgba(28,22,14,0.96)' : 'rgba(13,15,22,0.92)';
+        ctx.fillRect(tx, ty, tile, tile);
+        const face = this.ua['hud' + cid] || this.portraits[cid];
+        if (face) {
+          ctx.save();
+          if (!hovered) ctx.filter = 'brightness(0.62) saturate(0.85)';
+          ctx.drawImage(face, tx + 2, ty + 2, tile - 4, tile - 4);
+          ctx.restore();
+        }
+        ctx.strokeStyle = hovered ? c.theme : '#3a4157';
+        ctx.lineWidth = hovered ? 3 : 1;
+        ctx.strokeRect(tx + 1.5, ty + 1.5, tile - 3, tile - 3);
+        if (hovered) {
+          ctx.fillStyle = c.theme;
+          ctx.fillRect(tx, ty + tile + 4, tile, 3);
+          if (G.tick % 30 < 20) this.pixText(ctx, '▼', tx + tile / 2, ty - 8, { size: 14, align: 'center', color: '#ffc531' });
+        }
+      });
+      this.pixText(ctx, 'A/D SELECT · J OK · K BACK', 512, 570, { size: 12, align: 'center', color: '#9a8f78', spacing: 1 });
     } else if (s.phase === 'diff') {
       this.pixTextMixed(ctx, 'DIFFICULTY · 難易度', 512, 478, { size: 15, align: 'center', color: '#ffc531', outline: true });
       const keys = ['easy', 'normal', 'hard'];
@@ -1188,6 +1234,11 @@ const UI = {
     const QUOTES_EN = {
       mack: 'The blade... returns to its sheath.',
       kenji: '...Too slow.',
+      taro: 'Burn bright, burn true!',
+      tiga: 'The light never fades.',
+      dyna: 'Swift as the wind!',
+      gaia: 'The earth stands firm.',
+      zett: 'Chant my name — victory!',
     };
 
     // winner name/quote: rival won -> 怪兽名 + 吼声(STILLS rival.quote)
@@ -1318,6 +1369,12 @@ const UI = {
       ultrakenji: () => this._loadImg('portrait-ultra-kenji-sel.png'),
       kaijumack:  () => this._loadImg('portrait-kaiju-mack-sel.png'),
       kaijukenji: () => this._loadImg('portrait-kaiju-kenji-sel.png'),
+      // 新英雄立绘(2026-07-15, stance 烘焙): 同 320x344 透明格式
+      ultrataro:  () => this._loadImg('portrait-ultra-taro-sel.png'),
+      ultratiga:  () => this._loadImg('portrait-ultra-tiga-sel.png'),
+      ultradyna:  () => this._loadImg('portrait-ultra-dyna-sel.png'),
+      ultragaia:  () => this._loadImg('portrait-ultra-gaia-sel.png'),
+      ultrazett:  () => this._loadImg('portrait-ultra-zett-sel.png'),
       // square face crops of the same busts for the battle HUD (168px → 84)
       hudmack:  () => this._loadImg('portrait-hayato-hud.png'),
       hudkenji: () => this._loadImg('portrait-kenji-hud.png'),
@@ -1381,8 +1438,10 @@ const UI = {
       g.drawImage(art, HC.x - 2, HC.y - 2, HC.w, HC.w * 344 / 320);
       return cv;
     };
-    this.ua.hudmack = bakeFace(this.ua.ultramack, this.stillCrop['u:mack']) || this.ua.hudmack;
-    this.ua.hudkenji = bakeFace(this.ua.ultrakenji, this.stillCrop['u:kenji']) || this.ua.hudkenji;
+    for (const cid of (typeof ROSTER !== 'undefined' ? ROSTER : ['mack', 'kenji'])) {
+      const bf = bakeFace(this.ua['ultra' + cid], this.stillCrop['u:' + cid]);
+      if (bf) this.ua['hud' + cid] = bf;
+    }
   },
 
   // boot/loading screen — literally the press-any-key title page (same bg,

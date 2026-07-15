@@ -54,7 +54,7 @@ const Howto = (() => {
       { h: 'SPECIALS · 必殺' },
       // 隼人的 U 是飞行道具 —— 木桩放远(dist), 否则手里剑刚出手就命中, 看不出飞行轨迹
       { key: 'U', en: 'SPECIAL', jp: M.special.name, keys: ['U'], mv: 'special', chain: ['special'],
-        dist: cid === 'kenji' ? 760 : undefined, tip: 'HAS A COOLDOWN' },
+        dist: DATA[cid].base === 'kenji' ? 760 : undefined, tip: 'HAS A COOLDOWN' },
     ];
     if (M.airspecial) rows.push({ key: 'airU', en: 'AIR SPECIAL', jp: M.airspecial.name,
       keys: ['W', '>', 'U'], mv: 'airspecial', chain: ['special'], air: true, dist: 660, bJump: true,
@@ -308,9 +308,12 @@ const Howto = (() => {
     ensure();
     if (Input.consume('KeyW') || Input.consume('ArrowUp')) moveSel(-1);
     if (Input.consume('KeyS') || Input.consume('ArrowDown')) moveSel(1);
-    if (Input.consume('KeyA') || Input.consume('KeyD') ||
-        Input.consume('ArrowLeft') || Input.consume('ArrowRight')) {
-      charId = charId === 'mack' ? 'kenji' : 'mack';
+    // A/D 在 7 人名册里前后循环(2026-07-15 扩编)
+    const prev = Input.consume('KeyA') || Input.consume('ArrowLeft');
+    const next = Input.consume('KeyD') || Input.consume('ArrowRight');
+    if (prev || next) {
+      const i = ROSTER.indexOf(charId);
+      charId = ROSTER[(i + (next ? 1 : ROSTER.length - 1)) % ROSTER.length];
       const k = row().key;
       rows = catalog(charId);
       const same = rows.findIndex(r => r.key === k);
@@ -357,30 +360,30 @@ const Howto = (() => {
     ctx.fillStyle = '#6a4a24'; ctx.fillRect(0, 54, 1024, 2);
     UI.pixText(ctx, '心得', 40, 38, { size: 22, color: '#ffe27a', outline: true });
     UI.pixText(ctx, 'HOW TO PLAY', 106, 36, { size: 11, color: '#9a8f78', spacing: 3 });
-    for (let i = 0; i < 2; i++) {
-      const cid = i === 0 ? 'mack' : 'kenji';
+    // 7 人名册紧凑头像页签(2026-07-15 扩编): 方形脸块 + 右端当前角色名牌
+    const tabW = 42, tabGap = 6, tabX0 = 508;
+    ROSTER.forEach((cid, i) => {
       const on = cid === charId;
-      const tx = 640 + i * 180, tw = 168;
-      // 装饰框与标题页菜单按钮同款(UI.nine + 选中提亮), 无素材时回退线框
-      if (UI.ua.panel) {
-        if (on) { ctx.save(); ctx.filter = 'brightness(1.45) saturate(1.1)'; }
-        UI.nine(ctx, UI.ua.panel, tx, 9, tw, 38, 0.13);
-        if (on) { ctx.restore(); ctx.fillStyle = 'rgba(255,197,49,0.1)'; ctx.fillRect(tx + 5, 14, tw - 10, 28); }
-      } else {
-        ctx.fillStyle = on ? '#241610' : '#14100e';
-        ctx.fillRect(tx, 9, tw, 38);
-        ctx.strokeStyle = on ? '#d9a441' : '#6a4a24'; ctx.lineWidth = 2;
-        ctx.strokeRect(tx + 1, 10, tw - 2, 36);
+      const tx = tabX0 + i * (tabW + tabGap);
+      ctx.fillStyle = on ? '#241610' : '#14100e';
+      ctx.fillRect(tx, 7, tabW, 42);
+      const face = UI.ua['hud' + cid];
+      if (face) {
+        ctx.save();
+        if (!on) ctx.filter = 'brightness(0.55) saturate(0.8)';
+        ctx.drawImage(face, tx + 2, 9, tabW - 4, tabW - 4);
+        ctx.restore();
       }
-      const face = cid === 'mack' ? UI.ua.hudmack : UI.ua.hudkenji;
-      if (face) ctx.drawImage(face, tx + 4, 13, 30, 30);
-      UI.pixText(ctx, DATA[cid].name, tx + 42, 27, { size: 10, color: on ? '#ffe27a' : '#8a7a5f' });
-      UI.pixText(ctx, DATA[cid].cn, tx + 42, 43, { size: 12, color: on ? '#d9a441' : '#6a5a3f' });
+      ctx.strokeStyle = on ? DATA[cid].theme : '#6a4a24'; ctx.lineWidth = on ? 2 : 1;
+      ctx.strokeRect(tx + 0.5, 7.5, tabW - 1, 41);
       if (on && G.tick % 40 < 26) {
-        ctx.strokeStyle = 'rgba(255,226,122,0.5)'; ctx.strokeRect(tx - 1, 8, tw + 2, 40);
+        ctx.strokeStyle = 'rgba(255,226,122,0.5)'; ctx.strokeRect(tx - 1.5, 5.5, tabW + 3, 45);
       }
-    }
-    UI.pixText(ctx, 'A / D', 585, 33, { size: 9, color: '#5d6784', align: 'right' });
+    });
+    const tabsEnd = tabX0 + ROSTER.length * (tabW + tabGap);
+    UI.pixText(ctx, DATA[charId].name, tabsEnd + 8, 24, { size: 10, color: '#ffe27a', maxW: 1010 - tabsEnd });
+    UI.pixText(ctx, DATA[charId].cn, tabsEnd + 8, 42, { size: 12, color: '#d9a441', maxW: 1010 - tabsEnd });
+    UI.pixText(ctx, 'A / D', 500, 33, { size: 9, color: '#5d6784', align: 'right' });
 
     // left: move list (scrolls, selected row always visible)
     if (UI.ua.panel) {

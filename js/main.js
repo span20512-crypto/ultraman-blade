@@ -320,20 +320,19 @@ function updateControls() {
 
 function updateSelect() {
   const s = G.select;
-  const ids = ['mack', 'kenji'];
+  const ids = ROSTER; // 7 英雄名册(data.js); CPU = 名册中的下一位(怪兽皮)
   if (s.phase === 'char') {
-    // directional, not toggle: A always selects left card, D always right
-    if (Input.consume('KeyA') && s.cursor !== 0) {
-      s.cursor = 0;
+    if (Input.consume('KeyA')) {
+      s.cursor = (s.cursor + ids.length - 1) % ids.length;
       AudioSys.sfx('menuMove');
     }
-    if (Input.consume('KeyD') && s.cursor !== 1) {
-      s.cursor = 1;
+    if (Input.consume('KeyD')) {
+      s.cursor = (s.cursor + 1) % ids.length;
       AudioSys.sfx('menuMove');
     }
     if (Input.consume('KeyJ')) {
       s.p1 = ids[s.cursor];
-      s.p2 = ids[1 - s.cursor];
+      s.p2 = ids[(s.cursor + 1) % ids.length];
       if (s.training) { s.phase = 'vs'; s.vsT = 0; AudioSys.sfx('fight'); }
       else { s.phase = 'diff'; AudioSys.sfx('menuSel'); }
     }
@@ -623,7 +622,7 @@ function applyUrlParams() {
   if (q.has('fight')) {
     startMatch(
       q.get('p1') || 'mack',
-      q.get('p2') || (q.get('p1') === 'kenji' ? 'mack' : 'kenji'),
+      q.get('p2') || ROSTER[(ROSTER.indexOf(q.get('p1') || 'mack') + 1) % ROSTER.length] || 'kenji',
       q.get('ai') || 'normal',
       q.has('demo'),
       q.has('training'),
@@ -643,9 +642,14 @@ function applyUrlParams() {
   if (q.has('result') && G.screen === 'fight') endMatch(G.fighters[q.get('result') === '2' ? 1 : 0]);
   const sp = q.get('selphase');
   if (sp && G.screen === 'select') {
-    G.select.p1 = 'mack'; G.select.p2 = 'kenji';
+    G.select.p1 = q.get('p1') || 'mack';
+    G.select.p2 = q.get('p2') || ROSTER[(ROSTER.indexOf(G.select.p1) + 1) % ROSTER.length];
     if (sp === 'diff') G.select.phase = 'diff';
     if (sp === 'vs') { G.select.phase = 'vs'; G.select.vsT = 0; }
+  }
+  // debug: ?selcur=N 把选人光标定到名册第 N 位(截图验证)
+  if (q.has('selcur') && G.screen === 'select') {
+    G.select.cursor = Math.max(0, Math.min(ROSTER.length - 1, parseInt(q.get('selcur'), 10) || 0));
   }
 }
 

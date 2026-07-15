@@ -42,7 +42,7 @@ const STILLS = {
       },
     },
     rival: {
-      file: 'assets/img/still/kaiju-mack.png', native: -1,
+      file: 'assets/img/still/kaiju-mack.png', native: -1, art: 'mack',
       name: 'KAIJU 1', cn: '怪兽一号', quote: 'GRRRAAAGH...!!',
     },
   },
@@ -57,18 +57,22 @@ const STILLS = {
       },
     },
     rival: {
-      file: 'assets/img/still/kaiju-kenji.png', native: -1,
+      file: 'assets/img/still/kaiju-kenji.png', native: -1, art: 'kenji',
       name: 'KAIJU 2', cn: '怪兽二号', quote: 'SKREEEEE...!!',
     },
   },
 };
 const STILL_FS = 320, STILL_FEET = 304; // 方格边长 / 脚底线(烘焙常量)
 
+/* 可选英雄名册(2026-07-15 扩编): 选人页/图鉴/CPU 轮换共用。
+   ayame 仍是原型, 不入册。 */
+const ROSTER = ['mack', 'kenji', 'taro', 'tiga', 'dyna', 'gaia', 'zett'];
+
 const CHAIN_RANK = { light: 1, heavy: 2, special: 3, super: 4 };
 
 const DATA = {
   mack: {
-    id: 'mack',
+    id: 'mack', base: 'mack',
     name: 'ULTRAMAN', cn: '初代奥特曼', title: '光之巨人', type: 'POWER',
     theme: '#ff4a3d', theme2: '#ffc531',
     dir: 'assets/img/mack', native: 1, scale: 2.75,
@@ -201,7 +205,7 @@ const DATA = {
   },
 
   kenji: {
-    id: 'kenji',
+    id: 'kenji', base: 'kenji',
     name: 'ZERO', cn: '赛罗奥特曼', title: '光之战士', type: 'SPEED',
     theme: '#7d5bff', theme2: '#35e0d8',
     dir: 'assets/img/kenji', native: -1, scale: 2.75,
@@ -426,6 +430,87 @@ const DATA = {
     },
   },
 };
+
+/* ── 新英雄扩编(2026-07-15, codex hero-moves 图集 04-08 定稿) ─────────────
+   五位新奥特曼 = mack/kenji 帧数据完整复用(startup/active/判定框/伤害逐位不动,
+   连招回归基线不破坏), 只换 显示名/主题色/立绘/图标。smear/fx 的十六进制色按
+   "色相重映射"整体换装: 以基底角色主题色相为锚, 把每个 fx 色的色相差压缩 0.55
+   后搬到新主题色相上 —— 明度/饱和的设计关系原样保留, 只换颜色身份。
+   AI 行为分支一律看 c.base(见 ai.js), 克隆角色自动继承基底打法。
+   立绘: prep 见 scratchpad bake 脚本 —— stance = light 姿去能量爆(色相带种子
+   -> 大连通域 -> 有界生长), 320 方格脚底线 y=304, 身高对齐 250。 */
+const HERO_CLONES = {
+  taro: { base: 'mack', rival: 'kenji', hue: 27,
+    name: 'TARO', cn: '泰罗奥特曼', title: '炎之勇者', type: 'POWER',
+    theme: '#ff8c2e', theme2: '#ffd24a',
+    quoteWin: '燃えたぞ!', quoteLose: '修行が足りん…' },
+  tiga: { base: 'kenji', rival: 'mack', hue: 275,
+    name: 'TIGA', cn: '迪迦奥特曼', title: '光之巨人', type: 'SPEED',
+    theme: '#b44aff', theme2: '#ff7ad9',
+    quoteWin: '光は消えない。', quoteLose: '闇が深い…' },
+  dyna: { base: 'kenji', rival: 'mack', hue: 195,
+    name: 'DYNA', cn: '戴拿奥特曼', title: '光之战士', type: 'SPEED',
+    theme: '#2ec9ff', theme2: '#ff4a5a',
+    quoteWin: '風のように!', quoteLose: 'まだまだ…!' },
+  gaia: { base: 'mack', rival: 'kenji', hue: 345,
+    name: 'GAIA', cn: '盖亚奥特曼', title: '大地之光', type: 'POWER',
+    theme: '#ff2e63', theme2: '#ffb02e',
+    quoteWin: '大地は守った。', quoteLose: '大地が揺らぐ…' },
+  zett: { base: 'kenji', rival: 'mack', hue: 210,
+    name: 'Z', cn: '泽塔奥特曼', title: '光之继承', type: 'SPEED',
+    theme: '#47a3ff', theme2: '#8ce8ff',
+    quoteWin: '御唱和ください、勝利!', quoteLose: '未熟…!' },
+};
+
+function _hexHue(hex) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (!d) return 0;
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60; return h < 0 ? h + 360 : h;
+}
+/* 色相重映射: 保持 s/l, 色相 = 新锚 + (原色相-旧锚)*k (最短弧差) */
+function _hueRemap(hex, fromHue, toHue, k) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2;
+  if (d < 0.02) return hex; // 灰白不动
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60; if (h < 0) h += 360;
+  const diff = ((h - fromHue + 540) % 360) - 180;
+  h = ((toHue + diff * k) % 360 + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  const [rr, gg, bb] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+    : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  const to2 = v => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return '#' + to2(rr) + to2(gg) + to2(bb);
+}
+function _retint(node, fromHue, toHue) {
+  for (const [key, v] of Object.entries(node)) {
+    if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) node[key] = _hueRemap(v, fromHue, toHue, 0.55);
+    else if (v && typeof v === 'object') _retint(v, fromHue, toHue);
+  }
+}
+for (const [id, ov] of Object.entries(HERO_CLONES)) {
+  const c = JSON.parse(JSON.stringify(DATA[ov.base]));
+  _retint(c.moves, _hexHue(DATA[ov.base].theme), ov.hue);
+  Object.assign(c, {
+    id, base: ov.base, name: ov.name, cn: ov.cn, title: ov.title, type: ov.type,
+    theme: ov.theme, theme2: ov.theme2, quoteWin: ov.quoteWin, quoteLose: ov.quoteLose,
+  });
+  DATA[id] = c;
+  STILLS[id] = {
+    hero: {
+      file: `assets/img/still/ultra-${id}-stance.png`, native: 1,
+      moves: {
+        light:   { file: `assets/img/still/ultra-${id}-light.png`, native: 1 },
+        special: { file: `assets/img/still/ultra-${id}-special.png`, native: 1 },
+        super:   { file: `assets/img/still/ultra-${id}-super.png`, native: 1 },
+      },
+    },
+    rival: Object.assign({}, STILLS[ov.rival].rival),
+  };
+}
 
 const AI_DIFFS = {
   easy: {

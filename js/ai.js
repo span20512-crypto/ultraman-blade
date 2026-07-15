@@ -40,7 +40,7 @@ class AIController {
         else if (cur === 'light') { if (Math.random() < 0.4) p.light = true; else p.heavy = true; } // J→J→K
         else if (cur === 'heavy') {                        // K→K 回升斩(击倒), 或 mack 接必杀
           if (Math.random() < 0.7) p.heavy = true;
-          else if (f.c.id === 'mack' && f.specialReady()) p.special = true;
+          else if (f.c.base === 'mack' && f.specialReady()) p.special = true;
         }
       }
       return p;
@@ -76,7 +76,7 @@ class AIController {
       // 资源作弊(SNK Boss 式): 气槽自动回充 —— 无敌超必拆招有弹药
       f.gainMeter(d.meterRegen || 0.35);
       // 贴身计时(游击手脱身阀用): 挂在 update 层, think 层在高压下轮不到跑
-      if (f.c.id === 'kenji') {
+      if (f.c.base === 'kenji') {
         this.closeT = dist < 185 ? (this.closeT || 0) + 1 : 0;
         // 游击手特权: 镖冷却 1.5 倍速恢复(有效 cd 130→~87) —— 不然大部分脱身
         // 窗口里镖没转好, "拉开→丢镖"的风筝循环闭不上(同气槽回充, 隐藏 Boss 规格)
@@ -141,14 +141,14 @@ class AIController {
       // 游击手(hard 隼人): 对手硬直是最安全的脱身窗口 —— 一半用来跑(重开镖局),
       // 一半用来反打。被贴身压制时 think() 层根本轮不到执行(计划槽被读键反应
       // 刷满), 所以"过近就拉开"必须挂在这个反应钩子上(Eric 2026-07-11)
-      if (f.c.id === 'kenji' && d.cheatRead && dist < 230 &&
+      if (f.c.base === 'kenji' && d.cheatRead && dist < 230 &&
           ((this.closeT || 0) > 90 || Math.random() < (f.specialReady() ? 0.5 : 0.25))) {
         this.closeT = 0;
         if (f.backdashCd <= 0 && !cornered) this.setPlan('backdash', 6);
         else this.setPlan('jumpAway', 30);
       }
       // 反打距离按自己手长来(隼人比剣二短 25px, 用统一 210 会 whiff 送人头)
-      else if (dist < (f.c.id === 'mack' ? 205 : 180)) this.setPlan('attackL', 8);
+      else if (dist < (f.c.base === 'mack' ? 205 : 180)) this.setPlan('attackL', 8);
       else if (dist < 330 && !this.isMasher) this.setPlan('dashIn', 10); // 乱拳局不冲
     }
     // 追后撤(hard): 对手 backdash 拉开 -> 立即冲刺贴上, 落在他后撤收招硬直上
@@ -184,7 +184,7 @@ class AIController {
       if (tLand > f.c.moves.super.startup + 5) this.setPlan('super', 4);
     }
     // ---- 隼人专属打法(2026-07-11 Eric: AI 得会用我们给隼人加的新玩法) --------
-    if (f.c.id === 'kenji' && f.grounded && !f.busy()) {
+    if (f.c.base === 'kenji' && f.grounded && !f.busy()) {
       // 飞镖命中确认: 对手在硬直而我们离得远(≥220 说明不是近战打的, 是镖) ->
       // 有气接瞬身超必(hitstun 26 足够 teleport 前摇 16), 没气就冲进去补刀
       if (o.hitstun > 8 && dist > 220) {
@@ -242,7 +242,7 @@ class AIController {
     }
     // 龟读: 按着远离方向且不出招 -> 上去摁着打(被防也在磨他护条, 磨满破防)
     const away = o.x >= f.x ? pad.right : pad.left;
-    if (away && !atk && !o.move && dist < (f.c.id === 'mack' ? 185 : 165) &&
+    if (away && !atk && !o.move && dist < (f.c.base === 'mack' ? 185 : 165) &&
         f.grounded && !f.busy() && this.plan !== 'attackL' && this.plan !== 'attackH') {
       this.setPlan(Math.random() < 0.5 ? 'attackH' : 'attackL', 10); return true;
     }
@@ -257,7 +257,7 @@ class AIController {
       case 'dashIn':
         if (!this.fired) { this.fired = true; if (toward > 0) p.dashR = true; else p.dashL = true; }
         // 瞬移贴身即出招(dash-cancel): kenji 的 dash+J = dashslash 突进斩(Eric: 擅用 AA/DD)
-        else if (f.state === 'dash' && f.dashT > 5 && dist < (f.c.id === 'mack' ? 180 : 165)) {
+        else if (f.state === 'dash' && f.dashT > 5 && dist < (f.c.base === 'mack' ? 180 : 165)) {
           if (Math.random() < 0.55) p.light = true; else p.heavy = true;
         }
         break;
@@ -278,7 +278,7 @@ class AIController {
         if (!f.grounded && dist < 200 && Math.abs(o.y - f.y) < 200) {
           if (Math.random() < 0.35) p.heavy = true; // dive slam
           else p.light = true;
-        } else if (f.c.id === 'kenji' && !f.grounded && dist >= 200 && f.vy > -6 &&
+        } else if (f.c.base === 'kenji' && !f.grounded && dist >= 200 && f.vy > -6 &&
                    f.specialReady() && Math.random() < 0.3) {
           p.special = true; // 空中手裏剣: 跳入途中距离还远 -> 直线空镖压制
         }
@@ -365,13 +365,13 @@ class AIController {
       if (f.superReady() && dist < 340 && o.hitstun > 6) {
         this.setPlan('super', 6); return;
       }
-      const cheatRange = dist < (f.c.id === 'mack' ? 175 : 150);
+      const cheatRange = dist < (f.c.base === 'mack' ? 175 : 150);
       if (cheatRange) {
         if (oCommitted) {
           this.calm = 0;
           // 游击手: 对手硬直=最安全的脱身窗口。镖在手 55%(贴身超时必) 撤出重开
           // 镖局, 后撤在冷却就后跳(下落甩空镖封追击), 只有剩下的概率才换近身连段
-          if (f.c.id === 'kenji' &&
+          if (f.c.base === 'kenji' &&
               ((this.closeT || 0) > 90 || Math.random() < (f.specialReady() ? 0.55 : 0.3))) {
             this.closeT = 0;
             if (f.backdashCd <= 0 && !cornered) this.setPlan('backdash', 6);
@@ -381,7 +381,7 @@ class AIController {
           const roll = Math.random();
           if (roll < (d.launcher || 0) && o.grounded) this.setPlan('antiair', 12);
           else this.setPlan(roll < 0.7 ? 'attackL' : 'attackH', 4);
-        } else if (f.c.id === 'kenji' && !cornered && Math.random() < 0.6) {
+        } else if (f.c.base === 'kenji' && !cornered && Math.random() < 0.6) {
           // 游击手(Eric 2026-07-11): 近身占不到便宜就撤出, 重开距离回到镖局
           this.closeT = 0;
           if (f.backdashCd <= 0) this.setPlan('backdash', 6);
@@ -401,7 +401,7 @@ class AIController {
       // 放风筝(走速 4.3 徒步拉开, 剣二 3.0 追不上, 逼他冲刺撞读冲刺反应)、
       // 确认命中/对手硬直才冲进去收割 —— 中远距离绝不无脑贴脸
       const nearWall = toward > 0 ? f.x <= STAGE.left + 80 : f.x >= STAGE.right - 80;
-      if (f.c.id === 'kenji' && dist < 330) {
+      if (f.c.base === 'kenji' && dist < 330) {
         if (f.specialReady() && o.grounded && o.state !== 'attack' && Math.random() < 0.75) {
           this.setPlan('special', 6); return;
         }
@@ -418,7 +418,7 @@ class AIController {
         else this.setPlan('idle', 4);
         return;
       }
-      if (f.c.id === 'kenji') {
+      if (f.c.base === 'kenji') {
         if (f.specialReady() && r < 0.8) { this.setPlan('special', 6); return; }
         this.setPlan(Math.random() < 0.4 ? 'approach' : 'idle', 8); // 远距守株: 让他自己走进镖程
         return;
@@ -433,7 +433,7 @@ class AIController {
       return;
     }
 
-    const inRange = dist < (f.c.id === 'mack' ? 175 : 150);
+    const inRange = dist < (f.c.base === 'mack' ? 175 : 150);
 
     if (inRange) {
       // 乱拳局(hard)近身: 后撤(带 i-frame)是唯一安全位移 —— 拉开距离重置节奏。
@@ -448,7 +448,7 @@ class AIController {
         const roll = Math.random();
         // 主动挑空起手(hard): 蹲重打上天接浮空超必 —— 仅贴脸且对方非出招中
         // (蹲重 noChain 被防-2/-4, 距离远或对方正在挥刀时起手就是送)
-        const inPointBlank = dist < (f.c.id === 'mack' ? 150 : 128);
+        const inPointBlank = dist < (f.c.base === 'mack' ? 150 : 128);
         if (roll < (d.launcher || 0) && o.grounded && o.state !== 'attack' && inPointBlank) {
           this.setPlan('antiair', 12);
         } else this.setPlan(roll < 0.62 + (d.launcher || 0) ? 'attackL' : 'attackH', react());
@@ -466,16 +466,16 @@ class AIController {
     // 站在间合边缘让威胁反应工作(他走进来挥空, 由闪避+反压制超必收割)
     const masherFar = this.isMasher && !d.cheatRead; // 鬼级不守株待兔, 正面压
     if (masherFar && dist < 330) {
-      if (f.c.id === 'kenji' && f.specialReady() && r < 0.5) this.setPlan('special', 6);
+      if (f.c.base === 'kenji' && f.specialReady() && r < 0.5) this.setPlan('special', 6);
       else if (dist > 230 && r < 0.6) this.setPlan('jumpIn', 40); // 只从远处起跳(近跳=上升段挨刀)
       else this.setPlan('idle', 10); // 守株待兔: 反应层负责闪/防/拆
       return;
     }
 
     if (dist < 330) { // mid range
-      if (f.c.id === 'mack' && f.specialReady() && r < 0.3) this.setPlan('special', 6);
+      if (f.c.base === 'mack' && f.specialReady() && r < 0.3) this.setPlan('special', 6);
       // 隼人中距离 zoning: 对手非出招中就丢镖(命中确认反应会接管后续追打/超必)
-      else if (f.c.id === 'kenji' && f.specialReady() && o.state !== 'attack' && r < 0.35) this.setPlan('special', 6);
+      else if (f.c.base === 'kenji' && f.specialReady() && o.state !== 'attack' && r < 0.35) this.setPlan('special', 6);
       else if (r < d.jumpiness) this.setPlan('jumpIn', 40);
       else if (r < d.aggression) this.setPlan(Math.random() < 0.7 ? 'dashIn' : 'approach', react() + 8); // 多用冲刺瞬移(Eric)
       // 少原地站桩(Eric: 会移动) — 大多数时候仍向前压
@@ -484,7 +484,7 @@ class AIController {
     }
 
     // far range —— 多靠冲刺瞬移拉近(Eric: 擅用 AA/DD), 少走路
-    if (f.c.id === 'kenji' && f.specialReady() && r < (masherFar ? 0.75 : 0.4)) this.setPlan('special', 6);
+    if (f.c.base === 'kenji' && f.specialReady() && r < (masherFar ? 0.75 : 0.4)) this.setPlan('special', 6);
     else if (!masherFar && r < 0.6) this.setPlan('dashIn', 12);
     else this.setPlan('approach', react() + 10);
   }

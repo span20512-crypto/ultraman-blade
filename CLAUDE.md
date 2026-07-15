@@ -1,7 +1,8 @@
 # 刀魂 SOUL BLADE — 项目交接 (CLAUDE.md)
 
 KOF 式和风像素格斗游戏。纯 vanilla JS + Canvas,零依赖,零构建。人机对战,完整格斗机制 + 练习场。
-**2 角色(2026-07-13 奥特曼定名:内部 id 永不变,只改 DATA.name/cn)**:内部 id `mack` = 显示「**ULTRAMAN 初代奥特曼**」力量型(红/POWER);内部 id `kenji` = 显示「**ZERO 赛罗奥特曼**」速度型(蓝/SPEED)。对手侧(rival/CPU)显示名 = `STILLS[cid].rival`「KAIJU 1 怪兽一号 / KAIJU 2 怪兽二号」(`UI.sideName(cid, rival)` 统一取)。注意代码注释里"剑二/隼人"仍按旧武士义(纯注释)。逻辑一律用 id,不 key 显示名。
+**7 英雄(2026-07-15 扩编;内部 id 永不变,只改 DATA.name/cn)**:基底二人 —— `mack` = 「**ULTRAMAN 初代奥特曼**」力量型(红/POWER),`kenji` = 「**ZERO 赛罗奥特曼**」速度型(紫/SPEED);克隆五人(`data.js HERO_CLONES`,帧数据/判定/伤害与基底逐位相同,smear/fx 色相重映射换装)—— `taro` 泰罗(mack 系/橙)、`gaia` 盖亚(mack 系/绯红)、`tiga` 迪迦(kenji 系/魅紫)、`dyna` 戴拿(kenji 系/青)、`zett` 泽塔(kenji 系/蓝)。名册常量 `ROSTER`(data.js),选人/图鉴/CPU 轮换共用;**AI/特效的角色分支一律看 `c.base`**('mack'|'kenji'),不 key id。对手侧(rival/CPU)显示名 = `STILLS[cid].rival`「KAIJU 1 怪兽一号 / KAIJU 2 怪兽二号」(art 字段选 kaiju 立绘,`UI.sideName(cid, rival)` 统一取)。注意代码注释里"剑二/隼人"仍按旧武士义(纯注释)。逻辑一律用 id,不 key 显示名。
+**新英雄素材管线(2026-07-15)**:源 = `assets/img/ultraman-icons/hero-moves/`(codex 分支 03-08 图集,320 透明 PNG);战斗立绘/选人立绘由 scratchpad bake 脚本烘焙 —— stance = light 姿去能量爆(fx 色相带种子→大连通域→有界生长→最大连通域清渣),方格脚底线 y=304、身高对齐 250,portrait 320x344 身高 328;HUD 取景值在 `ui.js stillCrop`(u:/k: 新 id 已录)。字体:新增汉字/假名已重子集化(pyftsubset 不可用时可用 npm subset-font,原始全量字体在 git 44ccaf4)。
 
 ## 奥特曼换皮(2026-07-12)
 
