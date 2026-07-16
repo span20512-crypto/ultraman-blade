@@ -18,8 +18,6 @@ const Assets = {
       ['icon:kenji:light', 'assets/img/ultraman-icons/crops/zero-light.webp'],
       ['icon:kenji:special', 'assets/img/ultraman-icons/crops/zero-special.webp'],
       ['icon:kenji:super', 'assets/img/ultraman-icons/crops/zero-super.webp'],
-      ['icon:monster:mack', 'assets/img/ultraman-icons/crops/monster-1.webp'],
-      ['icon:monster:kenji', 'assets/img/ultraman-icons/crops/monster-2.webp'],
     ];
     // 新英雄(2026-07-15): 动作图标直接用 codex hero-moves 320 图集
     // (无独立肖像稿 -> portrait 用 light 姿)
@@ -29,8 +27,6 @@ const Assets = {
       for (const mv of ['light', 'special', 'super']) {
         list.push([`icon:${cid}:${mv}`, `assets/img/ultraman-icons/hero-moves/${base}-${mv}.png`]);
       }
-      const mon = (STILLS[cid].rival.art === 'mack') ? 'monster-1' : 'monster-2';
-      list.push([`icon:monster:${cid}`, `assets/img/ultraman-icons/crops/${mon}.webp`]);
     }
     const monsterMoveIcons = [
       'portrait', 'move', 'crouch', 'dash',
@@ -38,13 +34,13 @@ const Assets = {
       'airlight', 'dive', 'special', 'super',
       'guard', 'crush', 'combo', 'finisher',
     ];
-    const monsterIconFiles = {
-      mack: 'monster-1', kenji: 'monster-2', seven: 'monster-2',
-      taro: 'monster-2', tiga: 'monster-1', dyna: 'monster-1', gaia: 'monster-2', zett: 'monster-1',
-    };
-    for (const [cid, fileBase] of Object.entries(monsterIconFiles)) {
+    // 图鉴 tab 头像 + 招式图标: 全名册按各自 rival 怪兽取(data.js RIVAL_OF 指派,
+    // 8 套 monster-moves 图标组同名规则)
+    for (const cid of ROSTER) {
+      const rv = STILLS[cid].rival;
+      list.push([`icon:monster:${cid}`, rv.tab]);
       for (const move of monsterMoveIcons) {
-        list.push([`icon:monster:${cid}:${move}`, `assets/img/ultraman-icons/monster-moves/${fileBase}-${move}.webp`]);
+        list.push([`icon:monster:${cid}:${move}`, `assets/img/ultraman-icons/monster-moves/${rv.icon}-${move}.webp`]);
       }
     }
     for (const cid of Object.keys(DATA)) {

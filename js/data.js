@@ -20,6 +20,46 @@ const FX_SHEETS = {
   ma2: { file: 'assets/img/fxcres/mack-a2.png', frames: 2, smearFrames: [0, 1] },
 };
 
+/* 怪兽名册(2026-07-16 扩编): 老两只(独角兽型/鸟型) + codex monster-sources
+   新六只(tools/bake_kaiju_stills.js 烘焙: 白底 flood-fill 抠图 + 最大连通域,
+   身高 265 对齐老两只, 脚底线 y=303.5, 过宽怪兽按宽 312 封顶)。
+   art = 立绘键(ui.js bustArt 'kaiju'+art / stillCrop 'k:'+art),
+   icon = monster-moves 16 图标组文件前缀, tab = 图鉴 tab 头像 */
+const KAIJUS = {
+  unicorn:  { file: 'assets/img/still/kaiju-mack.png', native: -1, art: 'unicorn',
+    icon: 'monster-1', tab: 'assets/img/ultraman-icons/crops/monster-1.webp',
+    name: 'KAIJU 1', cn: '怪兽一号', quote: 'GRRRAAAGH...!!' },
+  birdon:   { file: 'assets/img/still/kaiju-kenji.png', native: -1, art: 'birdon',
+    icon: 'monster-2', tab: 'assets/img/ultraman-icons/crops/monster-2.webp',
+    name: 'KAIJU 2', cn: '怪兽二号', quote: 'SKREEEEE...!!' },
+  baltan:   { file: 'assets/img/still/kaiju-baltan.png', native: -1, art: 'baltan',
+    icon: 'alien-baltan', tab: 'assets/img/ultraman-icons/monster-moves/alien-baltan-portrait.webp',
+    name: 'BALTAN', cn: '巴尔坦星人', quote: 'FO FO FO FO...!!' },
+  gomora:   { file: 'assets/img/still/kaiju-gomora.png', native: -1, art: 'gomora',
+    icon: 'gomora', tab: 'assets/img/ultraman-icons/monster-moves/gomora-portrait.webp',
+    name: 'GOMORA', cn: '哥莫拉', quote: 'GUOOOAAAR...!!' },
+  kingjoe:  { file: 'assets/img/still/kaiju-kingjoe.png', native: -1, art: 'kingjoe',
+    icon: 'king-joe', tab: 'assets/img/ultraman-icons/monster-moves/king-joe-portrait.webp',
+    name: 'KING JOE', cn: '金古乔', quote: 'VREE-CLANK...!!' },
+  redking:  { file: 'assets/img/still/kaiju-redking.png', native: -1, art: 'redking',
+    icon: 'red-king', tab: 'assets/img/ultraman-icons/monster-moves/red-king-portrait.webp',
+    name: 'RED KING', cn: '雷德王', quote: 'GRUOOOHH...!!' },
+  fiveking: { file: 'assets/img/still/kaiju-fiveking.png', native: -1, art: 'fiveking',
+    icon: 'five-king', tab: 'assets/img/ultraman-icons/monster-moves/five-king-portrait.webp',
+    name: 'FIVE KING', cn: '五帝王', quote: 'GYAOOOOO...!!' },
+  orochi:   { file: 'assets/img/still/kaiju-orochi.png', native: -1, art: 'orochi',
+    icon: 'maga-orochi', tab: 'assets/img/ultraman-icons/monster-moves/maga-orochi-portrait.webp',
+    name: 'MAGA-OROCHI', cn: '玛迦大蛇', quote: 'SHRAAAAAH...!!' },
+};
+
+/* 每位英雄的 CPU 对手怪兽(选人页 CPU 行/对战/图鉴共用) —— 尽量按原作宿敌:
+   初代-巴尔坦 / 赛文-金古乔 / 赛罗-哥莫拉 / 泰罗-雷德王 / 迪迦-五帝王 /
+   泽塔-玛迦大蛇; 戴拿/盖亚沿用老两只 */
+const RIVAL_OF = {
+  mack: 'baltan', seven: 'kingjoe', kenji: 'gomora', taro: 'redking',
+  tiga: 'fiveking', dyna: 'unicorn', gaia: 'birdon', zett: 'orochi',
+};
+
 /* 奥特曼换皮 (2026-07-12): 战斗本体改静态立绘 —— 玩家侧 = 奥特曼英雄,
    对手侧 = 怪兽(prep-stills.js 白底抠图, 烘焙成 320 方格单帧"表", 脚底线
    y=304, 绘制比例 1:1)。姿态由 fighter.draw 的程序化 pose(倾角/压缩/弹跳)
@@ -41,10 +81,7 @@ const STILLS = {
         super:   { file: 'assets/img/still/ultra-mack-super.png', native: 1 },
       },
     },
-    rival: {
-      file: 'assets/img/still/kaiju-mack.png', native: -1, art: 'mack',
-      name: 'KAIJU 1', cn: '怪兽一号', quote: 'GRRRAAAGH...!!',
-    },
+    rival: Object.assign({}, KAIJUS[RIVAL_OF.mack]),
   },
   kenji: {
     hero: {
@@ -56,10 +93,7 @@ const STILLS = {
         super:   { file: 'assets/img/still/ultra-kenji-super.png', native: 1 },
       },
     },
-    rival: {
-      file: 'assets/img/still/kaiju-kenji.png', native: -1, art: 'kenji',
-      name: 'KAIJU 2', cn: '怪兽二号', quote: 'SKREEEEE...!!',
-    },
+    rival: Object.assign({}, KAIJUS[RIVAL_OF.kenji]),
   },
 };
 const STILL_FS = 320, STILL_FEET = 304; // 方格边长 / 脚底线(烘焙常量)
@@ -443,27 +477,27 @@ const HERO_CLONES = {
   /* 赛文(02)只有正脸基础形象(素材库无出招姿态图集) —— poses:false 表示不注册
      出招姿态立绘, fighter.stillDef 自动回退基础身, 刀光/fx 照常演出;
      以后补 02 动作图集后按 04-08 同管线烘焙即可移除该旗标 */
-  seven: { base: 'kenji', rival: 'kenji', hue: 145, poses: false,
+  seven: { base: 'kenji', hue: 145, poses: false,
     name: 'SEVEN', cn: '赛文奥特曼', title: '光之守护', type: 'SPEED',
     theme: '#2ed573', theme2: '#b8ffd9',
     quoteWin: '任務、完了。', quoteLose: '……無念。' },
-  taro: { base: 'mack', rival: 'kenji', hue: 27,
+  taro: { base: 'mack', hue: 27,
     name: 'TARO', cn: '泰罗奥特曼', title: '炎之勇者', type: 'POWER',
     theme: '#ff8c2e', theme2: '#ffd24a',
     quoteWin: '燃えたぞ!', quoteLose: '修行が足りん…' },
-  tiga: { base: 'kenji', rival: 'mack', hue: 275,
+  tiga: { base: 'kenji', hue: 275,
     name: 'TIGA', cn: '迪迦奥特曼', title: '光之巨人', type: 'SPEED',
     theme: '#b44aff', theme2: '#ff7ad9',
     quoteWin: '光は消えない。', quoteLose: '闇が深い…' },
-  dyna: { base: 'kenji', rival: 'mack', hue: 195,
+  dyna: { base: 'kenji', hue: 195,
     name: 'DYNA', cn: '戴拿奥特曼', title: '光之战士', type: 'SPEED',
     theme: '#2ec9ff', theme2: '#ff4a5a',
     quoteWin: '風のように!', quoteLose: 'まだまだ…!' },
-  gaia: { base: 'mack', rival: 'kenji', hue: 345,
+  gaia: { base: 'mack', hue: 345,
     name: 'GAIA', cn: '盖亚奥特曼', title: '大地之光', type: 'POWER',
     theme: '#ff2e63', theme2: '#ffb02e',
     quoteWin: '大地は守った。', quoteLose: '大地が揺らぐ…' },
-  zett: { base: 'kenji', rival: 'mack', hue: 210,
+  zett: { base: 'kenji', hue: 210,
     name: 'Z', cn: '泽塔奥特曼', title: '光之继承', type: 'SPEED',
     theme: '#47a3ff', theme2: '#8ce8ff',
     quoteWin: '御唱和ください、勝利!', quoteLose: '未熟…!' },
@@ -514,7 +548,7 @@ for (const [id, ov] of Object.entries(HERO_CLONES)) {
       super:   { file: `assets/img/still/ultra-${id}-super.png`, native: 1 },
     };
   }
-  STILLS[id] = { hero, rival: Object.assign({}, STILLS[ov.rival].rival) };
+  STILLS[id] = { hero, rival: Object.assign({}, KAIJUS[RIVAL_OF[id]]) };
 }
 
 const AI_DIFFS = {

@@ -1,7 +1,7 @@
 /* re-subset FusionPixel fonts: existing subset charset + new hero glyphs */
 const fs = require('fs'), zlib = require('zlib');
 const subsetFont = require('subset-font');
-const SCRATCH = '/tmp';
+const SCRATCH = process.env.SCRATCH || '/tmp';
 const KNOWN=['cmap','head','hhea','hmtx','maxp','name','OS/2','post','cvt ','fpgm','glyf','loca','prep','CFF ','VORG','EBDT','EBLC','gasp','hdmx','kern','LTSH','PCLT','VDMX','vhea','vmtx','BASE','GDEF','GPOS','GSUB','EBSC','JSTF','MATH','CBDT','CBLC','COLR','CPAL','SVG ','sbix','acnt','avar','bdat','bloc','bsln','cvar','fdsc','feat','fmtx','fvar','gvar','hsty','just','lcar','mort','morx','opbd','prop','trak','Zapf','Silf','Glat','Gloc','Feat','Sill'];
 function u128(buf,o){let r=0;for(let i=0;i<5;i++){const b=buf[o+i];r=(r*128)+(b&0x7f);if(!(b&0x80))return[r,o+i+1];}throw 'bad128';}
 function charset(file){
@@ -44,7 +44,9 @@ function charset(file){
   return cps;
 }
 const ADD = '泰罗迪迦戴拿盖亚泽塔奥特曼赛兽怪一二号' +
-  '燃えたぞ修行が足りん光は消えない闇深大地守った揺らぐ御唱和ください未熟勝利炎巨人勇者閃雷風のように継承まだよ、' ;
+  '燃えたぞ修行が足りん光は消えない闇深大地守った揺らぐ御唱和ください未熟勝利炎巨人勇者閃雷風のように継承まだよ、' +
+  // 2026-07-16: 双人对决菜单 + 怪兽名册(巴尔坦/哥莫拉/金古乔/雷德王/五帝王/玛迦大蛇)
+  '对决之巴尔坦星人哥莫拉金古乔雷德王五帝玛迦大蛇任務完了無念';
 (async()=>{
   for(const lang of ['zh','ja']){
     const cur = charset(`assets/fonts/FusionPixel-${lang}.woff2`);

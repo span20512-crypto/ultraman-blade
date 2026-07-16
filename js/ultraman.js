@@ -1,21 +1,48 @@
 /* Local two-player Ultraman arena. Two physical keyboards are supported by
-   using independent key zones (browsers intentionally merge keyboard devices). */
+   using independent key zones (browsers intentionally merge keyboard devices).
+   2026-07-16 扩编: 名册 = 全部 8 位英雄 + 8 只怪兽(KAIJUS), 直接复用主战引擎的
+   烘焙立绘(选人 = ui-lab 320x344 portrait webp, 战斗 = 320 方格 stance still,
+   脚底线 y=303.5) —— 旧 assets/img/ultraman/ 白底大图弃用。 */
 'use strict';
 
 const UltramanMode = (() => {
-  const HEROES = [
-    ['ultraman', '初代奥特曼', '#e53935'], ['seven', '赛文奥特曼', '#ff5a36'],
-    ['zero', '赛罗奥特曼', '#4aa3ff'], ['taro', '泰罗奥特曼', '#ffca38'],
-    ['tiga', '迪迦奥特曼', '#9b6cff'], ['dyna', '戴拿奥特曼', '#4c8dff'],
-    ['gaia', '盖亚奥特曼', '#ff7043'], ['z', '泽塔奥特曼', '#43d7e8'],
-  ].map(([id, name, color]) => ({ id, name, color, img: new Image() }));
-  HEROES.forEach(h => { h.img.src = `assets/img/ultraman/${h.id}.png`; });
+  /* 怪兽主题色(KAIJUS 无 theme 字段, 双人对战血条/光线用) */
+  const KAIJU_COLORS = {
+    unicorn: '#79c26e', birdon: '#e2984a', baltan: '#8fa3c0', gomora: '#c98a4b',
+    kingjoe: '#d8c26a', redking: '#d9c08a', fiveking: '#b04ad9', orochi: '#e0304e',
+  };
+  const STILL_FEET_R = 303.5 / 320; // 320 方格脚底线比例(烘焙常量)
 
+  /* 名册: 英雄按 ROSTER 顺序, 怪兽按 KAIJUS 名册顺序 —— 4x4 网格 */
+  const FIGHTERS = [
+    ...ROSTER.map(cid => ({
+      id: cid, name: DATA[cid].cn, color: DATA[cid].theme, kind: 'hero',
+      selSrc: `assets/ui-lab/portrait-ultra-${cid}-sel.webp`,
+      bodySrc: STILLS[cid].hero.file, nat: STILLS[cid].hero.native || 1,
+    })),
+    ...Object.values(KAIJUS).map(k => ({
+      id: k.art, name: k.cn, color: KAIJU_COLORS[k.art] || '#c95b4a', kind: 'kaiju',
+      selSrc: `assets/ui-lab/portrait-kaiju-${k.art === 'unicorn' ? 'mack' : k.art === 'birdon' ? 'kenji' : k.art}-sel.webp`,
+      bodySrc: k.file, nat: k.native || -1,
+    })),
+  ];
+  let assetsStarted = false;
+  function loadArt() { // 首次进入才加载(标题页不为双人模式买单)
+    if (assetsStarted) return;
+    assetsStarted = true;
+    for (const f of FIGHTERS) {
+      f.sel = new Image(); f.sel.src = f.selSrc;
+      f.img = new Image(); f.img.src = f.bodySrc;
+    }
+  }
+
+  const COLS = 4, N = FIGHTERS.length; // 4x4
   let phase = 'select1', cursor = [0, 1], chosen = [null, null], players = [], shots = [];
   let timer = 60, winner = '', flash = 0;
   const ground = 486;
 
   function enter() {
+    loadArt();
     phase = 'select1'; cursor = [0, 1]; chosen = [null, null]; players = []; shots = [];
     timer = 60; winner = ''; flash = 0;
   }
@@ -33,9 +60,12 @@ const UltramanMode = (() => {
   function selectUpdate() {
     const p = phase === 'select1' ? 0 : 1;
     const left = p === 0 ? 'KeyA' : 'ArrowLeft', right = p === 0 ? 'KeyD' : 'ArrowRight';
+    const up = p === 0 ? 'KeyW' : 'ArrowUp', down = p === 0 ? 'KeyS' : 'ArrowDown';
     const ok = p === 0 ? 'KeyJ' : 'Numpad1';
-    if (Input.consume(left)) { cursor[p] = (cursor[p] + 7) % 8; AudioSys.sfx('menuMove'); }
-    if (Input.consume(right)) { cursor[p] = (cursor[p] + 1) % 8; AudioSys.sfx('menuMove'); }
+    if (Input.consume(left)) { cursor[p] = (cursor[p] + N - 1) % N; AudioSys.sfx('menuMove'); }
+    if (Input.consume(right)) { cursor[p] = (cursor[p] + 1) % N; AudioSys.sfx('menuMove'); }
+    if (Input.consume(up)) { cursor[p] = (cursor[p] + N - COLS) % N; AudioSys.sfx('menuMove'); }
+    if (Input.consume(down)) { cursor[p] = (cursor[p] + COLS) % N; AudioSys.sfx('menuMove'); }
     if (Input.consume(ok) || (p === 1 && Input.consume('Enter'))) {
       chosen[p] = cursor[p]; AudioSys.sfx('menuSel');
       if (p === 0) phase = 'select2'; else startFight();
@@ -110,27 +140,37 @@ const UltramanMode = (() => {
 
   function drawSelect(ctx) {
     ctx.drawImage(UI.bgCanvas(G), 0, 0); ctx.fillStyle = 'rgba(7,8,12,.78)'; ctx.fillRect(0, 0, 1024, 576);
-    UI.pixTextMixed(ctx, '光之对决 · ULTRA DUEL', 512, 55, { size: 25, align: 'center', color: '#ffe27a', outline: true });
+    UI.pixTextMixed(ctx, '光之对决 · ULTRA DUEL', 512, 48, { size: 23, align: 'center', color: '#ffe27a', outline: true });
     const p = phase === 'select1' ? 0 : 1;
-    UI.pixText(ctx, `${p + 1}P CHOOSE YOUR HERO`, 512, 87, { size: 13, align: 'center', color: p ? '#58d8ff' : '#ff675c' });
-    HEROES.forEach((h, i) => {
-      const col = i % 4, row = Math.floor(i / 4), x = 82 + col * 220, y = 116 + row * 185;
-      panel(ctx, x, y, 200, 160, h.color, cursor[p] === i);
-      if (h.img.complete) ctx.drawImage(h.img, x + 35, y + 5, 130, 130);
-      UI.pixText(ctx, h.name, x + 100, y + 148, { size: 12, align: 'center', color: cursor[p] === i ? '#fff3bd' : '#aaa0a0', maxW: 185 });
-      if (chosen[0] === i) UI.pixText(ctx, '1P', x + 12, y + 25, { size: 11, color: '#ff675c', outline: true });
+    UI.pixText(ctx, `${p + 1}P CHOOSE YOUR FIGHTER`, 512, 76, { size: 12, align: 'center', color: p ? '#58d8ff' : '#ff675c' });
+    FIGHTERS.forEach((h, i) => {
+      const col = i % COLS, row = Math.floor(i / COLS), x = 78 + col * 224, y = 92 + row * 104;
+      panel(ctx, x, y, 206, 92, h.color, cursor[p] === i);
+      // 立绘 320x344, 高度撑满格 -> 左侧身位, 右侧留给名字
+      if (h.sel && h.sel.complete && h.sel.naturalWidth) {
+        ctx.drawImage(h.sel, x + 6, y + 4, 78, 84);
+      }
+      UI.pixText(ctx, h.name, x + 142, y + 40, { size: 11, align: 'center', color: cursor[p] === i ? '#fff3bd' : '#aaa0a0', maxW: 118 });
+      UI.pixText(ctx, h.kind === 'hero' ? 'HERO' : 'KAIJU', x + 142, y + 62,
+        { size: 8, align: 'center', color: h.kind === 'hero' ? '#d9a441' : '#9a67c9' });
+      if (chosen[0] === i) UI.pixText(ctx, '1P', x + 10, y + 20, { size: 11, color: '#ff675c', outline: true });
     });
-    UI.pixText(ctx, p === 0 ? '1P  A/D SELECT · J CONFIRM' : '2P  ←/→ SELECT · NUM 1 CONFIRM',
-      512, 517, { size: 12, align: 'center', color: '#d9a441' });
-    UI.pixText(ctx, 'ESC BACK', 512, 546, { size: 10, align: 'center', color: '#66708a' });
+    UI.pixText(ctx, p === 0 ? '1P  W/A/S/D SELECT · J CONFIRM' : '2P  ARROWS SELECT · NUM 1 CONFIRM',
+      512, 528, { size: 12, align: 'center', color: '#d9a441' });
+    UI.pixText(ctx, 'ESC BACK', 512, 552, { size: 10, align: 'center', color: '#66708a' });
   }
 
   function drawFighter(ctx, p) {
-    const h = HEROES[p.heroIndex], bob = p.onGround ? Math.sin(G.tick * .09 + p.side) * 2 : 0;
-    ctx.save(); ctx.translate(p.x, p.y + bob); ctx.scale(p.face, 1);
+    const h = FIGHTERS[p.heroIndex], bob = p.onGround ? Math.sin(G.tick * .09 + p.side) * 2 : 0;
+    ctx.save(); ctx.translate(p.x, p.y + bob);
+    ctx.scale(p.face * h.nat, 1); // nat = 立绘原生朝向, 显示朝向不一致才翻
     if (p.hurt && p.hurt % 4 < 2) ctx.globalAlpha = .45;
     if (p.attack > 7) { ctx.strokeStyle = h.color; ctx.lineWidth = 12; ctx.globalAlpha = .75; ctx.beginPath(); ctx.arc(45, -105, 75, -1, 1); ctx.stroke(); ctx.globalAlpha = 1; }
-    if (h.img.complete) ctx.drawImage(h.img, -82, -190, 164, 164);
+    // 320 方格 still: 脚底线对齐 p.y (方格底部下方为透明余量)
+    if (h.img && h.img.complete && h.img.naturalWidth) {
+      const S = 232;
+      ctx.drawImage(h.img, -S / 2, -S * STILL_FEET_R, S, S);
+    }
     ctx.restore();
   }
 
@@ -143,18 +183,18 @@ const UltramanMode = (() => {
     ctx.drawImage(UI.bgCanvas(G), 0, 0); ctx.fillStyle = 'rgba(5,8,18,.25)'; ctx.fillRect(0, 0, 1024, 576);
     const [a, b] = players; bar(ctx, 48, 42, 390, a.hp, '#ff4c42', false); bar(ctx, 586, 42, 390, b.hp, '#4bc6ff', true);
     bar(ctx, 48, 68, 250, a.energy, '#ffd43b', false); bar(ctx, 726, 68, 250, b.energy, '#ffd43b', true);
-    UI.pixText(ctx, HEROES[a.heroIndex].name, 48, 32, { size: 13, color: '#fff0d0' });
-    UI.pixText(ctx, HEROES[b.heroIndex].name, 976, 32, { size: 13, align: 'right', color: '#fff0d0' });
+    UI.pixTextMixed(ctx, FIGHTERS[a.heroIndex].name, 48, 32, { size: 13, color: '#fff0d0' });
+    UI.pixTextMixed(ctx, FIGHTERS[b.heroIndex].name, 976, 32, { size: 13, align: 'right', color: '#fff0d0' });
     UI.pixText(ctx, String(Math.ceil(timer)).padStart(2, '0'), 512, 65, { size: 28, align: 'center', color: '#ffe27a', outline: true });
     ctx.fillStyle = 'rgba(10,8,15,.55)'; ctx.fillRect(0, ground + 2, 1024, 90); ctx.fillStyle = '#8a6a2f'; ctx.fillRect(0, ground, 1024, 3);
     players.forEach(p => drawFighter(ctx, p));
-    shots.forEach(s => { const c = HEROES[players[s.owner].heroIndex].color; ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 25, s.y - 5, 50, 10); ctx.fillStyle = c; ctx.fillRect(s.x - 34, s.y - 2, 68, 4); });
+    shots.forEach(s => { const c = FIGHTERS[players[s.owner].heroIndex].color; ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 25, s.y - 5, 50, 10); ctx.fillStyle = c; ctx.fillRect(s.x - 34, s.y - 2, 68, 4); });
     UI.pixText(ctx, '1P A/D MOVE · W JUMP · J HIT · U BEAM', 20, 553, { size: 9, color: '#c5b8a0' });
     UI.pixText(ctx, '2P ←/→ MOVE · ↑ JUMP · NUM1 HIT · NUM4 BEAM', 1004, 553, { size: 9, align: 'right', color: '#c5b8a0' });
     if (winner) {
       ctx.fillStyle = 'rgba(4,5,10,.78)'; ctx.fillRect(0, 190, 1024, 190);
       UI.pixText(ctx, winner, 512, 275, { size: 38, align: 'center', color: '#ffe27a', outline: true, shadow: 5 });
-      UI.pixText(ctx, 'J / NUM1 REMATCH · K / NUM2 HERO SELECT', 512, 330, { size: 12, align: 'center', color: '#c5b8a0' });
+      UI.pixText(ctx, 'J / NUM1 REMATCH · K / NUM2 FIGHTER SELECT', 512, 330, { size: 12, align: 'center', color: '#c5b8a0' });
     }
     if (flash) { ctx.fillStyle = `rgba(255,255,255,${flash * .06})`; ctx.fillRect(0, 0, 1024, 576); }
   }

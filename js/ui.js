@@ -161,16 +161,17 @@ const UI = {
   // 88-unit 空间): u: = 英雄脸部特写, k: = 怪兽全身
   stillCrop: {
     'u:mack': { x: -51.5, y: -0.3, w: 191.9 }, 'u:kenji': { x: -63.3, y: -0.8, w: 214.8 },
-    'k:mack': { x: -3.2, y: 2.2, w: 93.1 }, 'k:kenji': { x: -13.8, y: 1.6, w: 117.7 },
-    // 新英雄(2026-07-15): u: 由烘焙脚本按头部取景计算(同 prep-portraits 规则);
-    // k: = 各自 rival 怪兽皮的取景(kaiju 立绘只有两张, 直接复用对应值)
-    'u:seven': { x: -52.2, y: 0.2, w: 192 }, 'k:seven': { x: -13.8, y: 1.6, w: 117.7 },
+    // 新英雄(2026-07-15): u: 由烘焙脚本按头部取景计算(同 prep-portraits 规则)
+    'u:seven': { x: -52.2, y: 0.2, w: 192 },
     'u:taro': { x: -46.7, y: -0.4, w: 192 }, 'u:tiga': { x: -75.9, y: -0.4, w: 192 },
     'u:dyna': { x: -50.6, y: -0.4, w: 192 }, 'u:gaia': { x: -65.8, y: -0.4, w: 192 },
     'u:zett': { x: -65.2, y: -0.4, w: 192 },
-    'k:taro': { x: -13.8, y: 1.6, w: 117.7 }, 'k:tiga': { x: -3.2, y: 2.2, w: 93.1 },
-    'k:dyna': { x: -3.2, y: 2.2, w: 93.1 }, 'k:gaia': { x: -13.8, y: 1.6, w: 117.7 },
-    'k:zett': { x: -3.2, y: 2.2, w: 93.1 },
+    // 怪兽(2026-07-16 扩编): k: 改按 KAIJUS art 键(不再按英雄 cid), 老两只
+    // 沿用手调值, 新六只 = tools/bake_kaiju_stills.js 顶部锚定取景输出
+    'k:unicorn': { x: -3.2, y: 2.2, w: 93.1 }, 'k:birdon': { x: -13.8, y: 1.6, w: 117.7 },
+    'k:baltan': { x: -3.9, y: -1, w: 94.9 }, 'k:gomora': { x: -1, y: 0.8, w: 93.1 },
+    'k:kingjoe': { x: -1.5, y: 1.1, w: 93.4 }, 'k:redking': { x: -2, y: 1.1, w: 92.8 },
+    'k:fiveking': { x: -5.2, y: -21.3, w: 97 }, 'k:orochi': { x: -5.5, y: 1.1, w: 92.8 },
   },
 
   // 侧别显示名: 对手侧显示怪兽名(STILLS rival.name/cn), 玩家侧 = DATA 英雄名
@@ -182,7 +183,7 @@ const UI = {
   },
 
   // side-aware bust art: player side = Ultraman hero, rival side = kaiju.
-  // 怪兽皮按 STILLS[cid].rival.art 选(只有两张 kaiju 立绘, 名册共用);
+  // 怪兽皮按 STILLS[cid].rival.art 选(KAIJUS 名册 8 只, RIVAL_OF 逐英雄指派);
   // Falls back to the old samurai bust when the new art is missing.
   bustArt(cid, rival) {
     if (rival) {
@@ -279,7 +280,9 @@ const UI = {
       const face = this.ua['hud' + f.c.id] || this.portraits[f.c.id];
       const selArt = this.bustArt(f.c.id, rival);
       const newArt = selArt && selArt !== this.ua.selmack && selArt !== this.ua.selkenji;
-      const HC = HUD_CROP[newArt ? (rival ? 'k:' : 'u:') + f.c.id : f.c.id];
+      // k: 取景按怪兽 art 键(KAIJUS 名册), u: 按英雄 cid
+      const rvArt = ((STILLS[f.c.id] || {}).rival || {}).art || f.c.id;
+      const HC = HUD_CROP[newArt ? (rival ? 'k:' + rvArt : 'u:' + f.c.id) : f.c.id];
       if (P) {
         const s = 86 / P.inner.w;
         ctx.fillStyle = '#141110';
@@ -1369,8 +1372,16 @@ const UI = {
       // (同 320x344 透明格式, prep-portraits.js 白底抠图烘焙; 缺失回退武士 bust)
       ultramack:  () => this._loadImg('portrait-ultra-mack-sel.png'),
       ultrakenji: () => this._loadImg('portrait-ultra-kenji-sel.png'),
-      kaijumack:  () => this._loadImg('portrait-kaiju-mack-sel.png'),
-      kaijukenji: () => this._loadImg('portrait-kaiju-kenji-sel.png'),
+      // 怪兽立绘按 KAIJUS art 键: 老两只文件名沿用 kaiju-{mack,kenji},
+      // 新六只 = bake_kaiju_stills.js 烘焙(同 320x344 透明格式)
+      kaijuunicorn:  () => this._loadImg('portrait-kaiju-mack-sel.png'),
+      kaijubirdon:   () => this._loadImg('portrait-kaiju-kenji-sel.png'),
+      kaijubaltan:   () => this._loadImg('portrait-kaiju-baltan-sel.png'),
+      kaijugomora:   () => this._loadImg('portrait-kaiju-gomora-sel.png'),
+      kaijukingjoe:  () => this._loadImg('portrait-kaiju-kingjoe-sel.png'),
+      kaijuredking:  () => this._loadImg('portrait-kaiju-redking-sel.png'),
+      kaijufiveking: () => this._loadImg('portrait-kaiju-fiveking-sel.png'),
+      kaijuorochi:   () => this._loadImg('portrait-kaiju-orochi-sel.png'),
       // 新英雄立绘(2026-07-15, stance 烘焙): 同 320x344 透明格式
       ultraseven: () => this._loadImg('portrait-ultra-seven-sel.png'),
       ultrataro:  () => this._loadImg('portrait-ultra-taro-sel.png'),
