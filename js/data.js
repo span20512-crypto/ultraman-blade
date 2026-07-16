@@ -64,9 +64,9 @@ const STILLS = {
 };
 const STILL_FS = 320, STILL_FEET = 304; // 方格边长 / 脚底线(烘焙常量)
 
-/* 可选英雄名册(2026-07-15 扩编): 选人页/图鉴/CPU 轮换共用。
-   ayame 仍是原型, 不入册。 */
-const ROSTER = ['mack', 'kenji', 'taro', 'tiga', 'dyna', 'gaia', 'zett'];
+/* 可选英雄名册(2026-07-15 扩编): 选人页/图鉴/CPU 轮换共用, 顺序 = 素材编号
+   01 初代 / 02 赛文 / 03 赛罗 / 04-08 新五人。ayame 仍是原型, 不入册。 */
+const ROSTER = ['mack', 'seven', 'kenji', 'taro', 'tiga', 'dyna', 'gaia', 'zett'];
 
 const CHAIN_RANK = { light: 1, heavy: 2, special: 3, super: 4 };
 
@@ -440,6 +440,13 @@ const DATA = {
    立绘: prep 见 scratchpad bake 脚本 —— stance = light 姿去能量爆(色相带种子
    -> 大连通域 -> 有界生长), 320 方格脚底线 y=304, 身高对齐 250。 */
 const HERO_CLONES = {
+  /* 赛文(02)只有正脸基础形象(素材库无出招姿态图集) —— poses:false 表示不注册
+     出招姿态立绘, fighter.stillDef 自动回退基础身, 刀光/fx 照常演出;
+     以后补 02 动作图集后按 04-08 同管线烘焙即可移除该旗标 */
+  seven: { base: 'kenji', rival: 'kenji', hue: 145, poses: false,
+    name: 'SEVEN', cn: '赛文奥特曼', title: '光之守护', type: 'SPEED',
+    theme: '#2ed573', theme2: '#b8ffd9',
+    quoteWin: '任務、完了。', quoteLose: '……無念。' },
   taro: { base: 'mack', rival: 'kenji', hue: 27,
     name: 'TARO', cn: '泰罗奥特曼', title: '炎之勇者', type: 'POWER',
     theme: '#ff8c2e', theme2: '#ffd24a',
@@ -499,17 +506,15 @@ for (const [id, ov] of Object.entries(HERO_CLONES)) {
     theme: ov.theme, theme2: ov.theme2, quoteWin: ov.quoteWin, quoteLose: ov.quoteLose,
   });
   DATA[id] = c;
-  STILLS[id] = {
-    hero: {
-      file: `assets/img/still/ultra-${id}-stance.png`, native: 1,
-      moves: {
-        light:   { file: `assets/img/still/ultra-${id}-light.png`, native: 1 },
-        special: { file: `assets/img/still/ultra-${id}-special.png`, native: 1 },
-        super:   { file: `assets/img/still/ultra-${id}-super.png`, native: 1 },
-      },
-    },
-    rival: Object.assign({}, STILLS[ov.rival].rival),
-  };
+  const hero = { file: `assets/img/still/ultra-${id}-stance.png`, native: 1 };
+  if (ov.poses !== false) {
+    hero.moves = {
+      light:   { file: `assets/img/still/ultra-${id}-light.png`, native: 1 },
+      special: { file: `assets/img/still/ultra-${id}-special.png`, native: 1 },
+      super:   { file: `assets/img/still/ultra-${id}-super.png`, native: 1 },
+    };
+  }
+  STILLS[id] = { hero, rival: Object.assign({}, STILLS[ov.rival].rival) };
 }
 
 const AI_DIFFS = {

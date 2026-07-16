@@ -39,7 +39,7 @@ const Assets = {
       'guard', 'crush', 'combo', 'finisher',
     ];
     const monsterIconFiles = {
-      mack: 'monster-1', kenji: 'monster-2',
+      mack: 'monster-1', kenji: 'monster-2', seven: 'monster-2',
       taro: 'monster-2', tiga: 'monster-1', dyna: 'monster-1', gaia: 'monster-2', zett: 'monster-1',
     };
     for (const [cid, fileBase] of Object.entries(monsterIconFiles)) {

@@ -164,6 +164,7 @@ const UI = {
     'k:mack': { x: -3.2, y: 2.2, w: 93.1 }, 'k:kenji': { x: -13.8, y: 1.6, w: 117.7 },
     // 新英雄(2026-07-15): u: 由烘焙脚本按头部取景计算(同 prep-portraits 规则);
     // k: = 各自 rival 怪兽皮的取景(kaiju 立绘只有两张, 直接复用对应值)
+    'u:seven': { x: -52.2, y: 0.2, w: 192 }, 'k:seven': { x: -13.8, y: 1.6, w: 117.7 },
     'u:taro': { x: -46.7, y: -0.4, w: 192 }, 'u:tiga': { x: -75.9, y: -0.4, w: 192 },
     'u:dyna': { x: -50.6, y: -0.4, w: 192 }, 'u:gaia': { x: -65.8, y: -0.4, w: 192 },
     'u:zett': { x: -65.2, y: -0.4, w: 192 },
@@ -1234,6 +1235,7 @@ const UI = {
     const QUOTES_EN = {
       mack: 'The blade... returns to its sheath.',
       kenji: '...Too slow.',
+      seven: 'Mission... complete.',
       taro: 'Burn bright, burn true!',
       tiga: 'The light never fades.',
       dyna: 'Swift as the wind!',
@@ -1370,6 +1372,7 @@ const UI = {
       kaijumack:  () => this._loadImg('portrait-kaiju-mack-sel.png'),
       kaijukenji: () => this._loadImg('portrait-kaiju-kenji-sel.png'),
       // 新英雄立绘(2026-07-15, stance 烘焙): 同 320x344 透明格式
+      ultraseven: () => this._loadImg('portrait-ultra-seven-sel.png'),
       ultrataro:  () => this._loadImg('portrait-ultra-taro-sel.png'),
       ultratiga:  () => this._loadImg('portrait-ultra-tiga-sel.png'),
       ultradyna:  () => this._loadImg('portrait-ultra-dyna-sel.png'),
