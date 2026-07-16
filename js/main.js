@@ -296,8 +296,8 @@ function updateTitle() {
   }
   // intro 过场 (~0.5s): 定住导航, 让 Logo 升起+按钮淡入演完, 也顺带吃掉启动键不误触菜单
   if (G.titleIntro < 30) { G.titleIntro++; return; }
-  if (Input.consume('KeyW')) { G.titleSel = (G.titleSel + 2) % 3; AudioSys.sfx('menuMove'); }
-  if (Input.consume('KeyS')) { G.titleSel = (G.titleSel + 1) % 3; AudioSys.sfx('menuMove'); }
+  if (Input.consume('KeyW')) { G.titleSel = (G.titleSel + 3) % 4; AudioSys.sfx('menuMove'); }
+  if (Input.consume('KeyS')) { G.titleSel = (G.titleSel + 1) % 4; AudioSys.sfx('menuMove'); }
   if (Input.consume('KeyJ') || Input.consume('Enter')) {
     AudioSys.sfx('menuSel');
     if (G.titleSel === 0 || G.titleSel === 1) {
@@ -307,6 +307,9 @@ function updateTitle() {
         training: G.titleSel === 1,
       };
       G.screen = 'select';
+    } else if (G.titleSel === 2) {
+      UltramanMode.enter();
+      G.screen = 'ultraman';
     } else {
       G.screen = 'controls';
     }
@@ -591,6 +594,7 @@ function draw() {
     case 'title': UI.drawTitle(ctx, G); break;
     case 'controls': Howto.draw(ctx, G); break;
     case 'select': UI.drawSelect(ctx, G); break;
+    case 'ultraman': UltramanMode.draw(ctx, G); break;
     case 'result': UI.drawResult(ctx, G); break;
     case 'fight': drawFight(); break;
   }
@@ -607,6 +611,7 @@ function update() {
     case 'title': updateTitle(); break;
     case 'controls': updateControls(); break;
     case 'select': updateSelect(); break;
+    case 'ultraman': UltramanMode.update(G); break;
     case 'result': updateResult(); break;
     case 'fight': updateFight(); break;
   }
@@ -619,7 +624,11 @@ function applyUrlParams() {
   if (q.get('stage')) G.stageArt = q.get('stage'); // ?stage=proc|alt
   if (q.get('pose')) G.poseTest = q.get('pose');
   const scr = q.get('screen');
-  if (scr && ['title', 'controls', 'select'].includes(scr)) G.screen = scr;
+  if (scr && ['title', 'controls', 'select'].includes(scr)) {
+    G.screen = scr;
+  } else if (scr === 'ultraman') {
+    UltramanMode.enter(); G.screen = 'ultraman';
+  }
   if (q.has('fight')) {
     startMatch(
       q.get('p1') || 'mack',

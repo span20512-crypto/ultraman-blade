@@ -870,11 +870,11 @@ const UI = {
 
     // menu: lacquered wood boards with a folding-fan cursor
     // bilingual menu per language policy: EN primary + JP kanji accent
-    const items = [['BATTLE', '決闘'], ['TRAINING', '修行'], ['HOW TO PLAY', '心得']];
+    const items = [['BATTLE', '決闘'], ['TRAINING', '修行'], ['ULTRA DUEL', '光之对决'], ['HOW TO PLAY', '心得']];
     const MP = this.ua.panel, FAN = this.ua.cursor;
     items.forEach((it, i) => {
       const sel = G.titleSel === i;
-      const bx = 322, by = 381 + i * 42, bw = 380, bh = 36;
+      const bx = 322, by = 360 + i * 39, bw = 380, bh = 34;
       if (MP) {
         if (sel) { ctx.save(); ctx.filter = 'brightness(1.5) saturate(1.15)'; }
         this.nine(ctx, MP, bx, by, bw, bh, 0.13);
@@ -895,7 +895,7 @@ const UI = {
           ctx.drawImage(FAN.cv, -(bx + bw + fw + 10), by + bh / 2 - fh / 2, fw, fh);
           ctx.restore();
         } else {
-          this.pixText(ctx, '▶', 352, 407 + i * 42, { size: 16, color: '#ffc531' });
+          this.pixText(ctx, '▶', 352, 384 + i * 39, { size: 16, color: '#ffc531' });
         }
       }
       // EN + JP drawn as one optically centered line, baseline-middle so both
@@ -913,7 +913,7 @@ const UI = {
       });
     });
 
-    this.pixText(ctx, 'W/S SELECT · J OK · M MUTE', 512, 520, { size: 12, align: 'center', color: '#5d6784' });
+    this.pixText(ctx, 'W/S SELECT · J OK · M MUTE', 512, 535, { size: 11, align: 'center', color: '#5d6784' });
     ctx.restore(); // 结束菜单淡入 alpha
   },
 

@@ -17,6 +17,7 @@ const Input = (() => {
     'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyK', 'KeyU', 'KeyI',
     'KeyM', 'KeyH', 'KeyP', 'KeyR', 'KeyT', 'Escape', 'Enter', 'Space',
     'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+    'Numpad1', 'Numpad2', 'Numpad4', 'Numpad5', 'Numpad7', 'Numpad8',
   ]);
 
   window.addEventListener('keydown', (e) => {
