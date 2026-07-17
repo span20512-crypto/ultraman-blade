@@ -94,10 +94,12 @@ const Howto = (() => {
   function row() { return rows[sel]; }
 
   function resetScene() {
-    const other = charId === 'kenji' ? 'mack' : 'kenji';
     A = new Fighter(charId, 380, 1, W);
+    // 木桩 B 用本角色自己的宿敌怪兽皮(rival 侧 -> STILLS[charId].rival) —— 与左侧
+    // 招式图标(icon:monster:charId)、实战对手一致; 泰罗打雷德王 / 赛文打金古乔等。
+    // B 帧数据取 DATA[charId], 全员克隆与基底逐位相同 -> 格挡/破防演示时序不变, 只换皮。
     // 默认 500 = anim-lab 实证的触及间距(连锁窗口才能开); 飞行道具/位移演示用 r.dist 拉远
-    B = new Fighter(other, row().dist || 500, -1, W);
+    B = new Fighter(charId, row().dist || 500, -1, W);
 
     const r = row();
     A.meter = r.meter || 0;
