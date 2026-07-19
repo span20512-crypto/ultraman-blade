@@ -1,16 +1,24 @@
-/* WebAudio synth: all SFX + chiptune BGM are generated, no audio assets. */
+/* WebAudio SFX plus original, locally generated instrumental BGM. */
 'use strict';
 
 const AudioSys = (() => {
   let ctx = null, master = null, sfxBus = null, bgmBus = null, noiseBuf = null;
   let muted = false;
-  // BGM = real instrumental mp3s (Lyria-generated), one per scene, routed through bgmBus.
+  // Original hero-rock / wafuu-tokusatsu suite. Battle cues rotate per match.
   const BGM_SRC = {
-    select: 'assets/audio/bgm/select-3.mp3',  // 丙 幽冷 — 菜单/标题/选人 共用此曲
-    battle: 'assets/audio/bgm/battle-1.mp3',  // 甲 幽玄 (丙 battle-3 = 候补)
-    result: 'assets/audio/bgm/result-1.mp3',  // 结算 = 余韵 LINGERING (Eric 选定)
+    lightRises: 'assets/audio/bgm/original/01-light-rises.wav',
+    steelKiai: 'assets/audio/bgm/original/02-steel-kiai.wav',
+    sevenfoldFlash: 'assets/audio/bgm/original/03-sevenfold-flash.wav',
+    callTheStar: 'assets/audio/bgm/original/04-name-of-the-star.wav',
+    afterglowVow: 'assets/audio/bgm/original/05-afterglow-vow.wav',
   };
-  const bgmTrk = {}, bgmBuf = {}; let curBgm = null, bgmInit = false;
+  const BGM_SCENES = {
+    select: ['lightRises'],
+    battle: ['steelKiai', 'sevenfoldFlash', 'callTheStar'],
+    result: ['afterglowVow'],
+  };
+  const bgmTrk = {}, bgmBuf = {};
+  let curBgm = null, curScene = null, battlePick = -1, bgmInit = false;
 
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return true; }
@@ -203,6 +211,14 @@ const AudioSys = (() => {
   }
 
   function playBgm(name) {
+    if (BGM_SCENES[name]) {
+      if (curScene !== name) {
+        curScene = name;
+        if (name === 'battle') battlePick = (battlePick + 1) % BGM_SCENES.battle.length;
+        curBgm = BGM_SCENES[name][name === 'battle' ? battlePick : 0];
+      }
+      name = curBgm;
+    }
     if (!BGM_SRC[name]) return;
     curBgm = name;
     if (!ctx) return;                     // remembered; ensure() → initBgm() → decode applies it
@@ -212,7 +228,7 @@ const AudioSys = (() => {
   }
 
   function stopBgm() {
-    curBgm = null;
+    curBgm = null; curScene = null;
     if (!ctx) return;
     const now = ctx.currentTime;
     for (const k in bgmTrk) if (bgmTrk[k].src) fadeTo(bgmTrk[k], 0, now);
