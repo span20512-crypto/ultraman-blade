@@ -1,24 +1,16 @@
-/* WebAudio SFX plus original, locally generated instrumental BGM. */
+/* WebAudio synth SFX + single general-purpose instrumental BGM. */
 'use strict';
 
 const AudioSys = (() => {
   let ctx = null, master = null, sfxBus = null, bgmBus = null, noiseBuf = null;
   let muted = false;
-  // Original hero-rock / wafuu-tokusatsu suite. Battle cues rotate per match.
+  // One general BGM for every screen. Keeping one key preserves playback position
+  // across title, select, battle, and result instead of rotating per match.
   const BGM_SRC = {
-    lightRises: 'assets/audio/bgm/original/01-light-rises.wav',
-    steelKiai: 'assets/audio/bgm/original/02-steel-kiai.wav',
-    sevenfoldFlash: 'assets/audio/bgm/original/03-sevenfold-flash.wav',
-    callTheStar: 'assets/audio/bgm/original/04-name-of-the-star.wav',
-    afterglowVow: 'assets/audio/bgm/original/05-afterglow-vow.wav',
-  };
-  const BGM_SCENES = {
-    select: ['lightRises'],
-    battle: ['steelKiai', 'sevenfoldFlash', 'callTheStar'],
-    result: ['afterglowVow'],
+    title: 'assets/audio/bgm/ultraman-hero-theme.mp3',
   };
   const bgmTrk = {}, bgmBuf = {};
-  let curBgm = null, curScene = null, battlePick = -1, bgmInit = false;
+  let curBgm = null, bgmInit = false;
 
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return true; }
@@ -211,14 +203,6 @@ const AudioSys = (() => {
   }
 
   function playBgm(name) {
-    if (BGM_SCENES[name]) {
-      if (curScene !== name) {
-        curScene = name;
-        if (name === 'battle') battlePick = (battlePick + 1) % BGM_SCENES.battle.length;
-        curBgm = BGM_SCENES[name][name === 'battle' ? battlePick : 0];
-      }
-      name = curBgm;
-    }
     if (!BGM_SRC[name]) return;
     curBgm = name;
     if (!ctx) return;                     // remembered; ensure() → initBgm() → decode applies it
@@ -228,7 +212,7 @@ const AudioSys = (() => {
   }
 
   function stopBgm() {
-    curBgm = null; curScene = null;
+    curBgm = null;
     if (!ctx) return;
     const now = ctx.currentTime;
     for (const k in bgmTrk) if (bgmTrk[k].src) fadeTo(bgmTrk[k], 0, now);
