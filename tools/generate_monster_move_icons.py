@@ -9,9 +9,10 @@ from the monster references already committed in assets/img/ultraman-icons.
 from __future__ import annotations
 
 import math
+import sys
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageStat
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +43,18 @@ MOVES = [
 
 
 MONSTERS = {
+    "alien-baltan": {
+        "src": ASSET_DIR / "monster-sources" / "alien-baltan.png",
+        "primary": (63, 218, 255),
+        "secondary": (142, 79, 255),
+        "accent": (255, 210, 67),
+    },
+    "red-king": {
+        "src": ASSET_DIR / "monster-sources" / "red-king.png",
+        "primary": (255, 132, 38),
+        "secondary": (142, 79, 255),
+        "accent": (39, 219, 255),
+    },
     "monster-1": {
         "src": ASSET_DIR / "monster-1.jpg",
         "primary": (255, 101, 38),
@@ -67,7 +80,16 @@ def alpha_crop(img: Image.Image) -> Image.Image:
             return img.crop(bbox)
 
     rgb = img.convert("RGB")
-    white_key = rgb.point(lambda v: 0 if v > 244 else 255).convert("L")
+    corner = max(8, min(img.size) // 20)
+    samples = Image.new("RGB", (corner * 4, corner))
+    samples.paste(rgb.crop((0, 0, corner, corner)), (0, 0))
+    samples.paste(rgb.crop((img.width - corner, 0, img.width, corner)), (corner, 0))
+    samples.paste(rgb.crop((0, img.height - corner, corner, img.height)), (corner * 2, 0))
+    samples.paste(rgb.crop((img.width - corner, img.height - corner, img.width, img.height)), (corner * 3, 0))
+    background = tuple(round(v) for v in ImageStat.Stat(samples).median)
+    bg = Image.new("RGB", rgb.size, background)
+    white_key = ImageChops.difference(rgb, bg).convert("L")
+    white_key = white_key.point(lambda v: 0 if v <= 8 else min(255, (v - 8) * 12))
     white_key = white_key.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(0.7))
     if white_key.getbbox():
         keyed = img.copy()
@@ -269,7 +291,13 @@ def make_monster(slug: str, spec: dict[str, object]) -> None:
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    for slug, spec in MONSTERS.items():
+    requested = sys.argv[1:] or list(MONSTERS)
+    unknown = [slug for slug in requested if slug not in MONSTERS]
+    if unknown:
+        choices = ", ".join(MONSTERS)
+        raise SystemExit(f"Unknown monster(s): {', '.join(unknown)}. Choose from: {choices}")
+    for slug in requested:
+        spec = MONSTERS[slug]
         make_monster(slug, spec)
 
 
