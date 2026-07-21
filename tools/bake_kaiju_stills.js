@@ -11,7 +11,8 @@ const SCRATCH = process.env.SCRATCH || '/tmp';
 const SRC = 'assets/img/ultraman-icons/monster-sources';
 
 const KAIJUS = {
-  baltan:   { src: `${SRC}/alien-baltan-cutout.png`, key: false },
+  // 巴尔坦 2026-07-21 最新高清稿为近白底，旧 cutout 已停用。
+  baltan:   { src: `${SRC}/alien-baltan.png`, key: true, bgLum: 220, bgSat: 12 },
   gomora:   { src: `${SRC}/gomora-cutout.png`,       key: false },
   // 金古乔/雷德王 2026-07-17 换新稿(chibi v2: 金古乔发光黄眼+虹彩胸板 / 雷德王暖棕大眼)。
   // 白底渲染图 -> key:true; 稿子脚下带一圈软投影(中性灰 lum 186~254, 严格近白阈值

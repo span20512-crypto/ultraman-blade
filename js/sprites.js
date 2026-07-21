@@ -61,8 +61,10 @@ const Assets = {
     // 出招姿态变体挂子键 still:hero:mack:light / :special / :super
     if (typeof STILLS !== 'undefined') {
       for (const [cid, sides] of Object.entries(STILLS)) {
-        for (const [side, st] of Object.entries(sides)) {
-          list.push([`still:${side}:${cid}`, st.file]);
+      for (const [side, st] of Object.entries(sides)) {
+          const canVersion = typeof location === 'undefined' || location.protocol !== 'file:';
+          const rev = st.iconRev && canVersion ? `?v=${encodeURIComponent(st.iconRev)}` : '';
+          list.push([`still:${side}:${cid}`, st.file + rev]);
           for (const [mv, m] of Object.entries(st.moves || {})) {
             list.push([`still:${side}:${cid}:${mv}`, m.file]);
           }
