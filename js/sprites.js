@@ -35,12 +35,14 @@ const Assets = {
       'guard', 'crush', 'combo', 'finisher',
     ];
     // 图鉴 tab 头像 + 招式图标: 全名册按各自 rival 怪兽取(data.js RIVAL_OF 指派,
-    // 8 套 monster-moves 图标组同名规则)
+    // 8 套 monster-moves 图标组同名规则)。iconRev 只用于换新稿的怪兽,
+    // 强制浏览器/CDN 丢弃同路径旧缓存, 避免代码已更新但仍显示旧图。
     for (const cid of ROSTER) {
       const rv = STILLS[cid].rival;
-      list.push([`icon:monster:${cid}`, rv.tab]);
+      const rev = rv.iconRev ? `?v=${encodeURIComponent(rv.iconRev)}` : '';
+      list.push([`icon:monster:${cid}`, rv.tab + rev]);
       for (const move of monsterMoveIcons) {
-        list.push([`icon:monster:${cid}:${move}`, `assets/img/ultraman-icons/monster-moves/${rv.icon}-${move}.webp`]);
+        list.push([`icon:monster:${cid}:${move}`, `assets/img/ultraman-icons/monster-moves/${rv.icon}-${move}.webp${rev}`]);
       }
     }
     for (const cid of Object.keys(DATA)) {
