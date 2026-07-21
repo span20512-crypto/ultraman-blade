@@ -663,7 +663,11 @@ function applyUrlParams() {
 }
 
 function desiredBgm() {
-  return 'title'; // 英雄主题贯穿全游戏(同键 = 跨屏无缝续播); 分场景配乐时在此按 G.screen 分支
+  // 分场景配乐(2026-07: 原创五曲): 对战=battle(每场轮换 3 曲), 结算=result,
+  // 其余(标题/选人/操作/光之对决菜单)=select(light-rises 作通用主题)。
+  if (G.screen === 'fight') return 'battle';
+  if (G.screen === 'result') return 'result';
+  return 'select';
 }
 
 let firstInput = false; // 起始页「按任意键」: 首次用户手势(键/点/触)置真

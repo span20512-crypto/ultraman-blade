@@ -1,17 +1,24 @@
-/* WebAudio synth SFX + licensed/generated MP3 background music. */
+/* WebAudio SFX plus original, locally generated instrumental BGM. */
 'use strict';
 
 const AudioSys = (() => {
   let ctx = null, master = null, sfxBus = null, bgmBus = null, noiseBuf = null;
   let muted = false;
-  // BGM = real instrumental MP3s routed through bgmBus.
-  // 2026-07-14: 英雄主题 = 全游戏唯一 BGM(标题/选人/对战/结算同键 → 全程无缝
-  // 续播不重头); 旧和风曲(select-*/battle-*/title-*/result-*)留在 assets 作
-  // 候补, 不再注册 —— 注册即启动预取, 每首多拉 1-4MB
+  // Original hero-rock / wafuu-tokusatsu suite. Battle cues rotate per match.
   const BGM_SRC = {
-    title: 'assets/audio/bgm/ultraman-hero-theme.mp3', // 英雄摇滚主题 — 全场景
+    lightRises: 'assets/audio/bgm/original/01-light-rises.wav',
+    steelKiai: 'assets/audio/bgm/original/02-steel-kiai.wav',
+    sevenfoldFlash: 'assets/audio/bgm/original/03-sevenfold-flash.wav',
+    callTheStar: 'assets/audio/bgm/original/04-name-of-the-star.wav',
+    afterglowVow: 'assets/audio/bgm/original/05-afterglow-vow.wav',
   };
-  const bgmTrk = {}, bgmBuf = {}; let curBgm = null, bgmInit = false;
+  const BGM_SCENES = {
+    select: ['lightRises'],
+    battle: ['steelKiai', 'sevenfoldFlash', 'callTheStar'],
+    result: ['afterglowVow'],
+  };
+  const bgmTrk = {}, bgmBuf = {};
+  let curBgm = null, curScene = null, battlePick = -1, bgmInit = false;
 
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return true; }
@@ -204,6 +211,14 @@ const AudioSys = (() => {
   }
 
   function playBgm(name) {
+    if (BGM_SCENES[name]) {
+      if (curScene !== name) {
+        curScene = name;
+        if (name === 'battle') battlePick = (battlePick + 1) % BGM_SCENES.battle.length;
+        curBgm = BGM_SCENES[name][name === 'battle' ? battlePick : 0];
+      }
+      name = curBgm;
+    }
     if (!BGM_SRC[name]) return;
     curBgm = name;
     if (!ctx) return;                     // remembered; ensure() → initBgm() → decode applies it
@@ -213,7 +228,7 @@ const AudioSys = (() => {
   }
 
   function stopBgm() {
-    curBgm = null;
+    curBgm = null; curScene = null;
     if (!ctx) return;
     const now = ctx.currentTime;
     for (const k in bgmTrk) if (bgmTrk[k].src) fadeTo(bgmTrk[k], 0, now);
