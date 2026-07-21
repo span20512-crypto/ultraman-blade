@@ -39,7 +39,10 @@ const Assets = {
     // 强制浏览器/CDN 丢弃同路径旧缓存, 避免代码已更新但仍显示旧图。
     for (const cid of ROSTER) {
       const rv = STILLS[cid].rival;
-      const rev = rv.iconRev ? `?v=${encodeURIComponent(rv.iconRev)}` : '';
+      // file:// 页面没有真正的同源服务器; 查询参数会让 Chrome 把图片视为
+      // 跨源资源并污染 Canvas。开发/发布经 HTTP 时才追加版本号。
+      const canVersion = typeof location === 'undefined' || location.protocol !== 'file:';
+      const rev = rv.iconRev && canVersion ? `?v=${encodeURIComponent(rv.iconRev)}` : '';
       list.push([`icon:monster:${cid}`, rv.tab + rev]);
       for (const move of monsterMoveIcons) {
         list.push([`icon:monster:${cid}:${move}`, `assets/img/ultraman-icons/monster-moves/${rv.icon}-${move}.webp${rev}`]);
