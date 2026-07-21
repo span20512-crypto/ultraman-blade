@@ -36,7 +36,7 @@ const KAIJUS = {
     icon: 'alien-baltan', iconRev: '20260721c', tab: 'assets/img/ultraman-icons/monster-moves/alien-baltan-portrait.webp',
     name: 'BALTAN', cn: '巴尔坦星人', quote: 'FO FO FO FO...!!' },
   gomora:   { file: 'assets/img/still/kaiju-gomora.png', native: -1, art: 'gomora',
-    icon: 'gomora', tab: 'assets/img/ultraman-icons/monster-moves/gomora-portrait.webp',
+    icon: 'gomora', iconRev: '20260721d', tab: 'assets/img/ultraman-icons/monster-moves/gomora-portrait.webp',
     name: 'GOMORA', cn: '哥莫拉', quote: 'GUOOOAAAR...!!' },
   kingjoe:  { file: 'assets/img/still/kaiju-kingjoe.png', native: -1, art: 'kingjoe',
     icon: 'king-joe', tab: 'assets/img/ultraman-icons/monster-moves/king-joe-portrait.webp',

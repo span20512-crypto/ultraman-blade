@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the complete approved icon sets for Baltan and Red King."""
+"""Verify the complete approved icon sets for Baltan, Red King, and Gomora."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ MOVES = (
     "airlight", "dive", "special", "super",
     "guard", "crush", "combo", "finisher",
 )
-MONSTERS = ("alien-baltan", "red-king")
+MONSTERS = ("alien-baltan", "red-king", "gomora")
 
 
 def main() -> None:
@@ -38,7 +38,7 @@ def main() -> None:
 
     if failures:
         raise SystemExit("\n".join(failures))
-    print(f"verified {len(hashes)} unique WebP icons for Baltan and Red King")
+    print(f"verified {len(hashes)} unique WebP icons for Baltan, Red King, and Gomora")
 
 
 if __name__ == "__main__":

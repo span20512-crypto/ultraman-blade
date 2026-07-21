@@ -55,6 +55,12 @@ MONSTERS = {
         "secondary": (142, 79, 255),
         "accent": (39, 219, 255),
     },
+    "gomora": {
+        "src": ASSET_DIR / "monster-sources" / "gomora.png",
+        "primary": (203, 126, 62),
+        "secondary": (142, 79, 255),
+        "accent": (39, 219, 255),
+    },
     "monster-1": {
         "src": ASSET_DIR / "monster-1.jpg",
         "primary": (255, 101, 38),

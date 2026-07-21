@@ -169,7 +169,7 @@ const UI = {
     // 怪兽(2026-07-16 扩编): k: 改按 KAIJUS art 键(不再按英雄 cid), 老两只
     // 沿用手调值, 新六只 = tools/bake_kaiju_stills.js 顶部锚定取景输出
     'k:unicorn': { x: -3.2, y: 2.2, w: 93.1 }, 'k:birdon': { x: -13.8, y: 1.6, w: 117.7 },
-    'k:baltan': { x: -3, y: 0.2, w: 93.7 }, 'k:gomora': { x: -1, y: 0.8, w: 93.1 },
+    'k:baltan': { x: -3, y: 0.2, w: 93.7 }, 'k:gomora': { x: -5.5, y: 0.8, w: 93.1 },
     'k:kingjoe': { x: -1.5, y: 1.1, w: 93.4 }, 'k:redking': { x: -0.4, y: 1.1, w: 92.8 },
     'k:fiveking': { x: -5.2, y: -21.3, w: 97 }, 'k:orochi': { x: -5.5, y: 1.1, w: 92.8 },
   },
@@ -1377,7 +1377,7 @@ const UI = {
       kaijuunicorn:  () => this._loadImg('portrait-kaiju-mack-sel.png'),
       kaijubirdon:   () => this._loadImg('portrait-kaiju-kenji-sel.png'),
       kaijubaltan:   () => this._loadImg('portrait-kaiju-baltan-sel.png', '20260721c'),
-      kaijugomora:   () => this._loadImg('portrait-kaiju-gomora-sel.png'),
+      kaijugomora:   () => this._loadImg('portrait-kaiju-gomora-sel.png', '20260721d'),
       kaijukingjoe:  () => this._loadImg('portrait-kaiju-kingjoe-sel.png'),
       kaijuredking:  () => this._loadImg('portrait-kaiju-redking-sel.png', '20260721c'),
       kaijufiveking: () => this._loadImg('portrait-kaiju-fiveking-sel.png'),
