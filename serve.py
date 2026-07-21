@@ -21,7 +21,10 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(('', PORT), NoCacheHandler) as httpd:
+    # A browser may keep one asset connection open; the single-threaded server
+    # would then stop accepting every other request and appear to be offline.
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    socketserver.ThreadingTCPServer.daemon_threads = True
+    with socketserver.ThreadingTCPServer(('', PORT), NoCacheHandler) as httpd:
         print(f'SOUL BLADE dev server: http://localhost:{PORT}')
         httpd.serve_forever()
