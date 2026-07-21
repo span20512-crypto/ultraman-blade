@@ -13,10 +13,14 @@ const SRC = 'assets/img/ultraman-icons/monster-sources';
 const KAIJUS = {
   baltan:   { src: `${SRC}/alien-baltan-cutout.png`, key: false },
   gomora:   { src: `${SRC}/gomora-cutout.png`,       key: false },
-  kingjoe:  { src: `${SRC}/king-joe-cutout.png`,     key: false },
-  redking:  { src: `${SRC}/red-king-cutout.png`,     key: false },
-  fiveking: { src: `${SRC}/five-king.png`,           key: true },
-  orochi:   { src: `${SRC}/maga-orochi.png`,         key: true },
+  // 金古乔/雷德王 2026-07-17 换新稿(chibi v2: 金古乔发光黄眼+虹彩胸板 / 雷德王暖棕大眼)。
+  // 白底渲染图 -> key:true; 稿子脚下带一圈软投影(中性灰 lum 186~254, 严格近白阈值
+  // 吃不掉 -> 烘出来脚底一坨白斑), 故放宽为 bgLum/bgSat 的"中性且够亮"判定。
+  // 五帝王/玛迦大蛇不加该旗标: 它们纯白底无投影, 且刃/角是浅银色(中性), 放宽会啃边。
+  kingjoe:  { src: `${SRC}/king-joe.png`,  key: true, bgLum: 170, bgSat: 10 },
+  redking:  { src: `${SRC}/red-king.png`,  key: true, bgLum: 170, bgSat: 10 },
+  fiveking: { src: `${SRC}/five-king.png`,            key: true },
+  orochi:   { src: `${SRC}/maga-orochi.png`,          key: true },
 };
 
 async function loadRaw(f) {
@@ -24,10 +28,20 @@ async function loadRaw(f) {
   return { data: Buffer.from(data), w: info.width, h: info.height };
 }
 
-/* 白底抠图: 从边界像素 BFS 近白(各通道>=238)连通域置透明 + 2px 软边 */
-function keyWhite(img) {
+/* 白底抠图: 从边界像素 BFS 背景连通域置透明 + 2px 软边。
+   缺省判定 = 近白(各通道>=238)。opt.bgLum/bgSat 给"带软投影"的稿子用: 背景判定
+   放宽成"中性(max-min<=bgSat)且够亮(max>=bgLum)" —— 投影是中性灰而怪兽本体有
+   色相(实测 sat 34~108), 故不误伤; 又因只吃边界连通域, 图内包在本体里的银色部件
+   BFS 到不了, 同样安全。 */
+function keyWhite(img, opt = {}) {
   const { data, w, h } = img, N = w * h;
-  const isWhite = (i) => data[i * 4] >= 238 && data[i * 4 + 1] >= 238 && data[i * 4 + 2] >= 238;
+  const isWhite = opt.bgLum
+    ? (i) => {
+        const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        return mx >= opt.bgLum && (mx - mn) <= opt.bgSat;
+      }
+    : (i) => data[i * 4] >= 238 && data[i * 4 + 1] >= 238 && data[i * 4 + 2] >= 238;
   const mask = new Uint8Array(N);
   const queue = [];
   for (let x = 0; x < w; x++) for (const y of [0, h - 1]) {
@@ -144,7 +158,7 @@ function hudCrop(pr) {
   const crops = {}, cells = [];
   for (const [id, cfg] of Object.entries(KAIJUS)) {
     const img = await loadRaw(cfg.src);
-    if (cfg.key) keyWhite(img);
+    if (cfg.key) keyWhite(img, cfg);
     largestComponent(img);
     const bb = bbox(img);
 
